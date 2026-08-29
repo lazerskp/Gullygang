@@ -3591,8 +3591,9 @@
     document.body.classList.toggle('is-stage-hidden', nextHidden);
     if (btn) {
       btn.setAttribute('aria-pressed', nextHidden ? 'true' : 'false');
+      btn.setAttribute('aria-label', nextHidden ? 'Show weather and player' : 'Hide weather and player');
       btn.classList.toggle('is-active', nextHidden);
-      btn.title = nextHidden ? 'Show Music Cards & Playlist (H)' : 'Hide Music Cards & Playlist (H)';
+      btn.title = nextHidden ? 'Show Weather & Player (H)' : 'Hide Weather & Player (H)';
       if (eyeOpen && eyeClosed) {
         eyeOpen.classList.toggle('hidden', nextHidden);
         eyeClosed.classList.toggle('hidden', !nextHidden);
