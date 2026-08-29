@@ -1688,20 +1688,49 @@
     // Trigger Dynamic Artwork Background Update on song change
     updateDynamicArtworkBackground(curTrack);
 
-    if ('mediaSession' in navigator) {
-      try {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: curTrack.title,
-          artist: curTrack.artist,
-          album: 'GULLYGANG — Music That Feels Different',
-          artwork: [
-            { src: artworkUrl, sizes: '320x180', type: 'image/jpeg' },
-            { src: `https://i.ytimg.com/vi/${curTrack.id}/hqdefault.jpg`, sizes: '480x360', type: 'image/jpeg' }
-          ]
-        });
-        navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
-      } catch (e) {}
+    // Synchronize OS-level Lock Screen & Notification Center MediaSession
+    updateMediaSessionMetadata(curTrack);
+  }
+
+  function updateMediaSessionMetadata(track) {
+    if (!('mediaSession' in navigator) || !track) return;
+    try {
+      const artworkUrl = getTrackArtworkUrl(track);
+      const ytId = track.id || track.youtubeId || track.youtube_id;
+      const artworkList = [];
+      if (artworkUrl) {
+        artworkList.push({ src: artworkUrl, sizes: '512x512', type: 'image/jpeg' });
+      }
+      if (ytId) {
+        artworkList.push({ src: `https://i.ytimg.com/vi/${ytId}/maxresdefault.jpg`, sizes: '1280x720', type: 'image/jpeg' });
+        artworkList.push({ src: `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`, sizes: '480x360', type: 'image/jpeg' });
+        artworkList.push({ src: `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`, sizes: '320x180', type: 'image/jpeg' });
+      }
+      artworkList.push({ src: 'romantic.png', sizes: '512x512', type: 'image/png' });
+
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title || 'Untitled Track',
+        artist: track.artist || 'GULLYGANG',
+        album: state.currentPlaylist?.name ? `GULLYGANG — ${state.currentPlaylist.name}` : 'GULLYGANG',
+        artwork: artworkList
+      });
+      navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
+    } catch (e) {
+      console.warn('[MediaSession] Metadata update error:', e);
     }
+  }
+
+  function updateMediaSessionPosition(position, duration) {
+    if (!('mediaSession' in navigator) || typeof navigator.mediaSession.setPositionState !== 'function') return;
+    try {
+      if (typeof duration === 'number' && duration > 0 && typeof position === 'number' && position >= 0 && position <= duration) {
+        navigator.mediaSession.setPositionState({
+          duration: duration,
+          playbackRate: 1,
+          position: position
+        });
+      }
+    } catch (e) {}
   }
 
   function setPlayState(playing) {
@@ -1711,6 +1740,12 @@
     if (DOM.playIcon) DOM.playIcon.innerHTML = playing ? pauseSvg : playSvg;
     const playIconMob = document.getElementById('play-icon-mobile');
     if (playIconMob) playIconMob.innerHTML = playing ? pauseSvg : playSvg;
+
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+      } catch (e) {}
+    }
 
     if (window.WeatherEffects) {
       window.WeatherEffects.setMusicPlaying(playing);
@@ -1911,6 +1946,7 @@
         if (DOM.dockCurrentTime) DOM.dockCurrentTime.textContent = formatTime(cur);
         if (DOM.dockDuration) DOM.dockDuration.textContent = `- ${formatTime(Math.max(0, dur - cur))}`;
         if (DOM.dockTimeCombined) DOM.dockTimeCombined.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+        updateMediaSessionPosition(cur, dur);
       } else {
         // Duration pending / initializing — don't freeze at 0:00 / 0:00
         if (DOM.dockFill) DOM.dockFill.style.width = '0%';
@@ -1918,6 +1954,29 @@
         if (DOM.dockDuration) DOM.dockDuration.textContent = '--:--';
         if (DOM.dockTimeCombined) DOM.dockTimeCombined.textContent = `${formatTime(cur)} / --:--`;
       }
+    } catch (e) {}
+  }
+
+  function seekToTime(targetSeconds) {
+    if (!state.isPlayerReady || !state.ytPlayer) return;
+    try {
+      const dur = typeof state.ytPlayer.getDuration === 'function' ? state.ytPlayer.getDuration() : 0;
+      const safeTarget = Math.max(0, Math.min(dur || targetSeconds, targetSeconds));
+      if (typeof state.ytPlayer.seekTo === 'function') {
+        state.ytPlayer.seekTo(safeTarget, true);
+        if (dur > 0 && DOM.dockFill) {
+          DOM.dockFill.style.width = `${(safeTarget / dur) * 100}%`;
+        }
+        updateMediaSessionPosition(safeTarget, dur);
+      }
+    } catch (e) {}
+  }
+
+  function seekBy(deltaSeconds) {
+    if (!state.isPlayerReady || !state.ytPlayer) return;
+    try {
+      const cur = typeof state.ytPlayer.getCurrentTime === 'function' ? state.ytPlayer.getCurrentTime() : 0;
+      seekToTime(cur + deltaSeconds);
     } catch (e) {}
   }
 
@@ -1954,8 +2013,7 @@
 
     if (dur > 0) {
       const targetSec = dur * pct;
-      state.ytPlayer.seekTo(targetSec, true);
-      if (DOM.dockFill) DOM.dockFill.style.width = `${pct * 100}%`;
+      seekToTime(targetSec);
     }
   }
 
@@ -2923,12 +2981,22 @@
     });
 
     if ('mediaSession' in navigator) {
-      try {
-        navigator.mediaSession.setActionHandler('play', togglePlay);
-        navigator.mediaSession.setActionHandler('pause', togglePlay);
-        navigator.mediaSession.setActionHandler('nexttrack', () => playNext(1));
-        navigator.mediaSession.setActionHandler('previoustrack', () => playPrev(1));
-      } catch (e) {}
+      const mediaActions = [
+        ['play', () => { if (!state.isPlaying) togglePlay(); }],
+        ['pause', () => { if (state.isPlaying) togglePlay(); }],
+        ['nexttrack', () => playNext(1, true)],
+        ['previoustrack', () => playPrev(1, true)],
+        ['seekbackward', (details) => seekBy(-(details.seekOffset || 10))],
+        ['seekforward', (details) => seekBy(details.seekOffset || 10)],
+        ['seekto', (details) => { if (details.seekTime !== undefined) seekToTime(details.seekTime); }],
+        ['stop', () => { if (state.isPlaying) togglePlay(); }]
+      ];
+
+      for (const [action, handler] of mediaActions) {
+        try {
+          navigator.mediaSession.setActionHandler(action, handler);
+        } catch (e) {}
+      }
     }
   }
 
