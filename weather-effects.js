@@ -1,6 +1,7 @@
 /**
  * GULLYGANG — Atmospheric Weather Effects Engine
  * Hyper-realistic 4K Cinematic Rain & Snow simulation with motion-blur gradients,
+ * multi-layered crystalline snowflake physics, 3D tumbling rotation, aerodynamic harmonic sway,
  * ground ripple physics, dynamic wind turbulence, and ultra-smooth 60fps rendering.
  */
 
@@ -31,7 +32,7 @@
   let isTabActive = true;
   let prefersReducedMotion = false;
 
-  // Particle pools
+  // Particle pools (pre-allocated to avoid GC churn)
   let rainDrops = [];
   let rainSplashes = [];
   let rainRipples = [];
@@ -42,100 +43,198 @@
   let lightningAlpha = 0;
   let lightningStep = 0;
 
-  // Pre-rendered offscreen sprite cache for 60fps snow rendering
+  // Pre-rendered offscreen sprite cache for 60fps realistic snow rendering
   let snowSprites = [];
 
-  // --- Initialize Snow Sprites ---
+  // --- Initialize Realistic Snow Crystal Sprites ---
   function initSnowSprites() {
     snowSprites = [];
 
     function makeSprite(size, drawFn) {
       const offCanvas = document.createElement('canvas');
-      offCanvas.width = size * 2;
-      offCanvas.height = size * 2;
+      const s = Math.ceil(size * 2);
+      offCanvas.width = s;
+      offCanvas.height = s;
       const offCtx = offCanvas.getContext('2d');
-      drawFn(offCtx, size);
+      offCtx.imageSmoothingEnabled = true;
+      drawFn(offCtx, size, size);
       return offCanvas;
     }
 
-    // Tier 0: Tiny dust
-    snowSprites[0] = makeSprite(8, (c, s) => {
-      const grad = c.createRadialGradient(s, s, 0, s, s, s);
+    // Sprite 0: Micro atmospheric dust motes (ultra-distant background)
+    snowSprites[0] = makeSprite(6, (c, cx, cy) => {
+      const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 5);
       grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      grad.addColorStop(0.5, 'rgba(235, 245, 255, 0.8)');
+      grad.addColorStop(0.5, 'rgba(235, 245, 255, 0.7)');
       grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
       c.fillStyle = grad;
       c.beginPath();
-      c.arc(s, s, s, 0, Math.PI * 2);
+      c.arc(cx, cy, 5, 0, Math.PI * 2);
       c.fill();
     });
 
-    // Tier 1: Midground crisp flake
-    snowSprites[1] = makeSprite(16, (c, s) => {
-      const grad = c.createRadialGradient(s, s, 0, s, s, s);
+    // Sprite 1: Background soft circular flake with subtle outer aura
+    snowSprites[1] = makeSprite(12, (c, cx, cy) => {
+      const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 10);
       grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      grad.addColorStop(0.4, 'rgba(240, 248, 255, 0.88)');
-      grad.addColorStop(0.75, 'rgba(210, 235, 255, 0.35)');
+      grad.addColorStop(0.45, 'rgba(240, 248, 255, 0.85)');
+      grad.addColorStop(0.8, 'rgba(215, 238, 255, 0.3)');
       grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
       c.fillStyle = grad;
       c.beginPath();
-      c.arc(s, s, s, 0, Math.PI * 2);
+      c.arc(cx, cy, 10, 0, Math.PI * 2);
       c.fill();
     });
 
-    // Tier 2: Foreground luminous flake
-    snowSprites[2] = makeSprite(32, (c, s) => {
-      const grad = c.createRadialGradient(s, s, 0, s, s, s);
-      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      grad.addColorStop(0.28, 'rgba(250, 252, 255, 0.94)');
-      grad.addColorStop(0.6, 'rgba(205, 235, 255, 0.45)');
-      grad.addColorStop(0.88, 'rgba(185, 220, 255, 0.15)');
+    // Sprite 2: Midground 6-pointed crystalline star snowflake
+    snowSprites[2] = makeSprite(20, (c, cx, cy) => {
+      // Soft radial bloom underlay
+      const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 16);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      grad.addColorStop(0.35, 'rgba(240, 248, 255, 0.6)');
+      grad.addColorStop(0.75, 'rgba(220, 240, 255, 0.2)');
       grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
       c.fillStyle = grad;
       c.beginPath();
-      c.arc(s, s, s, 0, Math.PI * 2);
+      c.arc(cx, cy, 16, 0, Math.PI * 2);
+      c.fill();
+
+      // Sharp crystalline 6-arm geometry
+      c.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+      c.lineWidth = 1.4;
+      c.lineCap = 'round';
+      const armLen = 14;
+      for (let i = 0; i < 6; i++) {
+        const angle = (i * Math.PI) / 3;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        c.beginPath();
+        c.moveTo(cx, cy);
+        c.lineTo(cx + cos * armLen, cy + sin * armLen);
+        c.stroke();
+
+        // Sub-branch v-prongs
+        const branchDist = armLen * 0.6;
+        const bx = cx + cos * branchDist;
+        const by = cy + sin * branchDist;
+        const bAngle1 = angle + Math.PI / 4;
+        const bAngle2 = angle - Math.PI / 4;
+        const bLen = 4;
+        c.beginPath();
+        c.moveTo(bx, by);
+        c.lineTo(bx + Math.cos(bAngle1) * bLen, by + Math.sin(bAngle1) * bLen);
+        c.moveTo(bx, by);
+        c.lineTo(bx + Math.cos(bAngle2) * bLen, by + Math.sin(bAngle2) * bLen);
+        c.stroke();
+      }
+      // Center nucleus
+      c.fillStyle = '#ffffff';
+      c.beginPath();
+      c.arc(cx, cy, 2.2, 0, Math.PI * 2);
       c.fill();
     });
 
-    // Tier 3: Cinematic Camera Bokeh Orb
-    snowSprites[3] = makeSprite(64, (c, s) => {
-      const grad = c.createRadialGradient(s, s, 0, s, s, s);
-      grad.addColorStop(0, 'rgba(255, 255, 255, 0.38)');
-      grad.addColorStop(0.35, 'rgba(235, 245, 255, 0.25)');
-      grad.addColorStop(0.7, 'rgba(205, 230, 255, 0.1)');
-      grad.addColorStop(0.95, 'rgba(180, 215, 255, 0.02)');
+    // Sprite 3: Foreground intricate dendritic snow crystal
+    snowSprites[3] = makeSprite(36, (c, cx, cy) => {
+      // Atmospheric bloom glow
+      const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 32);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+      grad.addColorStop(0.3, 'rgba(240, 250, 255, 0.6)');
+      grad.addColorStop(0.7, 'rgba(210, 235, 255, 0.18)');
       grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
       c.fillStyle = grad;
       c.beginPath();
-      c.arc(s, s, s, 0, Math.PI * 2);
+      c.arc(cx, cy, 32, 0, Math.PI * 2);
+      c.fill();
+
+      // Intricate 6-arm crystal structure
+      c.strokeStyle = 'rgba(255, 255, 255, 0.98)';
+      c.lineWidth = 1.8;
+      c.lineCap = 'round';
+      const armLen = 28;
+
+      for (let i = 0; i < 6; i++) {
+        const angle = (i * Math.PI) / 3;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        // Main arm
+        c.beginPath();
+        c.moveTo(cx, cy);
+        c.lineTo(cx + cos * armLen, cy + sin * armLen);
+        c.stroke();
+
+        // 2 tiers of chevron branches
+        [0.45, 0.75].forEach((ratio, idx) => {
+          const bDist = armLen * ratio;
+          const bx = cx + cos * bDist;
+          const by = cy + sin * bDist;
+          const bLen = idx === 0 ? 8 : 6;
+          const bAngle1 = angle + Math.PI / 3.5;
+          const bAngle2 = angle - Math.PI / 3.5;
+
+          c.beginPath();
+          c.moveTo(bx, by);
+          c.lineTo(bx + Math.cos(bAngle1) * bLen, by + Math.sin(bAngle1) * bLen);
+          c.moveTo(bx, by);
+          c.lineTo(bx + Math.cos(bAngle2) * bLen, by + Math.sin(bAngle2) * bLen);
+          c.stroke();
+        });
+      }
+
+      // Central hexagonal crystal plate
+      c.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      c.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (i * Math.PI) / 3;
+        const hx = cx + Math.cos(angle) * 4;
+        const hy = cy + Math.sin(angle) * 4;
+        if (i === 0) c.moveTo(hx, hy);
+        else c.lineTo(hx, hy);
+      }
+      c.closePath();
+      c.fill();
+    });
+
+    // Sprite 4: Lens Bokeh orb (ultra close out-of-focus foreground)
+    snowSprites[4] = makeSprite(64, (c, cx, cy) => {
+      const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 58);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.32)');
+      grad.addColorStop(0.35, 'rgba(235, 245, 255, 0.22)');
+      grad.addColorStop(0.7, 'rgba(205, 230, 255, 0.09)');
+      grad.addColorStop(0.92, 'rgba(180, 215, 255, 0.02)');
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      c.fillStyle = grad;
+      c.beginPath();
+      c.arc(cx, cy, 58, 0, Math.PI * 2);
       c.fill();
     });
   }
 
   // --- Rain Splash Sparks & Water Rings ---
   function createRainImpact(x, y) {
-    if (rainRipples.length < 15 && Math.random() < 0.4) {
+    if (rainRipples.length < 16 && Math.random() < 0.45) {
       rainRipples.push({
         x,
         y,
         radius: 1.5,
-        maxRadius: 8 + Math.random() * 8,
-        growth: 0.45 + Math.random() * 0.3,
-        alpha: 0.5,
+        maxRadius: 8 + Math.random() * 9,
+        growth: 0.45 + Math.random() * 0.35,
+        alpha: 0.55,
         decay: 0.035
       });
     }
 
-    if (rainSplashes.length < 20) {
+    if (rainSplashes.length < 22) {
       const angle = Math.PI + (Math.random() - 0.5) * 1.5;
-      const speed = 1.8 + Math.random() * 2.5;
+      const speed = 1.8 + Math.random() * 2.8;
       rainSplashes.push({
         x,
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         radius: 0.6 + Math.random() * 0.6,
-        alpha: 0.6,
+        alpha: 0.65,
         decay: 0.05
       });
     }
@@ -146,24 +245,27 @@
     const r = Math.random();
     let layer, speed, length, thickness, opacity;
 
-    if (r < 0.52) {
+    if (r < 0.50) {
+      // Layer 0: Background fine drizzle
       layer = 0;
       speed = 18 + Math.random() * 12;
-      length = 16 + Math.random() * 14;
+      length = 16 + Math.random() * 16;
       thickness = 0.9;
       opacity = 0.22 + Math.random() * 0.18;
-    } else if (r < 0.85) {
+    } else if (r < 0.84) {
+      // Layer 1: Midground raindrops
       layer = 1;
       speed = 28 + Math.random() * 16;
-      length = 28 + Math.random() * 20;
+      length = 28 + Math.random() * 22;
       thickness = 1.3;
-      opacity = 0.50 + Math.random() * 0.25;
+      opacity = 0.52 + Math.random() * 0.24;
     } else {
+      // Layer 2: Foreground prominent rain streaks
       layer = 2;
-      speed = (isMobile ? 36 : 42) + Math.random() * 18;
-      length = (isMobile ? 40 : 54) + Math.random() * 32;
+      speed = (isMobile ? 36 : 44) + Math.random() * 18;
+      length = (isMobile ? 42 : 56) + Math.random() * 32;
       thickness = 1.8;
-      opacity = 0.78 + Math.random() * 0.22;
+      opacity = 0.80 + Math.random() * 0.20;
     }
 
     drop.x = Math.random() * (width + 160) - 80;
@@ -173,7 +275,6 @@
     drop.thickness = thickness;
     drop.opacity = opacity;
     drop.layer = layer;
-    drop.swayOffset = Math.random() * Math.PI * 2;
     return drop;
   }
 
@@ -183,50 +284,72 @@
   }
 
   function resetSnowflake(flake, randomY = true) {
-    const isMobile = width < 768;
+    const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
     const r = Math.random();
-    let layer, radius, speed, opacity, spriteIdx;
+    let layer, radius, speed, opacity, spriteIdx, rotatable;
 
-    if (r < 0.42) {
+    if (r < 0.35) {
+      // Layer 0: Distant micro dust motes
       layer = 0;
       radius = 0.8 + Math.random() * 1.0;
-      speed = 0.35 + Math.random() * 0.45;
-      opacity = 0.25 + Math.random() * 0.25;
+      speed = 0.28 + Math.random() * 0.35;
+      opacity = 0.20 + Math.random() * 0.25;
       spriteIdx = 0;
-    } else if (r < 0.76) {
+      rotatable = false;
+    } else if (r < 0.68) {
+      // Layer 1: Background soft flakes
       layer = 1;
-      radius = 1.8 + Math.random() * 1.6;
-      speed = 0.75 + Math.random() * 0.75;
-      opacity = 0.55 + Math.random() * 0.3;
+      radius = 1.6 + Math.random() * 1.6;
+      speed = 0.55 + Math.random() * 0.55;
+      opacity = 0.45 + Math.random() * 0.30;
       spriteIdx = 1;
-    } else if (r < 0.92) {
+      rotatable = false;
+    } else if (r < 0.88) {
+      // Layer 2: Midground crisp 6-point stellar crystals
       layer = 2;
-      radius = 3.8 + Math.random() * 3.2;
-      speed = 1.5 + Math.random() * 1.0;
-      opacity = 0.75 + Math.random() * 0.22;
+      radius = 3.2 + Math.random() * 2.8;
+      speed = 0.95 + Math.random() * 0.85;
+      opacity = 0.70 + Math.random() * 0.25;
       spriteIdx = 2;
-    } else {
+      rotatable = true;
+    } else if (r < 0.96) {
+      // Layer 3: Foreground prominent dendritic snow crystals
       layer = 3;
-      radius = (isMobile ? 8 : 12) + Math.random() * (isMobile ? 8 : 14);
-      speed = 2.2 + Math.random() * 1.6;
-      opacity = 0.1 + Math.random() * 0.14;
+      radius = 5.8 + Math.random() * 4.2;
+      speed = 1.6 + Math.random() * 1.1;
+      opacity = 0.82 + Math.random() * 0.18;
       spriteIdx = 3;
+      rotatable = true;
+    } else {
+      // Layer 4: Cinematic Camera Bokeh Orb
+      layer = 4;
+      radius = (isMobile ? 12 : 18) + Math.random() * (isMobile ? 10 : 18);
+      speed = 2.0 + Math.random() * 1.4;
+      opacity = 0.06 + Math.random() * 0.08;
+      spriteIdx = 4;
+      rotatable = false;
     }
 
-    flake.x = Math.random() * (width + 120) - 60;
-    flake.y = randomY ? Math.random() * height : -radius * 2.5 - Math.random() * 40;
+    flake.x = Math.random() * (width + 160) - 80;
+    flake.y = randomY ? Math.random() * height : -radius * 3 - Math.random() * 60;
     flake.radius = radius;
     flake.speed = speed;
     flake.opacity = opacity;
     flake.layer = layer;
     flake.spriteIdx = spriteIdx;
-    flake.swayOffset = Math.random() * Math.PI * 2;
-    flake.swaySpeed1 = 0.0014 + Math.random() * 0.0016;
-    flake.swaySpeed2 = 0.0008 + Math.random() * 0.0012;
-    flake.swayAmp = 0.8 + Math.random() * 1.8;
-    flake.windDrift = 0.18 + Math.random() * 0.25;
+    flake.rotatable = rotatable;
+    flake.rot = Math.random() * Math.PI * 2;
+    flake.rotSpeed = (Math.random() - 0.5) * (0.015 + Math.random() * 0.025);
+    flake.swayOffset1 = Math.random() * Math.PI * 2;
+    flake.swayOffset2 = Math.random() * Math.PI * 2;
+    flake.swayOffset3 = Math.random() * Math.PI * 2;
+    flake.swaySpeed1 = 0.0012 + Math.random() * 0.0018;
+    flake.swaySpeed2 = 0.0007 + Math.random() * 0.0011;
+    flake.swaySpeed3 = 0.0022 + Math.random() * 0.0015;
+    flake.swayAmp = 0.6 + Math.random() * 1.6;
+    flake.windDrift = 0.12 + Math.random() * 0.22;
     flake.twinkleOffset = Math.random() * Math.PI * 2;
-    flake.twinkleSpeed = 0.002 + Math.random() * 0.003;
+    flake.twinkleSpeed = 0.0018 + Math.random() * 0.0028;
     return flake;
   }
 
@@ -248,12 +371,12 @@
     const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
 
     if (currentMode === 'rain') {
-      const dropCount = isMobile ? 26 : 100;
+      const dropCount = isMobile ? 32 : 105;
       for (let i = 0; i < dropCount; i++) {
         rainDrops.push(createRainDrop(true));
       }
     } else if (currentMode === 'snow') {
-      const flakeCount = isMobile ? 22 : 90;
+      const flakeCount = isMobile ? 36 : 95;
       for (let i = 0; i < flakeCount; i++) {
         snowflakes.push(createSnowflake(true));
       }
@@ -301,7 +424,7 @@
       }
     }
 
-    const windAngle = 0.13 + Math.sin(timestamp * 0.0006) * 0.035;
+    const windAngle = 0.12 + Math.sin(timestamp * 0.00045) * 0.032;
     const sinA = Math.sin(windAngle);
     const cosA = Math.cos(windAngle);
 
@@ -309,7 +432,7 @@
     const speedMultiplier = (isPlayingMusic ? 1.05 : 0.85) * intensityFactor;
     const frameFactor = dt / 16.67;
 
-    // 2. Batched rain streaks
+    // Batched rain streaks
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(215, 238, 255, 0.55)';
     ctx.lineWidth = 1.2;
@@ -338,7 +461,7 @@
     }
     ctx.stroke();
 
-    // 3. Render Ground Ripples
+    // Render Ground Ripples
     for (let r = rainRipples.length - 1; r >= 0; r--) {
       const rp = rainRipples[r];
       rp.radius += rp.growth * frameFactor;
@@ -356,7 +479,7 @@
       ctx.stroke();
     }
 
-    // 4. Render Splashes
+    // Render Splashes
     for (let s = rainSplashes.length - 1; s >= 0; s--) {
       const sp = rainSplashes[s];
       sp.x += sp.vx * frameFactor;
@@ -382,37 +505,63 @@
 
     const speedMultiplier = (isPlayingMusic ? 1.0 : 0.82) * intensityFactor;
     const frameFactor = dt / 16.67;
+    const globalWind = Math.sin(timestamp * 0.00035) * 0.25;
 
     for (let i = 0; i < snowflakes.length; i++) {
       const flake = snowflakes[i];
 
-      const sway1 = Math.sin(timestamp * flake.swaySpeed1 + flake.swayOffset);
-      const sway2 = Math.cos(timestamp * flake.swaySpeed2 + flake.swayOffset * 1.5);
-      const sway = (sway1 * 0.65 + sway2 * 0.35) * flake.swayAmp;
+      // Multi-harmonic aerodynamic sway
+      const s1 = Math.sin(timestamp * flake.swaySpeed1 + flake.swayOffset1);
+      const s2 = Math.cos(timestamp * flake.swaySpeed2 + flake.swayOffset2);
+      const s3 = Math.sin(timestamp * flake.swaySpeed3 + flake.swayOffset3);
+      const sway = (s1 * 0.55 + s2 * 0.32 + s3 * 0.13) * flake.swayAmp;
 
-      flake.x += (sway + flake.windDrift) * frameFactor;
+      flake.x += (sway + flake.windDrift + globalWind) * frameFactor;
       flake.y += flake.speed * speedMultiplier * frameFactor;
 
-      const twinkle = 0.85 + 0.15 * Math.sin(timestamp * flake.twinkleSpeed + flake.twinkleOffset);
-      ctx.globalAlpha = Math.max(0, Math.min(1, flake.opacity * twinkle));
+      // Subtle rotation for midground and foreground crystalline flakes
+      if (flake.rotatable) {
+        flake.rot += flake.rotSpeed * frameFactor;
+      }
+
+      // Natural luminosity twinkling
+      const twinkle = 0.82 + 0.18 * Math.sin(timestamp * flake.twinkleSpeed + flake.twinkleOffset);
+      const alpha = Math.max(0, Math.min(1, flake.opacity * twinkle));
 
       const sprite = snowSprites[flake.spriteIdx];
       if (sprite) {
-        ctx.drawImage(
-          sprite,
-          flake.x - flake.radius,
-          flake.y - flake.radius,
-          flake.radius * 2,
-          flake.radius * 2
-        );
+        ctx.globalAlpha = alpha;
+
+        if (flake.rotatable) {
+          ctx.save();
+          ctx.translate(flake.x, flake.y);
+          ctx.rotate(flake.rot);
+          ctx.drawImage(
+            sprite,
+            -flake.radius,
+            -flake.radius,
+            flake.radius * 2,
+            flake.radius * 2
+          );
+          ctx.restore();
+        } else {
+          ctx.drawImage(
+            sprite,
+            flake.x - flake.radius,
+            flake.y - flake.radius,
+            flake.radius * 2,
+            flake.radius * 2
+          );
+        }
       }
 
-      if (flake.y > height + flake.radius * 2.5) {
+      // Wrap / Respawn boundaries
+      if (flake.y > height + flake.radius * 3) {
         resetSnowflake(flake, false);
-      } else if (flake.x < -60) {
-        flake.x = width + 50;
-      } else if (flake.x > width + 60) {
-        flake.x = -50;
+      } else if (flake.x < -80) {
+        flake.x = width + 60;
+      } else if (flake.x > width + 80) {
+        flake.x = -60;
       }
     }
     ctx.globalAlpha = 1.0;
@@ -427,7 +576,7 @@
 
     if (!lastTimestamp) lastTimestamp = timestamp;
     const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
-    const minDelta = isMobile ? 33 : 16;
+    const minDelta = isMobile ? 24 : 14;
 
     if (timestamp - lastTimestamp < minDelta) {
       animationFrameId = requestAnimationFrame(animationLoop);

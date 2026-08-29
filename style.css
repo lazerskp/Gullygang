@@ -251,54 +251,40 @@ img {
   font-variant-numeric: tabular-nums;
 }
 
-/* Inline Atmospheric Switcher */
-.weather-fx-inline {
+/* ============================================================
+   HIDE & ATMOSPHERIC EFFECTS CONTROL BAR & VERTICAL DROPDOWN
+   ============================================================ */
+.effects-bar-wrapper {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  z-index: 60;
+}
+
+.effects-bar-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   padding: 3px 4px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: none;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.feature-icon-line {
-  width: 24px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 1px;
-  margin: 0 auto 8px;
+.effects-bar-pill:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
-.fx-inline-btn {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  padding: 0;
-  border: 1px solid transparent;
-}
-.fx-inline-btn:hover {
+.effects-bar-divider {
+  width: 1px;
+  height: 14px;
   background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  transform: scale(1.06);
-}
-.fx-inline-btn.is-active {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  box-shadow: none;
-  border-color: rgba(255, 255, 255, 0.15);
+  margin: 0 1px;
 }
 
 /* Top Hide Stage Button (Immersive View) */
@@ -306,32 +292,219 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.5);
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: none;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
   flex-shrink: 0;
-  opacity: 0.55;
 }
+
 .top-hide-stage-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.15);
-  opacity: 1;
 }
+
 .top-hide-stage-btn.is-active {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(56, 189, 248, 0.16);
   color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.25);
+}
+
+/* Effects Dropdown Trigger Button */
+.top-effects-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px 0 6px;
+  height: 28px;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.top-effects-dropdown-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.top-effects-dropdown-btn.is-open {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.top-effects-dropdown-btn.is-open .effects-chevron {
+  transform: rotate(180deg);
+}
+
+.top-effects-dropdown-btn.has-active-fx .effects-active-indicator {
+  display: block;
+}
+
+.effects-active-indicator {
+  display: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+}
+
+.effects-icon {
+  color: inherit;
+  transition: transform 0.2s ease;
+}
+
+.effects-chevron {
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Vertical Dropdown Panel Directly Underneath Hide / Effects Bar */
+.weather-effects-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 220px;
+  background: rgba(16, 16, 18, 0.94);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  padding: 8px 6px 6px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  opacity: 0;
+  transform: translateY(-8px) scale(0.96);
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.weather-effects-dropdown-panel.is-open {
   opacity: 1;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.weather-effects-dropdown-header {
+  padding: 4px 10px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 4px;
+}
+
+.weather-effects-dropdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Individual Dropdown Item */
+.weather-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.weather-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.weather-dropdown-item.is-active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.dropdown-item-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.weather-dropdown-item.is-active .rain-icon-wrap {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+}
+
+.weather-dropdown-item.is-active .snow-icon-wrap {
+  background: rgba(224, 242, 254, 0.2);
+  color: #e0f2fe;
+}
+
+.weather-dropdown-item.is-active .off-icon-wrap {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.dropdown-item-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.dropdown-item-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: inherit;
+  line-height: 1.2;
+}
+
+.dropdown-item-subtitle {
+  font-size: 9.5px;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.2;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-item-check {
+  display: none;
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.weather-dropdown-item.is-active .dropdown-item-check {
+  display: flex;
+  align-items: center;
 }
 
 /* Smooth Hide / Show Music Cards, Player Bar & Weather Panel (Immersive View) */
@@ -374,16 +547,40 @@ body.is-stage-hidden .top-weather-hub {
     gap: 3px;
   }
   .weather-hub-date { display: none; }
-  .fx-inline-btn {
-    width: 24px;
-    height: 24px;
-    min-width: 24px;
-    min-height: 24px;
-    font-size: 10px;
+  .effects-bar-pill {
+    padding: 2px 3px;
+    gap: 1px;
   }
   .top-hide-stage-btn {
     width: 26px;
     height: 26px;
+  }
+  .top-effects-dropdown-btn {
+    height: 26px;
+    padding: 0 6px 0 4px;
+    font-size: 10px;
+    gap: 3px;
+  }
+  .effects-label-text {
+    display: inline;
+  }
+  .weather-effects-dropdown-panel {
+    width: 195px;
+    padding: 6px 5px 5px;
+  }
+  .weather-dropdown-item {
+    padding: 7px 8px;
+    gap: 8px;
+  }
+  .dropdown-item-icon-wrap {
+    width: 26px;
+    height: 26px;
+  }
+  .dropdown-item-title {
+    font-size: 11.5px;
+  }
+  .dropdown-item-subtitle {
+    font-size: 9px;
   }
 }
 

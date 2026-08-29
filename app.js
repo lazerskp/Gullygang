@@ -2664,6 +2664,8 @@
   function closeAllDropdowns() {
     const playlistDropdown = document.getElementById('playlist-dropdown');
     const visualsDropdown = document.getElementById('visuals-dropdown');
+    const weatherFxPanel = document.getElementById('weather-effects-dropdown-panel');
+    const btnWeatherFx = document.getElementById('btn-weather-fx-dropdown');
 
     if (playlistDropdown) {
       playlistDropdown.classList.add('hidden');
@@ -2678,6 +2680,15 @@
     }
     document.getElementById('visuals-chevron')?.classList.remove('rotate-180');
     document.getElementById('btn-visuals-selector')?.setAttribute('aria-expanded', 'false');
+
+    if (weatherFxPanel) {
+      weatherFxPanel.classList.remove('is-open');
+      weatherFxPanel.setAttribute('aria-hidden', 'true');
+    }
+    if (btnWeatherFx) {
+      btnWeatherFx.classList.remove('is-open');
+      btnWeatherFx.setAttribute('aria-expanded', 'false');
+    }
 
     closeVolSlider();
     DropdownPositioner.detachListeners();
@@ -3039,6 +3050,23 @@
   }
 
   function initDropdownHandlers() {
+    // Weather Effects Dropdown Toggle
+    const btnWeatherFx = document.getElementById('btn-weather-fx-dropdown');
+    const weatherFxPanel = document.getElementById('weather-effects-dropdown-panel');
+
+    btnWeatherFx?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isOpen = weatherFxPanel?.classList.contains('is-open');
+      closeAllDropdowns();
+      if (!isOpen && weatherFxPanel && btnWeatherFx) {
+        weatherFxPanel.classList.add('is-open');
+        weatherFxPanel.setAttribute('aria-hidden', 'false');
+        btnWeatherFx.classList.add('is-open');
+        btnWeatherFx.setAttribute('aria-expanded', 'true');
+      }
+    });
+
     // Weather Atmosphere Effects Mode Buttons
     document.querySelectorAll('.weather-mode-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -3048,6 +3076,10 @@
         if (window.WeatherEffects) {
           window.WeatherEffects.setMode(mode);
         }
+        // Auto-close dropdown upon selection
+        setTimeout(() => {
+          closeAllDropdowns();
+        }, 120);
       });
     });
 
@@ -3095,6 +3127,8 @@
         !document.getElementById('btn-playlist-selector')?.contains(e.target) &&
         !document.getElementById('visuals-dropdown')?.contains(e.target) &&
         !document.getElementById('btn-visuals-selector')?.contains(e.target) &&
+        !document.getElementById('weather-effects-dropdown-panel')?.contains(e.target) &&
+        !document.getElementById('btn-weather-fx-dropdown')?.contains(e.target) &&
         !DOM.playerRightControls?.contains(e.target) &&
         !document.getElementById('mobile-vol-wrapper')?.contains(e.target)
       ) {
@@ -3475,6 +3509,11 @@
     modeBtns.forEach(btn => {
       btn.classList.toggle('is-active', btn.getAttribute('data-weather-mode') === mode);
     });
+
+    const btnWeatherFx = document.getElementById('btn-weather-fx-dropdown');
+    if (btnWeatherFx) {
+      btnWeatherFx.classList.toggle('has-active-fx', mode !== 'off');
+    }
   }
 
   // --- Attach Controls Listeners ---
@@ -3578,6 +3617,9 @@
         case 'KeyH':
           toggleStageView();
           break;
+        case 'Escape':
+          closeAllDropdowns();
+          break;
       }
     });
 
@@ -3609,6 +3651,7 @@
     const isCurrentlyHidden = document.body.classList.contains('is-stage-hidden');
     const nextHidden = forceState !== null ? forceState : !isCurrentlyHidden;
 
+    closeAllDropdowns();
     document.body.classList.toggle('is-stage-hidden', nextHidden);
     if (btn) {
       btn.setAttribute('aria-pressed', nextHidden ? 'true' : 'false');

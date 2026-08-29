@@ -211,7 +211,7 @@
       <h1 class="brand-logo-heading"><span class="brand-logo-text">GULLYGANG</span></h1>
     </div>
 
-    <!-- Right: Out-of-Box Live Typography Weather, Real Date & Time Hub + Hide Stage Toggle -->
+    <!-- Right: Out-of-Box Live Typography Weather, Real Date & Time Hub + Hide / Effects Control Bar -->
     <div class="top-header-right flex items-center gap-2.5 pointer-events-auto">
       <div class="top-weather-hub" id="top-weather-hub">
         <div class="weather-hub-primary">
@@ -230,32 +230,6 @@
           <span class="weather-hub-date" id="weather-date">--</span>
           <span class="weather-hub-divider" aria-hidden="true">•</span>
           <span class="weather-hub-clock" id="weather-clock">--:--</span>
-          <span class="weather-hub-divider" aria-hidden="true">•</span>
-          <!-- Inline Atmospheric Weather Switcher -->
-          <div class="weather-fx-inline" role="group" aria-label="Atmosphere effects">
-            <button type="button" class="fx-inline-btn weather-mode-btn is-active" data-weather-mode="off" title="Turn atmosphere off" aria-label="Disable atmosphere effects">
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-            <button type="button" class="fx-inline-btn weather-mode-btn" data-weather-mode="rain" title="Rain atmosphere" aria-label="Rain atmosphere effect">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"></path>
-                <line x1="8" y1="19" x2="8" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-                <line x1="16" y1="19" x2="16" y2="21"></line>
-              </svg>
-            </button>
-            <button type="button" class="fx-inline-btn weather-mode-btn" data-weather-mode="snow" title="Snow atmosphere" aria-label="Snow atmosphere effect">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <line x1="12" y1="2" x2="12" y2="22"></line>
-                <line x1="2" y1="12" x2="22" y2="12"></line>
-                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
-                <line x1="19.07" y1="4.93" x2="4.93" y2="19.07"></line>
-              </svg>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -267,17 +241,108 @@
         <span class="support-pill-text">Support</span>
       </button>
 
-      <!-- Hide Stage Cards & Playlist Button (Zen / Immersive Background View Toggle) -->
-      <button type="button" id="btn-toggle-stage-view" class="top-hide-stage-btn" title="Hide/Show Weather & Player (H)" aria-label="Toggle stage view" aria-pressed="false">
-        <svg class="eye-open-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-          <circle cx="12" cy="12" r="3"></circle>
-        </svg>
-        <svg class="eye-closed-icon hidden" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-          <line x1="1" y1="1" x2="23" y2="23"></line>
-        </svg>
-      </button>
+      <!-- Hide & Atmospheric Effects Control Wrapper -->
+      <div class="effects-bar-wrapper relative" id="effects-bar-wrapper">
+        <div class="effects-bar-pill flex items-center">
+          <!-- Hide Stage Toggle (H) -->
+          <button type="button" id="btn-toggle-stage-view" class="top-hide-stage-btn" title="Hide/Show Weather & Player (H)" aria-label="Toggle stage view" aria-pressed="false">
+            <svg class="eye-open-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <svg class="eye-closed-icon hidden" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+            </svg>
+          </button>
+
+          <!-- Divider -->
+          <span class="effects-bar-divider" aria-hidden="true"></span>
+
+          <!-- Atmospheric Effects Dropdown Trigger -->
+          <button type="button" id="btn-weather-fx-dropdown" class="top-effects-dropdown-btn" title="Atmosphere Effects (Rain / Snow)" aria-label="Toggle atmosphere effects dropdown" aria-expanded="false" aria-haspopup="true">
+            <span class="effects-active-indicator" id="effects-active-indicator" aria-hidden="true"></span>
+            <svg class="effects-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+            </svg>
+            <span class="effects-label-text">Effects</span>
+            <svg class="effects-chevron" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Vertical Dropdown Panel Directly Underneath Hide / Effects Bar -->
+        <div id="weather-effects-dropdown-panel" class="weather-effects-dropdown-panel" role="menu" aria-label="Atmospheric effects" aria-hidden="true">
+          <div class="weather-effects-dropdown-header">
+            <span>ATMOSPHERE</span>
+          </div>
+
+          <div class="weather-effects-dropdown-list">
+            <!-- Rain Option -->
+            <button type="button" class="weather-dropdown-item weather-mode-btn" data-weather-mode="rain" role="menuitem" aria-label="Rain atmosphere effect">
+              <span class="dropdown-item-icon-wrap rain-icon-wrap" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"></path>
+                  <line x1="8" y1="19" x2="8" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                  <line x1="16" y1="19" x2="16" y2="21"></line>
+                </svg>
+              </span>
+              <div class="dropdown-item-info">
+                <span class="dropdown-item-title">Rain</span>
+                <span class="dropdown-item-subtitle">Cinematic drizzle & ripples</span>
+              </div>
+              <span class="dropdown-item-check" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+            </button>
+
+            <!-- Snow Option -->
+            <button type="button" class="weather-dropdown-item weather-mode-btn" data-weather-mode="snow" role="menuitem" aria-label="Snow atmosphere effect">
+              <span class="dropdown-item-icon-wrap snow-icon-wrap" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="2" x2="12" y2="22"></line>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                  <line x1="19.07" y1="4.93" x2="4.93" y2="19.07"></line>
+                </svg>
+              </span>
+              <div class="dropdown-item-info">
+                <span class="dropdown-item-title">Snow</span>
+                <span class="dropdown-item-subtitle">Realistic layered snowfall</span>
+              </div>
+              <span class="dropdown-item-check" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+            </button>
+
+            <!-- Off Option -->
+            <button type="button" class="weather-dropdown-item weather-mode-btn is-active" data-weather-mode="off" role="menuitem" aria-label="Disable atmosphere effects">
+              <span class="dropdown-item-icon-wrap off-icon-wrap" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </span>
+              <div class="dropdown-item-info">
+                <span class="dropdown-item-title">Off</span>
+                <span class="dropdown-item-subtitle">Clear ambient canvas</span>
+              </div>
+              <span class="dropdown-item-check" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
   </header>
 
