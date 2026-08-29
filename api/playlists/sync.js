@@ -98,24 +98,54 @@ async function fetchYouTubePlaylistWithDataAPI(listId, apiKey) {
 }
 
 /**
- * Universal Recursive Tree Walker for YouTube InnerTube/HTML structures
+ * Strict Recursive Playlist Node Walker (Ignores recommendations, sidebar & unrelated carousels)
  */
-function walkYouTubeTree(node, tracks, seenIds, continuationTokens) {
+function walkPlaylistTree(node, tracks, seenIds, continuationTokens, cleanListId) {
   if (!node || typeof node !== 'object') return;
+
+  // Strict guard: NEVER walk into recommendation carousels, sidebar, related chips or feeds
+  if (
+    node.horizontalCardListRenderer ||
+    node.playlistSidebarRenderer ||
+    node.relatedChipCloudRenderer ||
+    node.richItemRenderer ||
+    node.richSectionRenderer ||
+    node.shelfRenderer
+  ) {
+    return;
+  }
 
   if (Array.isArray(node)) {
     for (const el of node) {
-      walkYouTubeTree(el, tracks, seenIds, continuationTokens);
+      walkPlaylistTree(el, tracks, seenIds, continuationTokens, cleanListId);
     }
     return;
   }
 
   // 1. Extract continuation tokens
   const token = node.continuationItemViewModel?.continuationCommand?.innertubeCommand?.continuationCommand?.token ||
-                node.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token ||
-                node.continuationCommand?.token;
+                node.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
   if (token && !continuationTokens.includes(token)) {
     continuationTokens.push(token);
+    return;
+  }
+
+  function addStrictTrack(vidId, title, artist, thumb, itemPlId) {
+    if (!vidId || typeof vidId !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(vidId)) return;
+    if (seenIds.has(vidId)) return;
+    if (isUnavailableTitle(title)) return;
+    // Strict playlist ID matching: if watch endpoint specifies playlistId, it MUST belong to this playlist
+    if (itemPlId && itemPlId !== cleanListId && itemPlId !== ('VL' + cleanListId)) {
+      return;
+    }
+
+    seenIds.add(vidId);
+    tracks.push({
+      youtube_id: vidId,
+      title: (title || 'Untitled Track').trim(),
+      artist: (artist || 'Odia Artist').trim(),
+      thumbnail: getNormalizedThumbnail(thumb, vidId)
+    });
   }
 
   // 2. Extract from modern lockupViewModel
@@ -125,18 +155,11 @@ function walkYouTubeTree(node, tracks, seenIds, continuationTokens) {
     const title = lockup.metadata?.lockupMetadataViewModel?.title?.content || '';
     const artist = lockup.metadata?.lockupMetadataViewModel?.metadata?.contentMetadataViewModel?.metadataRows?.[0]?.metadataParts?.[0]?.text?.content || 'Odia Artist';
     const thumb = lockup.contentImage?.collectionThumbnailViewModel?.primaryThumbnail?.thumbnailViewModel?.image?.sources?.[0]?.url ||
-                  lockup.contentImage?.thumbnailViewModel?.image?.sources?.[0]?.url ||
-                  (vidId ? `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg` : '');
+                  lockup.contentImage?.thumbnailViewModel?.image?.sources?.[0]?.url;
+    const itemPlId = lockup.rendererContext?.commandContext?.onTap?.innertubeCommand?.watchEndpoint?.playlistId;
 
-    if (vidId && !seenIds.has(vidId) && !isUnavailableTitle(title)) {
-      seenIds.add(vidId);
-      tracks.push({
-        youtube_id: vidId,
-        title: title.trim() || 'Untitled Track',
-        artist: artist.trim() || 'Odia Artist',
-        thumbnail: getNormalizedThumbnail(thumb, vidId)
-      });
-    }
+    addStrictTrack(vidId, title, artist, thumb, itemPlId);
+    return;
   }
 
   // 3. Extract from classic playlistVideoRenderer
@@ -145,24 +168,26 @@ function walkYouTubeTree(node, tracks, seenIds, continuationTokens) {
     const vidId = pvr.videoId;
     const title = pvr.title?.runs?.[0]?.text || pvr.title?.simpleText || '';
     const artist = pvr.shortBylineText?.runs?.[0]?.text || 'Odia Artist';
-    const thumb = pvr.thumbnail?.thumbnails?.[pvr.thumbnail.thumbnails.length - 1]?.url ||
-                  (vidId ? `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg` : '');
+    const thumb = pvr.thumbnail?.thumbnails?.[pvr.thumbnail.thumbnails.length - 1]?.url;
+    const itemPlId = pvr.navigationEndpoint?.watchEndpoint?.playlistId;
 
-    if (vidId && !seenIds.has(vidId) && !isUnavailableTitle(title)) {
-      seenIds.add(vidId);
-      tracks.push({
-        youtube_id: vidId,
-        title: title.trim() || 'Untitled Track',
-        artist: artist.trim() || 'Odia Artist',
-        thumbnail: getNormalizedThumbnail(thumb, vidId)
-      });
-    }
+    addStrictTrack(vidId, title, artist, thumb, itemPlId);
+    return;
   }
 
-  // Recurse into child properties
+  // Recurse into valid child properties
   for (const key of Object.keys(node)) {
-    if (key !== 'lockupViewModel' && key !== 'playlistVideoRenderer') {
-      walkYouTubeTree(node[key], tracks, seenIds, continuationTokens);
+    if (
+      key !== 'lockupViewModel' &&
+      key !== 'playlistVideoRenderer' &&
+      key !== 'horizontalCardListRenderer' &&
+      key !== 'playlistSidebarRenderer' &&
+      key !== 'relatedChipCloudRenderer' &&
+      key !== 'richItemRenderer' &&
+      key !== 'richSectionRenderer' &&
+      key !== 'shelfRenderer'
+    ) {
+      walkPlaylistTree(node[key], tracks, seenIds, continuationTokens, cleanListId);
     }
   }
 }
@@ -190,12 +215,13 @@ async function fetchYouTubeBrowseContinuation(token) {
 }
 
 /**
- * Fetch all tracks from YouTube Playlist via Web / InnerTube Pagination (Tier 2: Universal Crawler)
+ * Fetch all tracks from YouTube Playlist via Web / InnerTube Pagination (Tier 2: Strict Universal Crawler)
  */
 async function fetchYouTubePlaylistWithCrawler(listId) {
+  const cleanListId = listId.replace(/^VL/, '');
   const tracks = [];
   const seenIds = new Set();
-  const url = `https://www.youtube.com/playlist?list=${encodeURIComponent(listId)}`;
+  const url = `https://www.youtube.com/playlist?list=${encodeURIComponent(cleanListId)}`;
   const res = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -210,7 +236,8 @@ async function fetchYouTubePlaylistWithCrawler(listId) {
 
   const data = JSON.parse(jsonMatches[0][1]);
   const continuationTokens = [];
-  walkYouTubeTree(data, tracks, seenIds, continuationTokens);
+  const primaryContents = data.contents?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents;
+  walkPlaylistTree(primaryContents, tracks, seenIds, continuationTokens, cleanListId);
 
   const processedTokens = new Set();
   let pageCount = 1;
@@ -224,11 +251,12 @@ async function fetchYouTubePlaylistWithCrawler(listId) {
     const contData = await fetchYouTubeBrowseContinuation(token);
     if (!contData) continue;
 
-    const newTokens = [];
-    walkYouTubeTree(contData, tracks, seenIds, newTokens);
-    for (const t of newTokens) {
-      if (!processedTokens.has(t) && !continuationTokens.includes(t)) {
-        continuationTokens.push(t);
+    const actions = contData.onResponseReceivedActions || contData.onResponseReceivedEndpoints || [];
+    for (const act of actions) {
+      const items = act.appendContinuationItemsAction?.continuationItems ||
+                    act.reloadContinuationItemsCommand?.continuationItems;
+      if (items) {
+        walkPlaylistTree(items, tracks, seenIds, continuationTokens, cleanListId);
       }
     }
   }
