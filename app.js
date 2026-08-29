@@ -1768,194 +1768,6 @@
     }
   }
 
-  // ============================================================
-  // BACKGROUND VISUAL QUALITY ENGINE (FOR bgYtPlayer & bgVideo ONLY)
-  // Does NOT touch music playback or state.ytPlayer
-  // ============================================================
-  const VISUAL_QUALITY_MAP = {
-    'auto': 'default',
-    '720p': 'hd720',
-    '1080p': 'hd1080',
-    '1440p': 'hd1440',
-    '2160p': 'hd2160'
-  };
-
-  const VISUAL_QUALITY_LABELS = {
-    'hd2160': '2160p',
-    'hd1440': '1440p',
-    'hd1080': '1080p',
-    'hd720': '720p',
-    'large': '480p',
-    'medium': '360p',
-    'small': '240p',
-    'tiny': '144p',
-    'auto': 'Auto',
-    'default': 'Auto'
-  };
-
-  let requestedVisualQuality = 'auto'; // 'auto' | '720p' | '1080p' | '1440p' | '2160p'
-  let actualVisualQuality = 'default';
-  let activeBgYtVideoId = null;
-
-  function applyRequestedVisualQuality() {
-    const bgVideo = document.getElementById('bg-video');
-    const bgYtContainer = document.getElementById('bg-yt-container');
-
-    // 1. YouTube Background Visual
-    if (bgYtContainer && bgYtContainer.classList.contains('is-active') && bgYtPlayer && typeof bgYtPlayer.setPlaybackQuality === 'function') {
-      const targetYtQuality = VISUAL_QUALITY_MAP[requestedVisualQuality] || 'default';
-      try {
-        bgYtPlayer.setPlaybackQuality(targetYtQuality);
-      } catch (e) {}
-
-      // Multi-tier polling to capture YouTube's real negotiated stream quality
-      [300, 800, 1600].forEach(delay => {
-        setTimeout(() => {
-          detectActualVisualQuality();
-        }, delay);
-      });
-      return;
-    }
-
-    // 2. HTML5 MP4 Background Visual
-    if (bgVideo && bgVideo.classList.contains('is-active')) {
-      actualVisualQuality = requestedVisualQuality;
-      updateVisualQualityUI();
-      return;
-    }
-
-    // 3. Default Artwork mode
-    updateVisualQualityUI();
-  }
-
-  function detectActualVisualQuality() {
-    const bgVideo = document.getElementById('bg-video');
-    const bgYtContainer = document.getElementById('bg-yt-container');
-
-    if (bgYtContainer && bgYtContainer.classList.contains('is-active') && bgYtPlayer && typeof bgYtPlayer.getPlaybackQuality === 'function') {
-      try {
-        const q = bgYtPlayer.getPlaybackQuality();
-        if (q && q !== 'unknown') {
-          actualVisualQuality = q;
-          updateVisualQualityUI();
-        }
-      } catch (e) {}
-      return;
-    }
-
-    if (bgVideo && bgVideo.classList.contains('is-active')) {
-      actualVisualQuality = requestedVisualQuality;
-      updateVisualQualityUI();
-    }
-  }
-
-  function updateVisualQualityUI() {
-    const statusBadge = document.getElementById('quality-actual-status');
-    if (!statusBadge) return;
-
-    const bgYtContainer = document.getElementById('bg-yt-container');
-    const bgVideo = document.getElementById('bg-video');
-
-    const reqLabel = (requestedVisualQuality === 'auto') ? 'Auto' : requestedVisualQuality;
-
-    if (bgYtContainer && bgYtContainer.classList.contains('is-active')) {
-      const realQualityLabel = VISUAL_QUALITY_LABELS[actualVisualQuality] || actualVisualQuality || 'Auto';
-      statusBadge.textContent = `Requested: ${reqLabel} · Actual: ${realQualityLabel}`;
-    } else if (bgVideo && bgVideo.classList.contains('is-active')) {
-      statusBadge.textContent = `Requested: ${reqLabel} · Actual: ${reqLabel}`;
-    } else {
-      statusBadge.textContent = `Requested: ${reqLabel} · Actual: Auto`;
-    }
-  }
-
-  function setVisualQuality(quality, persist = true) {
-    const validQualities = ['auto', '720p', '1080p', '1440p', '2160p'];
-    if (!validQualities.includes(quality)) quality = 'auto';
-    requestedVisualQuality = quality;
-
-    if (persist) {
-      try {
-        localStorage.setItem('odiverse_visual_quality', quality);
-      } catch (e) {}
-    }
-
-    const qualityOptionsList = document.getElementById('quality-options-list');
-    if (qualityOptionsList) {
-      const btns = qualityOptionsList.querySelectorAll('.quality-option-btn');
-      btns.forEach(btn => {
-        const q = btn.getAttribute('data-quality');
-        btn.classList.toggle('is-active', q === quality);
-      });
-    }
-
-    const bgYtContainer = document.getElementById('bg-yt-container');
-    const bgVideo = document.getElementById('bg-video');
-    const targetYtQuality = VISUAL_QUALITY_MAP[requestedVisualQuality] || 'default';
-
-    // 1. YouTube Background Visual: reload from 0:00 with requested suggestedQuality
-    if (bgYtContainer && bgYtContainer.classList.contains('is-active') && bgYtPlayer) {
-      let currentYtId = activeBgYtVideoId;
-      if (!currentYtId && typeof bgYtPlayer.getVideoData === 'function') {
-        const vData = bgYtPlayer.getVideoData();
-        if (vData && vData.video_id) currentYtId = vData.video_id;
-      }
-      if (!currentYtId) {
-        const currentPresets = (state.visuals && state.visuals.length > 0) ? state.visuals : DEFAULT_VISUAL_PRESETS;
-        const preset = currentPresets.find(p => p.id === state.currentVisual);
-        if (preset && preset.url) currentYtId = extractYouTubeVideoId(preset.url);
-      }
-
-      if (currentYtId && typeof bgYtPlayer.loadVideoById === 'function') {
-        try {
-          if (typeof bgYtPlayer.stopVideo === 'function') {
-            bgYtPlayer.stopVideo();
-          }
-          bgYtPlayer.loadVideoById({
-            videoId: currentYtId,
-            startSeconds: 0,
-            suggestedQuality: targetYtQuality
-          });
-          bgYtPlayer.mute();
-          bgYtPlayer.playVideo();
-          if (typeof bgYtPlayer.setPlaybackQuality === 'function') {
-            bgYtPlayer.setPlaybackQuality(targetYtQuality);
-          }
-        } catch (e) {}
-      } else if (typeof bgYtPlayer.setPlaybackQuality === 'function') {
-        try {
-          bgYtPlayer.setPlaybackQuality(targetYtQuality);
-        } catch (e) {}
-      }
-
-      [300, 800, 1600].forEach(delay => {
-        setTimeout(() => {
-          detectActualVisualQuality();
-        }, delay);
-      });
-      return;
-    }
-
-    // 2. Seamless HTML5 MP4 quality source switching
-    if (bgVideo && bgVideo.classList.contains('is-active')) {
-      const currentPresets = (state.visuals && state.visuals.length > 0) ? state.visuals : DEFAULT_VISUAL_PRESETS;
-      const preset = currentPresets.find(p => p.id === state.currentVisual);
-      if (preset && preset.sources) {
-        const targetSrc = preset.sources[quality] || preset.sources['1080p'] || preset.url;
-        if (targetSrc) {
-          bgVideo.src = targetSrc;
-          bgVideo.currentTime = 0;
-          bgVideo.load();
-          bgVideo.play().catch(() => {});
-        }
-      }
-      actualVisualQuality = requestedVisualQuality;
-      updateVisualQualityUI();
-      return;
-    }
-
-    applyRequestedVisualQuality();
-  }
-
   // --- YouTube IFrame API ---
   let ytApiInjected = false;
   function initYouTubeAPI() {
@@ -3048,19 +2860,14 @@
   }
 
   function ensureBgYouTubePlayer(ytId, onReadyCallback) {
-    activeBgYtVideoId = ytId;
-    const targetYtQuality = VISUAL_QUALITY_MAP[requestedVisualQuality] || 'default';
-
     if (bgYtPlayer && typeof bgYtPlayer.loadVideoById === 'function') {
       try {
         bgYtPlayer.loadVideoById({
           videoId: ytId,
-          startSeconds: 0,
-          suggestedQuality: targetYtQuality
+          startSeconds: 0
         });
         bgYtPlayer.mute();
         bgYtPlayer.playVideo();
-        applyRequestedVisualQuality();
         if (onReadyCallback) onReadyCallback();
         return;
       } catch (e) {}
@@ -3082,27 +2889,17 @@
             iv_load_policy: 3,
             disablekb: 1,
             playsinline: 1,
-            fs: 0,
-            suggestedQuality: targetYtQuality
+            fs: 0
           },
           events: {
             onReady: (event) => {
               bgYtReady = true;
               event.target.mute();
               event.target.playVideo();
-              applyRequestedVisualQuality();
               if (onReadyCallback) onReadyCallback();
             },
-            onPlaybackQualityChange: (event) => {
-              if (event && event.data) {
-                actualVisualQuality = event.data;
-                updateVisualQualityUI();
-              }
-            },
             onStateChange: (event) => {
-              if (event.data === 1 || event.data === 3) {
-                applyRequestedVisualQuality();
-              } else if (event.data === 0) {
+              if (event.data === 0) {
                 event.target.playVideo(); // Loop back to start
               }
             }
@@ -3276,45 +3073,6 @@
       }
     });
 
-    // YouTube Video & Audio Playback Quality Controls
-    const btnQualityToggle = document.getElementById('btn-visuals-quality-toggle');
-    const qualityPanel = document.getElementById('visuals-quality-panel');
-    const qualityOptionsList = document.getElementById('quality-options-list');
-
-    btnQualityToggle?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isHidden = qualityPanel?.classList.contains('hidden');
-      qualityPanel?.classList.toggle('hidden', !isHidden);
-      btnQualityToggle?.classList.toggle('is-active', isHidden);
-      if (isHidden) {
-        detectActualVisualQuality();
-      }
-      if (visualsDropdown && btnVisuals) {
-        DropdownPositioner.position(visualsDropdown, btnVisuals, 'visuals');
-      }
-    });
-
-    qualityOptionsList?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const qBtn = e.target.closest('.quality-option-btn');
-      if (qBtn) {
-        const quality = qBtn.getAttribute('data-quality');
-        setVisualQuality(quality, true);
-        qualityPanel?.classList.add('hidden');
-        btnQualityToggle?.classList.remove('is-active');
-        if (visualsDropdown && btnVisuals) {
-          DropdownPositioner.position(visualsDropdown, btnVisuals, 'visuals');
-        }
-      }
-    });
-
-    // Restore saved Visual quality preference
-    let savedVisualQuality = 'auto';
-    try {
-      savedVisualQuality = localStorage.getItem('odiverse_visual_quality') || 'auto';
-    } catch (e) {}
-    setVisualQuality(savedVisualQuality, false);
-
     // Restore saved visual mode
     let savedVisual = 'off';
     let savedCustomUrl = '';
@@ -3427,16 +3185,14 @@
         }
       }
       if (bgVideo) {
-        const resolvedUrl = (preset && preset.sources && (preset.sources[requestedVisualQuality] || preset.sources['1080p'])) || targetRawUrl;
-        if (bgVideo.src !== resolvedUrl) {
-          bgVideo.src = resolvedUrl;
+        if (bgVideo.src !== targetRawUrl) {
+          bgVideo.src = targetRawUrl;
           bgVideo.load();
         }
         bgVideo.play().catch(e => console.log('[Visuals] Autoplay note:', e.message));
         bgVideo.classList.add('is-active');
       }
       if (dynamicArtworkBg) dynamicArtworkBg.style.opacity = '0.5';
-      applyRequestedVisualQuality();
     }
   }
 
