@@ -1211,6 +1211,7 @@
           if (!vidId || seenIds.has(vidId) || isUnavailable) continue;
           seenIds.add(vidId);
 
+          const artist = item.snippet?.videoOwnerChannelTitle || item.snippet?.channelTitle || 'Odia Artist';
           const thumbs = item.snippet?.thumbnails || {};
           const thumbUrl = thumbs.maxres?.url || thumbs.standard?.url || thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url || '';
 
@@ -1455,20 +1456,40 @@
     let runtimeTracks = [];
     if (playlist.id && playlist.id !== 'default') {
       try {
-        const res = await insforgeFetch(`/api/database/records/playlist_songs?playlist_id=eq.${encodeURIComponent(playlist.id)}&order=display_order.asc&limit=5000`);
-        if (res.ok) {
-          const songs = await res.json();
-          if (Array.isArray(songs) && songs.length > 0) {
-            runtimeTracks = songs.map((s, idx) => ({
-              id: s.youtube_id,
-              title: s.title || 'Unknown Title',
-              artist: s.artist || 'Odia Artist',
-              thumbnail: normalizeThumbnailUrl(s.thumbnail, s.youtube_id),
-              playlistId: playlist.id,
-              position: idx + 1
-            }));
-            PlaylistCacheEngine.set(cacheKey, runtimeTracks);
+        let allSongs = [];
+        let offset = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const res = await insforgeFetch(`/api/database/records/playlist_songs?playlist_id=eq.${encodeURIComponent(playlist.id)}&order=display_order.asc&limit=${pageSize}&offset=${offset}`);
+          if (res.ok) {
+            const pageSongs = await res.json();
+            if (Array.isArray(pageSongs) && pageSongs.length > 0) {
+              allSongs = allSongs.concat(pageSongs);
+              if (pageSongs.length < pageSize) {
+                hasMore = false;
+              } else {
+                offset += pageSize;
+              }
+            } else {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
           }
+        }
+
+        if (allSongs.length > 0) {
+          runtimeTracks = allSongs.map((s, idx) => ({
+            id: s.youtube_id,
+            title: s.title || 'Unknown Title',
+            artist: s.artist || 'Odia Artist',
+            thumbnail: normalizeThumbnailUrl(s.thumbnail, s.youtube_id),
+            playlistId: playlist.id,
+            position: idx + 1
+          }));
+          PlaylistCacheEngine.set(cacheKey, runtimeTracks);
         }
       } catch (e) {
         console.warn('[Playlists] InsForge database fetch notice (offline/slow connection):', e);
@@ -3824,8 +3845,13 @@
 
     function init() {
       const config = getAdSenseConfig();
-      const isConfigured = Boolean(config.client && config.client.startsWith('ca-pub-') && config.slot1 && !config.client.includes('XXXX'));
-      const modalScrollRoot = document.getElementById('legal-view-modal');
+      const isConfigured = Boolean(
+        config.client &&
+        config.client.startsWith('ca-pub-') &&
+        !config.client.includes('XXXX') &&
+        config.slot1 &&
+        !config.slot1.includes('XXXX')
+      );
 
       const placements = document.querySelectorAll('.editorial-ad-placement-wrap');
       if (placements.length === 0) return;
@@ -3833,13 +3859,11 @@
       placements.forEach((wrap) => {
         const placementId = wrap.getAttribute('data-ad-placement') || wrap.id;
         const insEl = wrap.querySelector('.adsense-about-ins');
-        const devPlaceholder = wrap.querySelector('.adsense-dev-placeholder');
         const slotId = placementId === '2' ? config.slot2 : config.slot1;
 
-        wrap.style.display = 'block';
-
         if (isConfigured && slotId) {
-          if (devPlaceholder) devPlaceholder.classList.add('hidden');
+          wrap.classList.remove('hidden');
+          wrap.style.display = 'block';
           if (insEl) {
             insEl.setAttribute('data-ad-client', config.client);
             insEl.setAttribute('data-ad-slot', slotId);
@@ -3864,8 +3888,9 @@
 
           observer.observe(wrap);
         } else {
-          // In development or when ad credentials not set, show the editorial placeholder
-          if (devPlaceholder) devPlaceholder.classList.remove('hidden');
+          // When not configured with approved AdSense credentials, keep ad containers cleanly hidden
+          wrap.classList.add('hidden');
+          wrap.style.display = 'none';
           if (insEl) insEl.style.display = 'none';
         }
       });
@@ -3967,7 +3992,7 @@
           </section>
 
           <!-- Placement 1: Google AdSense Placement 1 -->
-          <div class="editorial-ad-placement-wrap" id="about-ad-section-1" data-ad-placement="1">
+          <div class="editorial-ad-placement-wrap hidden" id="about-ad-section-1" data-ad-placement="1">
             <div class="editorial-ad-label">ADVERTISEMENT</div>
             <div class="editorial-ad-slot-inner">
               <ins class="adsbygoogle adsense-about-ins"
@@ -3977,10 +4002,6 @@
                    data-ad-slot=""
                    data-ad-format="auto"
                    data-full-width-responsive="true"></ins>
-              <div class="adsense-dev-box adsense-dev-placeholder" id="adsense-dev-placeholder-1">
-                <div class="adsense-dev-badge">Google AdSense Placement 1</div>
-                <div class="adsense-dev-sub">Responsive Unit &bull; Non-Intrusive Editorial</div>
-              </div>
             </div>
           </div>
 
@@ -4028,7 +4049,7 @@
           </section>
 
           <!-- Placement 2: Google AdSense Placement 2 -->
-          <div class="editorial-ad-placement-wrap" id="about-ad-section-2" data-ad-placement="2">
+          <div class="editorial-ad-placement-wrap hidden" id="about-ad-section-2" data-ad-placement="2">
             <div class="editorial-ad-label">ADVERTISEMENT</div>
             <div class="editorial-ad-slot-inner">
               <ins class="adsbygoogle adsense-about-ins"
@@ -4038,10 +4059,6 @@
                    data-ad-slot=""
                    data-ad-format="auto"
                    data-full-width-responsive="true"></ins>
-              <div class="adsense-dev-box adsense-dev-placeholder" id="adsense-dev-placeholder-2">
-                <div class="adsense-dev-badge">Google AdSense Placement 2</div>
-                <div class="adsense-dev-sub">Responsive Unit &bull; Non-Intrusive Editorial</div>
-              </div>
             </div>
           </div>
 
@@ -4118,7 +4135,7 @@
                 </li>
                 <li class="editorial-feature-item">
                   <div class="editorial-feature-item-title">Approximate Location (Optional)</div>
-                  <div class="editorial-feature-item-desc">If live weather is enabled, approximate coordinates query public weather APIs. Location data is never stored on our database or used for user profiling.</div>
+                  <div class="editorial-feature-item-desc">If live weather is enabled, browser geolocation queries Open-Meteo for local atmospheric conditions. Location data is never stored on our database or used for user profiling.</div>
                 </li>
                 <li class="editorial-feature-item">
                   <div class="editorial-feature-item-title">Voluntary Contact Submissions</div>
@@ -4129,7 +4146,7 @@
           </section>
 
           <!-- Google AdSense Placement for Privacy -->
-          <div class="editorial-ad-placement-wrap" id="privacy-ad-section" data-ad-placement="privacy">
+          <div class="editorial-ad-placement-wrap hidden" id="privacy-ad-section" data-ad-placement="privacy">
             <div class="editorial-ad-label">ADVERTISEMENT</div>
             <div class="editorial-ad-slot-inner">
               <ins class="adsbygoogle adsense-about-ins"
@@ -4139,10 +4156,6 @@
                    data-ad-slot=""
                    data-ad-format="auto"
                    data-full-width-responsive="true"></ins>
-              <div class="adsense-dev-box adsense-dev-placeholder" id="adsense-dev-placeholder-privacy">
-                <div class="adsense-dev-badge">Google AdSense &bull; Privacy</div>
-                <div class="adsense-dev-sub">Responsive Unit &bull; Non-Intrusive Editorial</div>
-              </div>
             </div>
           </div>
 
@@ -4250,7 +4263,7 @@
           </section>
 
           <!-- Google AdSense Placement for Terms -->
-          <div class="editorial-ad-placement-wrap" id="terms-ad-section" data-ad-placement="terms">
+          <div class="editorial-ad-placement-wrap hidden" id="terms-ad-section" data-ad-placement="terms">
             <div class="editorial-ad-label">ADVERTISEMENT</div>
             <div class="editorial-ad-slot-inner">
               <ins class="adsbygoogle adsense-about-ins"
@@ -4260,10 +4273,6 @@
                    data-ad-slot=""
                    data-ad-format="auto"
                    data-full-width-responsive="true"></ins>
-              <div class="adsense-dev-box adsense-dev-placeholder" id="adsense-dev-placeholder-terms">
-                <div class="adsense-dev-badge">Google AdSense &bull; Terms of Use</div>
-                <div class="adsense-dev-sub">Responsive Unit &bull; Non-Intrusive Editorial</div>
-              </div>
             </div>
           </div>
 
@@ -4360,7 +4369,7 @@
           </section>
 
           <!-- Google AdSense Placement for Cookies -->
-          <div class="editorial-ad-placement-wrap" id="cookies-ad-section" data-ad-placement="cookies">
+          <div class="editorial-ad-placement-wrap hidden" id="cookies-ad-section" data-ad-placement="cookies">
             <div class="editorial-ad-label">ADVERTISEMENT</div>
             <div class="editorial-ad-slot-inner">
               <ins class="adsbygoogle adsense-about-ins"
@@ -4370,10 +4379,6 @@
                    data-ad-slot=""
                    data-ad-format="auto"
                    data-full-width-responsive="true"></ins>
-              <div class="adsense-dev-box adsense-dev-placeholder" id="adsense-dev-placeholder-cookies">
-                <div class="adsense-dev-badge">Google AdSense &bull; Cookie Policy</div>
-                <div class="adsense-dev-sub">Responsive Unit &bull; Non-Intrusive Editorial</div>
-              </div>
             </div>
           </div>
 
@@ -4383,6 +4388,70 @@
             <div class="editorial-chapter-body">
               <p>
                 You can control, block, or clear cookies and local browser storage through your browser settings. For personalized advertising options, visit <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" class="text-emerald-400 underline underline-offset-4">Google Ads Settings</a>.
+              </p>
+            </div>
+          </section>
+        </article>
+      `;
+    }
+
+    function getDisclaimerPageHtml() {
+      return `
+        <article class="editorial-article-wrap">
+          <header class="editorial-monument-hero">
+            <div class="editorial-monument-tagline-top">LEGAL &bull; DISCLAIMER</div>
+            <h1 class="editorial-hero-huge-title">
+              LEGAL<br />
+              <span class="brand-gradient-word">DISCLAIMER</span>
+            </h1>
+            <div class="editorial-hero-meta-row">
+              <span>${LEGAL_CONFIG.siteName}</span>
+              <span>&bull;</span>
+              <span>${LEGAL_CONFIG.siteDomain}</span>
+              <span>&bull;</span>
+              <span>Last updated: August 2026</span>
+            </div>
+          </header>
+
+          <section class="editorial-magazine-chapter">
+            <div class="editorial-chapter-num">01</div>
+            <h2 class="editorial-chapter-title">GENERAL INFORMATION</h2>
+            <div class="editorial-chapter-body">
+              <p>
+                The information, media player interface, atmospheric visuals, and music playlists curated on ${LEGAL_CONFIG.siteName} (${LEGAL_CONFIG.siteDomain}) are provided for personal, non-commercial entertainment and cultural discovery purposes only. All materials on this platform are provided in good faith on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis without warranties of any kind.
+              </p>
+            </div>
+          </section>
+
+          <section class="editorial-magazine-chapter">
+            <div class="editorial-chapter-num">02</div>
+            <h2 class="editorial-chapter-title">THIRD-PARTY CONTENT &amp; EMBEDDED MEDIA</h2>
+            <div class="editorial-chapter-body">
+              <p>
+                ${LEGAL_CONFIG.siteName} operates as an independent streaming directory and player interface. We do not host, store, copy, re-encode, or distribute proprietary audio or video files on our own servers. Audio and video streams are embedded and played directly through official third-party APIs, including the YouTube IFrame Player API.
+              </p>
+              <p>
+                All copyrights, trademarks, musical compositions, sound recordings, lyrics, artist likenesses, and album artwork belong exclusively to their respective creators, record labels, songwriters, and intellectual property rightsholders. The appearance of third-party music, channel titles, or trademarks on this website does not imply endorsement, sponsorship, or affiliation with ${LEGAL_CONFIG.siteName}.
+              </p>
+            </div>
+          </section>
+
+          <section class="editorial-magazine-chapter">
+            <div class="editorial-chapter-num">03</div>
+            <h2 class="editorial-chapter-title">ACCURACY OF WEATHER &amp; EXTERNAL APIS</h2>
+            <div class="editorial-chapter-body">
+              <p>
+                Real-time weather data and approximate locality names are retrieved via public meteorological services (such as Open-Meteo). We make no representations or warranties concerning the accuracy, completeness, or timeliness of atmospheric readings displayed on the canvas.
+              </p>
+            </div>
+          </section>
+
+          <section class="editorial-magazine-chapter">
+            <div class="editorial-chapter-num">04</div>
+            <h2 class="editorial-chapter-title">COPYRIGHT CONCERNS &amp; TAKEDOWN INQUIRIES</h2>
+            <div class="editorial-chapter-body">
+              <p>
+                ${LEGAL_CONFIG.siteName} respects all intellectual property rights. If you are a copyright owner, artist, or authorized representative and believe that any playlist listing or reference on our website infringes your rights, please contact us immediately through our <a href="#/contact" class="text-emerald-400 underline underline-offset-4" data-route="contact">Contact page</a> by selecting <strong>&ldquo;Copyright / Content Concern&rdquo;</strong> with the track title, artist name, and relevant reference link. We review and process verified requests promptly.
               </p>
             </div>
           </section>
@@ -4490,6 +4559,10 @@
           html = getCookiesPageHtml();
           pageTitle = 'GULLYGANG — Cookie Policy';
           break;
+        case 'disclaimer':
+          html = getDisclaimerPageHtml();
+          pageTitle = 'GULLYGANG — Disclaimer';
+          break;
         case 'contact':
           html = getContactPageHtml();
           pageTitle = 'GULLYGANG — Contact';
@@ -4521,7 +4594,7 @@
       }
 
       // Initialize Google AdSense placements for all editorial/legal pages
-      if (['about', 'privacy', 'terms', 'cookies'].includes(normalizedKey)) {
+      if (['about', 'privacy', 'terms', 'cookies', 'disclaimer'].includes(normalizedKey)) {
         AdSenseEngine.init();
       }
 

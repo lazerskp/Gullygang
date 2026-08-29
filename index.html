@@ -140,10 +140,10 @@
           },
           {
             "@type": "Question",
-            "name": "Can I listen in the background on mobile?",
+            "name": "Can I listen on mobile with lockscreen controls?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. GULLYGANG supports background audio streaming on mobile devices and lockscreens, letting you play, pause, or switch tracks without keeping the browser active."
+              "text": "Yes. GULLYGANG integrates with the standard MediaSession API to support track metadata and media controls on supported mobile devices and desktop lockscreens."
             }
           },
           {
@@ -654,7 +654,7 @@
              DEDICATED ADVERTISEMENT PLACEMENT 1 (ABOUT SECTION)
              Clean, non-intrusive, responsive Google AdSense placement
              ============================================================ -->
-        <section class="editorial-ad-section editorial-ad-placement-wrap scroll-reveal" id="about-ad-section-1" data-ad-placement="1" aria-label="Sponsored Advertisement">
+        <section class="editorial-ad-section editorial-ad-placement-wrap scroll-reveal hidden" id="about-ad-section-1" data-ad-placement="1" aria-label="Sponsored Advertisement">
           <div class="editorial-ad-container">
             <div class="editorial-ad-header">
               <span class="editorial-ad-label">ADVERTISEMENT</span>
@@ -669,13 +669,6 @@
                    data-ad-slot=""
                    data-ad-format="auto"
                    data-full-width-responsive="true"></ins>
-                   
-              <!-- Clean development placeholder (Shown when client ID is not configured in dev mode) -->
-              <div class="ad-dev-placeholder adsense-dev-placeholder" id="adsense-dev-placeholder-1">
-                <div class="ad-dev-badge">Google AdSense &bull; Placement 1</div>
-                <p class="ad-dev-title">Responsive Ad Slot</p>
-                <p class="ad-dev-sub">Non-Intrusive Editorial Placement</p>
-              </div>
             </div>
           </div>
         </section>
@@ -833,7 +826,7 @@
              DEDICATED ADVERTISEMENT PLACEMENT 2 (ABOUT SECTION)
              Clean, non-intrusive, responsive Google AdSense placement
              ============================================================ -->
-        <section class="editorial-ad-section editorial-ad-placement-wrap scroll-reveal" id="about-ad-section-2" data-ad-placement="2" aria-label="Sponsored Advertisement">
+        <section class="editorial-ad-section editorial-ad-placement-wrap scroll-reveal hidden" id="about-ad-section-2" data-ad-placement="2" aria-label="Sponsored Advertisement">
           <div class="editorial-ad-container">
             <div class="editorial-ad-header">
               <span class="editorial-ad-label">ADVERTISEMENT</span>
@@ -848,13 +841,6 @@
                    data-ad-slot=""
                    data-ad-format="auto"
                    data-full-width-responsive="true"></ins>
-                   
-              <!-- Clean development placeholder (Shown when client ID is not configured in dev mode) -->
-              <div class="ad-dev-placeholder adsense-dev-placeholder" id="adsense-dev-placeholder-2">
-                <div class="ad-dev-badge">Google AdSense &bull; Placement 2</div>
-                <p class="ad-dev-title">Responsive Ad Slot</p>
-                <p class="ad-dev-sub">Non-Intrusive Editorial Placement</p>
-              </div>
             </div>
           </div>
         </section>
@@ -908,11 +894,11 @@
               <article class="faq-hairline-row">
                 <button type="button" class="faq-hairline-trigger" aria-expanded="false">
                   <span class="faq-num">03</span>
-                  <span class="faq-question">Can I listen on mobile &amp; in the background?</span>
+                  <span class="faq-question">Can I listen on mobile with lockscreen controls?</span>
                   <span class="faq-plus-icon">+</span>
                 </button>
                 <div class="faq-hairline-content hidden">
-                  <p>Yes. GULLYGANG fully supports background audio streaming on mobile browsers, tablets, and lockscreen media sessions, allowing you to play, pause, or switch tracks seamlessly.</p>
+                  <p>Yes. GULLYGANG integrates with the standard MediaSession API to support track metadata and media playback controls on supported mobile devices and desktop lockscreens.</p>
                 </div>
               </article>
 
@@ -1008,6 +994,7 @@
             <button type="button" class="editorial-nav-item" data-legal-page="privacy">Privacy</button>
             <button type="button" class="editorial-nav-item" data-legal-page="terms">Terms</button>
             <button type="button" class="editorial-nav-item" data-legal-page="cookies">Cookies</button>
+            <button type="button" class="editorial-nav-item" data-legal-page="disclaimer">Disclaimer</button>
             <button type="button" class="editorial-nav-item" data-legal-page="contact">Contact</button>
           </nav>
 
@@ -1201,6 +1188,7 @@
               <li><a href="#/privacy" class="footer-nav-link" data-route="privacy">Privacy Policy</a></li>
               <li><a href="#/terms" class="footer-nav-link" data-route="terms">Terms of Use</a></li>
               <li><a href="#/cookies" class="footer-nav-link" data-route="cookies">Cookie Policy</a></li>
+              <li><a href="#/disclaimer" class="footer-nav-link" data-route="disclaimer">Disclaimer</a></li>
             </ul>
           </div>
 

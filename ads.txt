@@ -1,0 +1,6 @@
+# Google AdSense authorized digital sellers file for gullygang.in
+# Documentation: https://support.google.com/adsense/answer/7532444
+# 
+# IMPORTANT: Once you receive your approved Google AdSense Publisher ID,
+# replace pub-XXXXXXXXXXXXXXXX with your 16-digit publisher ID (e.g. pub-1234567890123456)
+google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
