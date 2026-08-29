@@ -8,24 +8,34 @@ const INSFORGE_API_KEY = process.env.INSFORGE_API_KEY || process.env.API_KEY || 
 /**
  * Execute InsForge SQL Query via official rawsql API
  */
-async function queryInsForge(sql) {
+async function queryInsForge(sql, timeoutMs = 15000) {
   const url = `${INSFORGE_HOST}/api/database/advance/rawsql`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${INSFORGE_API_KEY}`
-    },
-    body: JSON.stringify({ query: sql })
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`InsForge query failed (${response.status}): ${errText}`);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${INSFORGE_API_KEY}`
+      },
+      body: JSON.stringify({ query: sql }),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`InsForge query failed (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.rows ?? data.data ?? data ?? [];
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
   }
-
-  const data = await response.json();
-  return data.rows ?? data.data ?? data ?? [];
 }
 
 /**

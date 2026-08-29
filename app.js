@@ -704,7 +704,57 @@
     }
   }
 
-  // --- InsForge REST Helper ---
+  // --- Resilient Network Fetcher (Timeout, Exponential Backoff Retry & In-Flight Deduplication) ---
+  const inFlightRequests = new Map();
+
+  async function fetchWithRetryAndTimeout(url, options = {}, maxRetries = 2, timeoutMs = 12000) {
+    const isGet = !options.method || options.method.toUpperCase() === 'GET';
+    const dedupeKey = isGet ? `${url}__${JSON.stringify(options.headers || {})}` : null;
+
+    if (dedupeKey && inFlightRequests.has(dedupeKey)) {
+      return inFlightRequests.get(dedupeKey).then(res => res.clone());
+    }
+
+    const execPromise = (async () => {
+      let lastError = null;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+          const res = await fetch(url, {
+            ...options,
+            signal: controller.signal
+          });
+          clearTimeout(timer);
+
+          // Retry on 5xx or server gateway errors with backoff
+          if (!res.ok && res.status >= 500 && attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, (attempt + 1) * 400));
+            continue;
+          }
+
+          return res;
+        } catch (err) {
+          clearTimeout(timer);
+          lastError = err;
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, (attempt + 1) * 400));
+          }
+        }
+      }
+      throw lastError || new Error(`Network request timed out or failed: ${url}`);
+    })();
+
+    if (dedupeKey) {
+      inFlightRequests.set(dedupeKey, execPromise);
+      execPromise.finally(() => inFlightRequests.delete(dedupeKey));
+    }
+
+    return execPromise;
+  }
+
+  // --- InsForge REST Helper with Automatic Retry & Timeout ---
   async function insforgeFetch(path, options = {}) {
     const url = `${INSFORGE_CONFIG.baseUrl}${path}`;
     const headers = {
@@ -713,7 +763,7 @@
       'Content-Type': 'application/json',
       ...(options.headers || {})
     };
-    return fetch(url, { ...options, headers });
+    return fetchWithRetryAndTimeout(url, { ...options, headers }, 2, 12000);
   }
 
   // --- Google Drive & Media URL Normalizer ---
@@ -736,13 +786,37 @@
     return clean;
   }
 
-  // --- Dynamic InsForge Cloud Playlists Sync ---
+  // --- Dynamic InsForge Cloud Playlists Sync with SWR (Stale-While-Revalidate) ---
+  const CACHED_PLAYLISTS_KEY = 'gullygang_cached_playlists';
+
   async function loadInsForgePlaylists(isBackgroundSync = false) {
+    // 1. Instant Cache Hydration: Render cached playlists in 0ms so UI is never blank
+    if (!state.playlists || state.playlists.length === 0) {
+      try {
+        const cached = localStorage.getItem(CACHED_PLAYLISTS_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            state.playlists = parsed;
+            renderPlaylistMenus();
+            if (!state.currentPlaylist) {
+              selectPlaylist(parsed[0]);
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Background Revalidation from InsForge
     try {
       const res = await insforgeFetch('/api/database/records/playlists?is_active=eq.true&order=display_order.asc');
       if (res.ok) {
         const playlists = await res.json();
         if (Array.isArray(playlists) && playlists.length > 0) {
+          try {
+            localStorage.setItem(CACHED_PLAYLISTS_KEY, JSON.stringify(playlists));
+          } catch (e) {}
+
           const prevId = state.currentPlaylist?.id;
           state.playlists = playlists;
           renderPlaylistMenus();
@@ -763,24 +837,25 @@
         }
       }
     } catch (e) {
-      console.warn('[InsForge] Playlists sync warning:', e);
+      console.warn('[InsForge] Playlists sync notice (offline/slow connection):', e);
     }
 
-    if (!state.currentPlaylist) {
+    // 3. Fallback only if no playlists exist at all
+    if (!state.currentPlaylist && (!state.playlists || state.playlists.length === 0)) {
       state.playlists = [
         {
-          id: 'romantic-default',
-          name: 'Romantic',
-          icon: '💝',
-          youtube_playlist_url: 'https://youtube.com/playlist?list=PLIQS0Hg0bqrUpax63Fk7i7XjGa5a-9Av1',
+          id: '25217e19-6e46-4e64-8d34-14a697b56f63',
+          name: 'GullyGang Special',
+          icon: '⚡️',
+          youtube_playlist_url: 'https://youtube.com/playlist?list=PLIQS0Hg0bqrV8JDs67xuNRI0C5UTfGAyt',
           bg_image: 'romantic.png'
         },
         {
-          id: 'bhajan-default',
-          name: 'Bhajan',
-          icon: '🕉️',
-          youtube_playlist_url: 'https://youtube.com/playlist?list=PLP3mTiRDfnMpWe6mlcgYiAz93pSUjwGzo',
-          bg_image: 'BHajan.png'
+          id: '79baaf20-b9b9-44c6-b38c-193f2aa8efbf',
+          name: 'Odia Romantic',
+          icon: '💝',
+          youtube_playlist_url: 'https://youtube.com/playlist?list=PLIQS0Hg0bqrUpax63Fk7i7XjGa5a-9Av1',
+          bg_image: 'romantic.png'
         }
       ];
       renderPlaylistMenus();
@@ -946,6 +1021,8 @@
 
   function setupImageWithWaterfall(imgEl, track) {
     if (!imgEl) return;
+    imgEl.decoding = 'async';
+    imgEl.loading = 'lazy';
     const candidates = getArtworkWaterfallCandidates(track);
     imgEl._waterfallCandidates = candidates;
     imgEl._waterfallIndex = 0;
@@ -1024,12 +1101,15 @@
   // PLAYLIST RUNTIME CACHE ENGINE
   // High-performance 10-minute cache with in-memory Map & sessionStorage
   // ============================================================
+  // ============================================================
+  // DURABLE PLAYLIST CACHE ENGINE (Stale-While-Revalidate)
+  // Persistent localStorage + in-memory Map for instantaneous 0ms cold-start
+  // ============================================================
   const PlaylistCacheEngine = (function () {
-    const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache TTL
     const memoryCache = new Map();
 
     function getCacheKey(listId) {
-      return `odiverse_pl_cache_${listId}`;
+      return `gullygang_pl_cache_${listId}`;
     }
 
     function get(listId) {
@@ -1038,20 +1118,32 @@
 
       // 1. Check in-memory map
       if (memoryCache.has(key)) {
-        const entry = memoryCache.get(key);
-        if (Date.now() - entry.timestamp < CACHE_TTL_MS && Array.isArray(entry.tracks) && entry.tracks.length > 0) {
-          return entry.tracks;
-        }
+        const tracks = memoryCache.get(key);
+        if (Array.isArray(tracks) && tracks.length > 0) return tracks;
       }
 
-      // 2. Check sessionStorage
+      // 2. Check localStorage (persistent across app closes & restarts)
       try {
-        const stored = sessionStorage.getItem(key);
+        const stored = localStorage.getItem(key);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Date.now() - parsed.timestamp < CACHE_TTL_MS && Array.isArray(parsed.tracks) && parsed.tracks.length > 0) {
-            memoryCache.set(key, parsed);
-            return parsed.tracks;
+          const tracks = Array.isArray(parsed) ? parsed : parsed.tracks;
+          if (Array.isArray(tracks) && tracks.length > 0) {
+            memoryCache.set(key, tracks);
+            return tracks;
+          }
+        }
+      } catch (e) {}
+
+      // 3. Fallback check sessionStorage
+      try {
+        const stored = sessionStorage.getItem(key) || sessionStorage.getItem(`odiverse_pl_cache_${listId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const tracks = Array.isArray(parsed) ? parsed : parsed.tracks;
+          if (Array.isArray(tracks) && tracks.length > 0) {
+            memoryCache.set(key, tracks);
+            return tracks;
           }
         }
       } catch (e) {}
@@ -1062,13 +1154,12 @@
     function set(listId, tracks) {
       if (!listId || !Array.isArray(tracks) || tracks.length === 0) return;
       const key = getCacheKey(listId);
-      const entry = {
-        timestamp: Date.now(),
-        tracks: tracks
-      };
-      memoryCache.set(key, entry);
+      memoryCache.set(key, tracks);
       try {
-        sessionStorage.setItem(key, JSON.stringify(entry));
+        localStorage.setItem(key, JSON.stringify({
+          timestamp: Date.now(),
+          tracks: tracks
+        }));
       } catch (e) {}
     }
 
@@ -1077,6 +1168,7 @@
       const key = getCacheKey(listId);
       memoryCache.delete(key);
       try {
+        localStorage.removeItem(key);
         sessionStorage.removeItem(key);
       } catch (e) {}
     }
@@ -1168,7 +1260,7 @@
     if (errorBox) errorBox.classList.remove('hidden');
   }
 
-  // --- Dynamic Playlist Loading from First-Party Source with Transitions ---
+  // --- Dynamic Playlist Loading with SWR (Stale-While-Revalidate) & Zero Data Loss ---
   async function loadPlaylistSongs(playlist, forceRefresh = false, isManualTrigger = false) {
     if (!playlist) return;
 
@@ -1188,28 +1280,28 @@
       refreshIconEl?.classList.add('animate-spin');
     }
 
-    // 1. Fast Cache Path (Snappy transition)
-    if (!forceRefresh && cacheKey) {
-      const cachedTracks = PlaylistCacheEngine.get(cacheKey);
-      if (cachedTracks && cachedTracks.length > 0) {
-        setPlaylistLoadingState(true, playlist.name, false);
-        await new Promise(r => setTimeout(r, 120));
+    // --- STEP 1: INSTANT SWR CACHE HYDRATION ---
+    // If cached tracks exist, display them immediately in 0ms so user never waits on slow 3G/4G
+    const cachedTracks = cacheKey ? PlaylistCacheEngine.get(cacheKey) : null;
+    const hasCachedTracks = Array.isArray(cachedTracks) && cachedTracks.length > 0;
 
-        if (requestId !== currentPlaylistRequestId) return;
-
-        state.tracks = cachedTracks;
-        state.currentIndex = 0;
-        setupCardsInitial();
-        updateDockUI();
+    if (hasCachedTracks) {
+      state.tracks = cachedTracks;
+      state.currentIndex = 0;
+      setupCardsInitial();
+      updateDockUI();
+      if (!state.isPlaying) {
         playCurrent();
-        setPlaylistLoadingState(false);
-        return;
       }
+      if (!isManualTrigger) {
+        setPlaylistLoadingState(false);
+      }
+    } else {
+      // Only show full loading overlay if we have ZERO tracks
+      setPlaylistLoadingState(true, playlist.name, isManualTrigger);
     }
 
-    // 2. Fresh Fetch from First-Party InsForge BaaS Database
-    setPlaylistLoadingState(true, playlist.name, isManualTrigger);
-
+    // --- STEP 2: BACKGROUND REVALIDATION FROM INSFORGE BAAS ---
     let runtimeTracks = [];
     if (playlist.id && playlist.id !== 'default') {
       try {
@@ -1229,11 +1321,11 @@
           }
         }
       } catch (e) {
-        console.warn('[Playlists] InsForge database fetch notice:', e);
+        console.warn('[Playlists] InsForge database fetch notice (offline/slow connection):', e);
       }
     }
 
-    // 3. Optional Direct YouTube Data API v3 (if official API key is provided)
+    // --- STEP 3: OPTIONAL DIRECT YOUTUBE API FALLBACK (if configured) ---
     if (runtimeTracks.length === 0 && listId) {
       const apiKey = (typeof window !== 'undefined' && (
         window.__ENV__?.YOUTUBE_API_KEY ||
@@ -1261,38 +1353,40 @@
       }
     }
 
-    // 4. Built-in Offline Fallback
+    // --- STEP 4: NEVER DESTROY GOOD DATA ON NETWORK FAILURE ---
     if (runtimeTracks.length === 0) {
-      const fallbackTracks = [
-        { id: 'Qc0mNOjlaH8', title: 'Bhijei Dei Ja Thare', artist: 'Humane Sagar', thumbnail: 'https://i.ytimg.com/vi/Qc0mNOjlaH8/hqdefault.jpg' },
-        { id: 'hdNCm2gkOGA', title: 'Tike Tike Barsha Hela', artist: 'Humane Sagar', thumbnail: 'https://i.ytimg.com/vi/hdNCm2gkOGA/hqdefault.jpg' },
-        { id: '0zhPaRZev8w', title: 'Sefali', artist: 'Kuldeep Pattanaik', thumbnail: 'https://i.ytimg.com/vi/0zhPaRZev8w/hqdefault.jpg' },
-        { id: 'a1sStJSVGA4', title: 'Tu Megha Heija', artist: 'Humane Sagar', thumbnail: 'https://i.ytimg.com/vi/a1sStJSVGA4/hqdefault.jpg' }
-      ];
-      runtimeTracks = fallbackTracks.map((t, idx) => ({
-        ...t,
-        playlistId: playlist.id || 'default',
-        position: idx + 1
-      }));
+      if (hasCachedTracks) {
+        runtimeTracks = cachedTracks; // Preserve existing cached tracks
+      } else if (state.tracks && state.tracks.length > 0 && state.currentPlaylist?.id === playlist.id) {
+        runtimeTracks = state.tracks; // Preserve existing memory state
+      } else {
+        // Safe offline seed tracks only if completely empty cold-start with no cache and offline
+        const fallbackTracks = [
+          { id: '3:59 AM', title: '3:59 AM', artist: 'DIVINE', thumbnail: 'romantic.png' },
+          { id: 'Winning Speech', title: 'Winning Speech', artist: 'Karan Aujla', thumbnail: 'romantic.png' }
+        ];
+        runtimeTracks = fallbackTracks.map((t, idx) => ({
+          ...t,
+          playlistId: playlist.id || 'default',
+          position: idx + 1
+        }));
+      }
     }
 
     if (requestId !== currentPlaylistRequestId) return;
 
-    // 5. Smooth minimum animation duration guard (avoid flash)
-    const elapsed = Date.now() - startTime;
-    if (elapsed < 300) {
-      await new Promise(r => setTimeout(r, 300 - elapsed));
-    }
-
-    if (requestId !== currentPlaylistRequestId) return;
-
-    // 6. Apply runtime tracks to state and UI
+    // --- STEP 5: APPLY FRESH DATA TO STATE & UI ---
     if (runtimeTracks.length > 0) {
-      state.tracks = runtimeTracks;
-      state.currentIndex = 0;
-      setupCardsInitial();
-      updateDockUI();
-      playCurrent();
+      const isTracksDifferent = !state.tracks || state.tracks.length !== runtimeTracks.length || (state.tracks[0]?.id !== runtimeTracks[0]?.id);
+      if (isTracksDifferent || !state.isPlaying) {
+        state.tracks = runtimeTracks;
+        state.currentIndex = 0;
+        setupCardsInitial();
+        updateDockUI();
+        if (!state.isPlaying) {
+          playCurrent();
+        }
+      }
       setPlaylistLoadingState(false);
     } else {
       showPlaylistLoadingError(playlist.name);
@@ -1301,9 +1395,9 @@
     if (isManualTrigger && refreshStatusEl) {
       refreshIconEl?.classList.remove('animate-spin');
       if (runtimeTracks.length > 0) {
-        refreshStatusEl.textContent = `Playlist refreshed — ${runtimeTracks.length} songs`;
+        refreshStatusEl.textContent = `Playlist ready — ${runtimeTracks.length} tracks`;
       } else {
-        refreshStatusEl.textContent = `Unable to refresh playlist`;
+        refreshStatusEl.textContent = `Offline — using cached tracks`;
       }
       setTimeout(() => {
         if (refreshStatusEl) refreshStatusEl.textContent = 'Refresh Playlist';
@@ -2196,11 +2290,27 @@
     }
   }
 
-  // --- InsForge Cloud Visuals Sync ---
+  // --- InsForge Cloud Visuals Sync with SWR ---
+  const CACHED_VISUALS_KEY = 'gullygang_cached_visuals';
+
   async function loadInsForgeVisuals(isBackgroundSync = false) {
     let cloudVisuals = null;
 
-    // 1. Try fetching from dedicated 'visuals' database table
+    // 1. Instant Cache Hydration: Render cached visuals in 0ms
+    if (!state.visuals || state.visuals.length === 0) {
+      try {
+        const cached = localStorage.getItem(CACHED_VISUALS_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            state.visuals = parsed;
+            renderVisualsOptions();
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Try fetching from dedicated 'visuals' database table
     try {
       const res = await insforgeFetch('/api/database/records/visuals?is_active=eq.true&order=display_order.asc');
       if (res.ok) {
@@ -2211,7 +2321,7 @@
       }
     } catch (e) {}
 
-    // 2. Try fetching from 'site_settings' (background_visuals key)
+    // 3. Try fetching from 'site_settings' (background_visuals key)
     if (!cloudVisuals) {
       try {
         const res = await insforgeFetch('/api/database/records/site_settings?key=eq.background_visuals');
@@ -2239,9 +2349,15 @@
           url: url
         });
       });
+    } else if (state.visuals && state.visuals.length > 0) {
+      formattedList = state.visuals;
     } else {
       formattedList = DEFAULT_VISUAL_PRESETS;
     }
+
+    try {
+      localStorage.setItem(CACHED_VISUALS_KEY, JSON.stringify(formattedList));
+    } catch (e) {}
 
     state.visuals = formattedList;
     renderVisualsOptions();
@@ -2569,7 +2685,7 @@
 
   async function loadWeatherFromIP() {
     try {
-      const res = await fetch('https://ipapi.co/json/');
+      const res = await fetchWithRetryAndTimeout('https://ipapi.co/json/', {}, 1, 6000);
       if (res.ok) {
         const data = await res.json();
         if (data.latitude && data.longitude) {
@@ -2578,12 +2694,10 @@
           return;
         }
       }
-    } catch (e) {
-      console.warn('[Weather] IP location warning:', e);
-    }
+    } catch (e) {}
 
     try {
-      const res2 = await fetch('https://get.geojs.io/v1/ip/geo.json');
+      const res2 = await fetchWithRetryAndTimeout('https://get.geojs.io/v1/ip/geo.json', {}, 1, 6000);
       if (res2.ok) {
         const data2 = await res2.json();
         const lat = parseFloat(data2.latitude);
@@ -2604,11 +2718,26 @@
     const descEl = document.getElementById('weather-condition');
     const iconEl = document.getElementById('weather-icon');
 
-    // 1. Reverse geocode city name if not supplied
+    // 1. Check cached weather for instant 0ms render
+    try {
+      const cached = sessionStorage.getItem('gullygang_cached_weather');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Date.now() - parsed.timestamp < 1800000) { // 30 min cache
+          if (locEl && parsed.city) locEl.textContent = parsed.city;
+          if (tempEl && parsed.temp) tempEl.textContent = parsed.temp;
+          if (descEl && parsed.desc) descEl.textContent = parsed.desc;
+          if (iconEl && parsed.icon) iconEl.textContent = parsed.icon;
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // 2. Reverse geocode city name if not supplied
     let city = knownCity;
     if (!city) {
       try {
-        const geoRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+        const geoRes = await fetchWithRetryAndTimeout(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`, {}, 1, 5000);
         if (geoRes.ok) {
           const geoData = await geoRes.json();
           city = geoData.locality || geoData.city || geoData.principalSubdivision || 'My Location';
@@ -2620,27 +2749,36 @@
       locEl.textContent = city;
     }
 
-    // 2. Fetch live real weather from Open-Meteo
+    // 3. Fetch live weather from Open-Meteo
     try {
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&timezone=auto`;
-      const wRes = await fetch(weatherUrl);
+      const wRes = await fetchWithRetryAndTimeout(weatherUrl, {}, 1, 8000);
       if (wRes.ok) {
         const wData = await wRes.json();
         const current = wData.current;
         if (current) {
-          const temp = Math.round(current.temperature_2m);
+          const temp = `${Math.round(current.temperature_2m)}°C`;
           const code = current.weather_code;
           const info = WMO_WEATHER_MAP[code] || { desc: 'Clear', icon: '☀️' };
 
-          if (tempEl) tempEl.textContent = `${temp}°C`;
+          if (tempEl) tempEl.textContent = temp;
           if (descEl) descEl.textContent = info.desc;
           if (iconEl) iconEl.textContent = info.icon;
+
+          try {
+            sessionStorage.setItem('gullygang_cached_weather', JSON.stringify({
+              timestamp: Date.now(),
+              city: city || 'Bhubaneswar',
+              temp: temp,
+              desc: info.desc,
+              icon: info.icon
+            }));
+          } catch (e) {}
         }
       }
     } catch (e) {
-      console.warn('[Weather] Fetch error:', e);
-      if (tempEl && tempEl.textContent === '--°C') tempEl.textContent = '26°C';
-      if (descEl && descEl.textContent === 'Loading') descEl.textContent = 'Overcast';
+      if (tempEl && (tempEl.textContent === '--°C' || !tempEl.textContent)) tempEl.textContent = '26°C';
+      if (descEl && (descEl.textContent === 'Loading' || !descEl.textContent)) descEl.textContent = 'Overcast';
     }
   }
 
@@ -4384,6 +4522,19 @@
       } else {
         stopProgressTracker();
       }
+    });
+
+    // Online / Offline Network Resilience Manager
+    window.addEventListener('online', () => {
+      console.log('[GULLYGANG Network] Connection restored — background revalidation triggered');
+      loadInsForgePlaylists(true);
+      if (state.currentPlaylist) {
+        loadPlaylistSongs(state.currentPlaylist, false);
+      }
+    });
+
+    window.addEventListener('offline', () => {
+      console.log('[GULLYGANG Network] Offline detected — continuing with cached content & active player');
     });
   }
 
