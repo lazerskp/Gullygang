@@ -155,7 +155,7 @@
   // ============================================================
   // ARTWORK COLOR EXTRACTION & DYNAMIC PALETTE ENGINE
   // Extracts dominant, secondary, accent, and deep shadow tones directly
-  // from the active song's center artwork
+  // from the active song's center artwork (100% dynamic, no hardcoded colors)
   // ============================================================
   const ArtworkColorEngine = (function () {
     const paletteCache = new Map();
@@ -164,12 +164,12 @@
     sampleCanvas.height = 48;
     const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
 
-    // Fallback palette: Rich crimson, deep ruby, nocturnal shadow base
+    // Neutral dark fallback — used only when image loading fails entirely
     const DEFAULT_PALETTE = {
-      dominant: 'rgb(185, 28, 45)',
-      secondary: 'rgb(115, 18, 34)',
-      accent: 'rgb(225, 45, 65)',
-      darkBase: 'rgb(8, 4, 6)'
+      dominant: 'rgb(28, 32, 42)',
+      secondary: 'rgb(18, 22, 28)',
+      accent: 'rgb(55, 65, 80)',
+      darkBase: 'rgb(6, 7, 9)'
     };
 
     function rgbToHsl(r, g, b) {
@@ -194,8 +194,9 @@
     function extractFromImageData(imgData) {
       if (!imgData || imgData.length === 0) return DEFAULT_PALETTE;
 
-      const colorBuckets = [];
-      let totalR = 0, totalG = 0, totalB = 0, validPixelCount = 0;
+      const pixels = [];
+      let sumR = 0, sumG = 0, sumB = 0, count = 0;
+      let whiteCount = 0, blackCount = 0;
 
       for (let i = 0; i < imgData.length; i += 4) {
         const r = imgData[i];
@@ -204,60 +205,121 @@
         const a = imgData[i + 3];
         if (a < 128) continue;
 
-        totalR += r;
-        totalG += g;
-        totalB += b;
-        validPixelCount++;
+        sumR += r;
+        sumG += g;
+        sumB += b;
+        count++;
 
         const [h, s, l] = rgbToHsl(r, g, b);
-        // Exclude blown out whites (L > 94) and pitch black (L < 4) from chromatic ranking
-        if (l < 4 || l > 94) continue;
 
-        // Vibrancy scoring: high saturation, balanced lightness
-        const score = (s * 2.2) + (100 - Math.abs(48 - l) * 1.3);
-        colorBuckets.push({ r, g, b, h, s, l, score });
+        if (l >= 90 && s < 12) whiteCount++;
+        if (l <= 8) blackCount++;
+
+        // Only include chromatic / non-blown-out pixels in vibrant hue clustering
+        if (l >= 8 && l <= 88) {
+          const score = (s * 2.2) + (100 - Math.abs(50 - l) * 1.3);
+          pixels.push({ r, g, b, h, s, l, score });
+        }
       }
 
-      if (colorBuckets.length === 0 && validPixelCount > 0) {
-        const avgR = Math.round(totalR / validPixelCount);
-        const avgG = Math.round(totalG / validPixelCount);
-        const avgB = Math.round(totalB / validPixelCount);
+      if (count === 0) return DEFAULT_PALETTE;
+
+      // Handle predominantly monochromatic, black-and-white, or minimalist covers
+      if (pixels.length < 20) {
+        const avgR = Math.round(sumR / count);
+        const avgG = Math.round(sumG / count);
+        const avgB = Math.round(sumB / count);
+        const isWhiteDom = (whiteCount / count) > 0.45;
+        const isBlackDom = (blackCount / count) > 0.45;
+
+        if (isWhiteDom) {
+          return {
+            dominant: 'rgb(200, 205, 215)',
+            secondary: 'rgb(140, 145, 155)',
+            accent: 'rgb(235, 240, 250)',
+            darkBase: 'rgb(12, 14, 18)'
+          };
+        }
+
         return {
-          dominant: `rgb(${avgR}, ${avgG}, ${avgB})`,
-          secondary: `rgb(${Math.round(avgR * 0.7)}, ${Math.round(avgG * 0.7)}, ${Math.round(avgB * 0.7)})`,
+          dominant: `rgb(${Math.max(20, avgR)}, ${Math.max(22, avgG)}, ${Math.max(26, avgB)})`,
+          secondary: `rgb(${Math.max(12, Math.round(avgR * 0.7))}, ${Math.max(14, Math.round(avgG * 0.7))}, ${Math.max(18, Math.round(avgB * 0.7))})`,
           accent: `rgb(${Math.min(255, avgR + 35)}, ${Math.min(255, avgG + 35)}, ${Math.min(255, avgB + 35)})`,
           darkBase: `rgb(${Math.max(4, Math.round(avgR * 0.08))}, ${Math.max(4, Math.round(avgG * 0.08))}, ${Math.max(6, Math.round(avgB * 0.08))})`
         };
       }
 
-      if (colorBuckets.length === 0) return DEFAULT_PALETTE;
+      // Group into 12 hue bins (30 degrees each) to filter out single logo outliers
+      const bins = Array.from({ length: 12 }, () => ({
+        pixels: [],
+        totalScore: 0
+      }));
 
-      // Sort by chromatic vibrancy and salience
-      colorBuckets.sort((a, b) => b.score - a.score);
+      for (let i = 0; i < pixels.length; i++) {
+        const p = pixels[i];
+        const binIdx = Math.floor((p.h % 360) / 30);
+        bins[binIdx].pixels.push(p);
+        bins[binIdx].totalScore += p.score;
+      }
 
-      // Dominant: Top representative vibrant color
-      const dom = colorBuckets[0];
+      // Filter out bins that have less than 3% of the image's pixels (eliminates small logos/badges)
+      const minClusterSize = Math.max(4, Math.floor(pixels.length * 0.035));
+      const validBins = bins.filter(b => b.pixels.length >= minClusterSize);
 
-      // Secondary: Distinct hue or tone with perceptual distance
-      const sec = colorBuckets.find(c => Math.abs(c.h - dom.h) > 20 || Math.abs(c.l - dom.l) > 18)
-               || colorBuckets[Math.floor(colorBuckets.length * 0.35)]
-               || dom;
+      for (const bin of validBins) {
+        let r = 0, g = 0, b = 0, h = 0, s = 0, l = 0;
+        const len = bin.pixels.length;
+        for (const p of bin.pixels) {
+          r += p.r; g += p.g; b += p.b; h += p.h; s += p.s; l += p.l;
+        }
+        bin.avgR = Math.round(r / len);
+        bin.avgG = Math.round(g / len);
+        bin.avgB = Math.round(b / len);
+        bin.avgH = Math.round(h / len);
+        bin.avgS = Math.round(s / len);
+        bin.avgL = Math.round(l / len);
+        // Cluster strength = score weighted by cluster volume
+        bin.weightedScore = bin.totalScore * Math.sqrt(len);
+      }
 
-      // Accent: High-saturation highlight
-      const acc = colorBuckets.find(c => c.s > 42 && (Math.abs(c.h - dom.h) > 30 || Math.abs(c.l - dom.l) > 22))
-               || colorBuckets.find(c => c.s > dom.s)
-               || colorBuckets[Math.floor(colorBuckets.length * 0.65)]
-               || dom;
+      if (validBins.length === 0) {
+        pixels.sort((a, b) => b.score - a.score);
+        const top = pixels[0];
+        const darkR = Math.max(4, Math.min(22, Math.round(top.r * 0.07 + 2)));
+        const darkG = Math.max(4, Math.min(22, Math.round(top.g * 0.07 + 2)));
+        const darkB = Math.max(5, Math.min(26, Math.round(top.b * 0.07 + 3)));
+        return {
+          dominant: `rgb(${top.r}, ${top.g}, ${top.b})`,
+          secondary: `rgb(${Math.round(top.r * 0.7)}, ${Math.round(top.g * 0.7)}, ${Math.round(top.b * 0.7)})`,
+          accent: `rgb(${Math.min(255, top.r + 30)}, ${Math.min(255, top.g + 30)}, ${Math.min(255, top.b + 30)})`,
+          darkBase: `rgb(${darkR}, ${darkG}, ${darkB})`
+        };
+      }
 
-      // Dark Base: Atmospheric shadow tint derived proportionally from dominant hue
-      const darkR = Math.max(4, Math.min(22, Math.round(dom.r * 0.07 + 2)));
-      const darkG = Math.max(4, Math.min(22, Math.round(dom.g * 0.07 + 2)));
-      const darkB = Math.max(5, Math.min(26, Math.round(dom.b * 0.07 + 4)));
+      validBins.sort((a, b) => b.weightedScore - a.weightedScore);
+      const domBin = validBins[0];
+
+      // Secondary: distinct chromatic bin with hue difference >= 30 degrees
+      const secBin = validBins.find(b => Math.abs(b.avgH - domBin.avgH) >= 30)
+                  || validBins[1]
+                  || domBin;
+
+      // Accent: highest saturation bin
+      const accBin = validBins.reduce((best, b) => (b.avgS > best.avgS ? b : best), domBin);
+
+      const domR = domBin.avgR, domG = domBin.avgG, domB = domBin.avgB;
+      const secR = secBin.avgR, secG = secBin.avgG, secB = secBin.avgB;
+      const accR = accBin.avgR, accG = accBin.avgG, accB = accBin.avgB;
+
+      // Dark Base: deep shadow tint matching the extracted dominant hue
+      const darkR = Math.max(4, Math.min(22, Math.round(domR * 0.07 + 2)));
+      const darkG = Math.max(4, Math.min(22, Math.round(domG * 0.07 + 2)));
+      const darkB = Math.max(5, Math.min(26, Math.round(domB * 0.07 + 3)));
 
       return {
-        dominant: `rgb(${dom.r}, ${dom.g}, ${dom.b})`,
-        secondary: `rgb(${sec.r}, ${sec.g}, ${sec.b})`,
-        accent: `rgb(${acc.r}, ${acc.g}, ${acc.b})`,
+        dominant: `rgb(${domR}, ${domG}, ${domB})`,
+        secondary: `rgb(${secR}, ${secG}, ${secB})`,
+        accent: `rgb(${accR}, ${accG}, ${accB})`,
         darkBase: `rgb(${darkR}, ${darkG}, ${darkB})`
       };
     }
@@ -359,13 +421,12 @@
     let prefersReducedMotion = false;
     let crossfadeTimeout = null;
 
-    // Node blueprint with non-linear irrational harmonic frequencies (Golden ratio, sqrt(2), sqrt(3), pi, e)
-    // Ensures organic, non-repeating, continuously evolving liquid light movement
+    // Node blueprint with non-linear irrational harmonic frequencies
     const NODE_CONFIGS = [
       {
         role: 'dominant',
         baseRadiusRatio: 0.75,
-        baseAlpha: 0.85,
+        baseAlpha: 0.65,
         speed: 0.0012,
         spreadX: 0.40,
         spreadY: 0.35,
@@ -380,7 +441,7 @@
       {
         role: 'accent',
         baseRadiusRatio: 0.68,
-        baseAlpha: 0.88,
+        baseAlpha: 0.68,
         speed: 0.0016,
         spreadX: 0.44,
         spreadY: 0.38,
@@ -395,7 +456,7 @@
       {
         role: 'secondary',
         baseRadiusRatio: 0.72,
-        baseAlpha: 0.82,
+        baseAlpha: 0.62,
         speed: 0.0010,
         spreadX: 0.42,
         spreadY: 0.36,
@@ -410,7 +471,7 @@
       {
         role: 'highlight',
         baseRadiusRatio: 0.55,
-        baseAlpha: 0.92,
+        baseAlpha: 0.68,
         speed: 0.0020,
         spreadX: 0.46,
         spreadY: 0.40,
@@ -425,7 +486,7 @@
       {
         role: 'mid',
         baseRadiusRatio: 0.65,
-        baseAlpha: 0.75,
+        baseAlpha: 0.58,
         speed: 0.0014,
         spreadX: 0.38,
         spreadY: 0.42,
@@ -440,7 +501,7 @@
       {
         role: 'dominant',
         baseRadiusRatio: 0.82,
-        baseAlpha: 0.65,
+        baseAlpha: 0.52,
         speed: 0.0009,
         spreadX: 0.35,
         spreadY: 0.30,
@@ -501,10 +562,9 @@
       return {
         img: null,
         imgLoaded: false,
-        darkBase: { r: 5, g: 6, b: 9 },
-        targetDarkBase: { r: 5, g: 6, b: 9 },
+        darkBase: { r: 6, g: 7, b: 9 },
+        targetDarkBase: { r: 6, g: 7, b: 9 },
         timeOffset: timeSeed,
-        // Artwork frame flow drift parameters
         coreDrift: {
           speedX: 0.0008, speedY: 0.0007, speedScale: 0.0006, speedRot: 0.0005,
           px1: Math.random() * 6.28, px2: Math.random() * 6.28,
@@ -513,8 +573,8 @@
         },
         nodes: NODE_CONFIGS.map(cfg => ({
           ...cfg,
-          current: { r: 195, g: 30, b: 75 },
-          target: { r: 195, g: 30, b: 75 }
+          current: { r: 28, g: 32, b: 42 },
+          target: { r: 28, g: 32, b: 42 }
         })),
         fogNodes: createFogNodes(),
         particles: createParticles(14)
@@ -526,12 +586,12 @@
     let liveAudioPulse = 1.0;
 
     function parseRgb(colorStr) {
-      if (!colorStr) return { r: 195, g: 30, b: 75 };
+      if (!colorStr) return { r: 28, g: 32, b: 42 };
       const m = colorStr.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
       if (m) {
         return { r: parseInt(m[1], 10), g: parseInt(m[2], 10), b: parseInt(m[3], 10) };
       }
-      return { r: 195, g: 30, b: 75 };
+      return { r: 28, g: 32, b: 42 };
     }
 
     let crossfadeEndTime = 0;
@@ -580,7 +640,7 @@
         }
       }
 
-      // Initialize default atmosphere with gradient nodes (zero redundant network transfer)
+      // Initialize default atmosphere with neutral palette
       loadLayerArtwork(stateA, '', ArtworkColorEngine.DEFAULT_PALETTE);
 
       start();
@@ -590,7 +650,6 @@
       if (!canvasA || !canvasB) return;
       const isMobile = window.innerWidth < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
       const aspect = (window.innerWidth && window.innerHeight) ? (window.innerWidth / window.innerHeight) : (16 / 9);
-      // Lightweight canvas dimensions: blurred heavily by CSS, zero visual difference but 60% lower GPU overhead
       const targetW = isMobile ? 320 : 460;
       const targetH = Math.max(200, Math.round(targetW / aspect));
 
@@ -611,7 +670,7 @@
 
       const img = new Image();
       img.decoding = 'async';
-      img.crossOrigin = 'Anonymous';
+      img.crossOrigin = 'anonymous';
       img.onload = () => {
         layerState.img = img;
         layerState.imgLoaded = true;
@@ -633,15 +692,15 @@
       layerState.targetDarkBase = dark;
 
       const highlight = {
-        r: Math.min(255, Math.round(acc.r * 0.75 + dom.r * 0.25 + 35)),
-        g: Math.min(255, Math.round(acc.g * 0.75 + dom.g * 0.25 + 35)),
-        b: Math.min(255, Math.round(acc.b * 0.75 + dom.b * 0.25 + 45))
+        r: Math.min(255, Math.round(acc.r * 0.85 + dom.r * 0.15)),
+        g: Math.min(255, Math.round(acc.g * 0.85 + dom.g * 0.15)),
+        b: Math.min(255, Math.round(acc.b * 0.85 + dom.b * 0.15))
       };
 
       const mid = {
-        r: Math.round(dom.r * 0.55 + sec.r * 0.45),
-        g: Math.round(dom.g * 0.55 + sec.g * 0.45),
-        b: Math.round(dom.b * 0.55 + sec.b * 0.45)
+        r: Math.round(dom.r * 0.60 + sec.r * 0.40),
+        g: Math.round(dom.g * 0.60 + sec.g * 0.40),
+        b: Math.round(dom.b * 0.60 + sec.b * 0.40)
       };
 
       layerState.paletteColors = { dom, sec, acc, highlight, mid };
@@ -1327,6 +1386,7 @@
   function setupImageWithWaterfall(imgEl, track, isCritical = false) {
     if (!imgEl) return;
     imgEl.decoding = 'async';
+    imgEl.crossOrigin = 'anonymous';
     const isLcpElement = isCritical || imgEl.id === 'curr-cover-img' || (imgEl.parentElement && imgEl.parentElement.closest('#card-curr'));
     if (isLcpElement) {
       imgEl.removeAttribute('loading');
