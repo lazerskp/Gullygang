@@ -439,6 +439,23 @@
         }
       });
 
+      // Off-screen viewport culling: pause RAF when scrolled past the hero stage
+      if ('IntersectionObserver' in window) {
+        const stageContainer = document.getElementById('stage-hero') || document.querySelector('.stage-section') || canvasA.parentElement;
+        if (stageContainer) {
+          const obs = new IntersectionObserver((entries) => {
+            const entry = entries[0];
+            const inView = entry.isIntersecting;
+            if (inView && isVisible) {
+              if (!isRunning) start();
+            } else {
+              stop();
+            }
+          }, { threshold: 0.05 });
+          obs.observe(stageContainer);
+        }
+      }
+
       // Initialize default artwork
       loadLayerArtwork(stateA, 'romantic.png', ArtworkColorEngine.DEFAULT_PALETTE);
 
@@ -450,8 +467,8 @@
       const isMobile = window.innerWidth < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
       const aspect = (window.innerWidth && window.innerHeight) ? (window.innerWidth / window.innerHeight) : (16 / 9);
       // Lightweight canvas dimensions: blurred heavily by CSS, zero visual difference but 60% lower GPU overhead
-      const targetW = isMobile ? 360 : 480;
-      const targetH = Math.max(220, Math.round(targetW / aspect));
+      const targetW = isMobile ? 320 : 460;
+      const targetH = Math.max(200, Math.round(targetW / aspect));
 
       [canvasA, canvasB].forEach(c => {
         if (c.width !== targetW || c.height !== targetH) {
@@ -907,24 +924,6 @@
     `;
 
     container.innerHTML = itemsHtml + syncFooterHtml;
-
-    container.querySelectorAll('.playlist-option-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const plId = btn.getAttribute('data-pl-id');
-        const pl = state.playlists.find(p => String(p.id) === String(plId));
-        if (pl) {
-          selectPlaylist(pl);
-          closeAllDropdowns();
-        }
-      });
-    });
-
-    const btnRefresh = container.querySelector('#btn-refresh-playlist');
-    btnRefresh?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      refreshCurrentPlaylist();
-    });
   }
 
   async function selectPlaylist(playlist) {
@@ -2605,15 +2604,6 @@
         </button>
       `;
     }).join('');
-
-    optionsList.querySelectorAll('.visual-item-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const visualId = btn.getAttribute('data-visual-id');
-        setVisual(visualId);
-        closeAllDropdowns();
-      });
-    });
   }
 
   function initVisualsSystem() {
@@ -2623,10 +2613,21 @@
     const visualsChevron = document.getElementById('visuals-chevron');
     const customInput = document.getElementById('custom-visual-url');
     const btnApplyCustom = document.getElementById('btn-apply-custom-visual');
+    const optionsList = document.getElementById('visuals-options-list');
 
     if (!bgVideo) return;
 
     renderVisualsOptions();
+
+    optionsList?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const itemBtn = e.target.closest('.visual-item-btn');
+      if (itemBtn) {
+        const visualId = itemBtn.getAttribute('data-visual-id');
+        setVisual(visualId);
+        closeAllDropdowns();
+      }
+    });
 
     // Custom URL Apply Button (Secure Protocol Check)
     btnApplyCustom?.addEventListener('click', (e) => {
@@ -2833,6 +2834,20 @@
 
     playlistDropdown?.addEventListener('click', (e) => {
       e.stopPropagation();
+      const optionBtn = e.target.closest('.playlist-option-btn');
+      if (optionBtn) {
+        const plId = optionBtn.getAttribute('data-pl-id');
+        const pl = state.playlists.find(p => String(p.id) === String(plId));
+        if (pl) {
+          selectPlaylist(pl);
+          closeAllDropdowns();
+        }
+        return;
+      }
+      const refreshBtn = e.target.closest('#btn-refresh-playlist');
+      if (refreshBtn) {
+        refreshCurrentPlaylist();
+      }
     });
 
     // Outside click dismiss

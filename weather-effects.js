@@ -112,117 +112,100 @@
     });
   }
 
-  // --- Rain Generator: 4 Depth Layers with Tapered Motion Blur ---
-  function createRainDrop(randomY = true) {
-    const isMobile = width < 768;
-    const r = Math.random();
-
-    let layer, speed, length, thickness, opacity;
-
-    if (r < 0.4) {
-      // Layer 0: Background fine mist drizzle
-      layer = 0;
-      speed = (isMobile ? 7 : 9.5) + Math.random() * 3.5;
-      length = 10 + Math.random() * 8;
-      thickness = 0.7;
-      opacity = 0.18 + Math.random() * 0.16;
-    } else if (r < 0.78) {
-      // Layer 1: Midground gentle rainfall
-      layer = 1;
-      speed = (isMobile ? 11 : 14.5) + Math.random() * 4.5;
-      length = 18 + Math.random() * 12;
-      thickness = 1.05;
-      opacity = 0.38 + Math.random() * 0.22;
-    } else if (r < 0.94) {
-      // Layer 2: Foreground smooth streaks
-      layer = 2;
-      speed = (isMobile ? 15 : 19.5) + Math.random() * 5.5;
-      length = 26 + Math.random() * 16;
-      thickness = 1.5;
-      opacity = 0.62 + Math.random() * 0.25;
-    } else {
-      // Layer 3: Lens streak (close to camera)
-      layer = 3;
-      speed = (isMobile ? 18 : 23.5) + Math.random() * 6.5;
-      length = 36 + Math.random() * 20;
-      thickness = 2.2;
-      opacity = 0.2 + Math.random() * 0.18;
-    }
-
-    return {
-      x: Math.random() * (width + 160) - 80,
-      y: randomY ? Math.random() * height : -length - Math.random() * 60,
-      speed,
-      length,
-      thickness,
-      opacity,
-      layer,
-      swayOffset: Math.random() * Math.PI * 2
-    };
-  }
-
   // --- Rain Splash Sparks & Water Rings ---
   function createRainImpact(x, y) {
-    // 1. Water Ripple Ring
-    if (Math.random() < 0.55) {
+    if (rainRipples.length < 15 && Math.random() < 0.4) {
       rainRipples.push({
         x,
         y,
         radius: 1.5,
-        maxRadius: 8 + Math.random() * 10,
-        growth: 0.45 + Math.random() * 0.35,
-        alpha: 0.55 + Math.random() * 0.25,
-        decay: 0.025 + Math.random() * 0.02
+        maxRadius: 8 + Math.random() * 8,
+        growth: 0.45 + Math.random() * 0.3,
+        alpha: 0.5,
+        decay: 0.035
       });
     }
 
-    // 2. Micro-splash particles
-    const splashCount = 2 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < splashCount; i++) {
+    if (rainSplashes.length < 20) {
       const angle = Math.PI + (Math.random() - 0.5) * 1.5;
-      const speed = 1.8 + Math.random() * 3.6;
+      const speed = 1.8 + Math.random() * 2.5;
       rainSplashes.push({
         x,
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        radius: 0.6 + Math.random() * 0.8,
-        alpha: 0.65,
-        decay: 0.045 + Math.random() * 0.035
+        radius: 0.6 + Math.random() * 0.6,
+        alpha: 0.6,
+        decay: 0.05
       });
     }
   }
 
-  // --- 4-Tier 4K Snowflake Generator ---
-  function createSnowflake(randomY = true) {
+  function resetRainDrop(drop, randomY = false) {
+    const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+    const r = Math.random();
+    let layer, speed, length, thickness, opacity;
+
+    if (r < 0.52) {
+      layer = 0;
+      speed = 18 + Math.random() * 12;
+      length = 16 + Math.random() * 14;
+      thickness = 0.9;
+      opacity = 0.22 + Math.random() * 0.18;
+    } else if (r < 0.85) {
+      layer = 1;
+      speed = 28 + Math.random() * 16;
+      length = 28 + Math.random() * 20;
+      thickness = 1.3;
+      opacity = 0.50 + Math.random() * 0.25;
+    } else {
+      layer = 2;
+      speed = (isMobile ? 36 : 42) + Math.random() * 18;
+      length = (isMobile ? 40 : 54) + Math.random() * 32;
+      thickness = 1.8;
+      opacity = 0.78 + Math.random() * 0.22;
+    }
+
+    drop.x = Math.random() * (width + 160) - 80;
+    drop.y = randomY ? Math.random() * height : -length - Math.random() * 60;
+    drop.speed = speed;
+    drop.length = length;
+    drop.thickness = thickness;
+    drop.opacity = opacity;
+    drop.layer = layer;
+    drop.swayOffset = Math.random() * Math.PI * 2;
+    return drop;
+  }
+
+  function createRainDrop(randomY = true) {
+    const drop = {};
+    return resetRainDrop(drop, randomY);
+  }
+
+  function resetSnowflake(flake, randomY = true) {
     const isMobile = width < 768;
     const r = Math.random();
-
     let layer, radius, speed, opacity, spriteIdx;
 
     if (r < 0.42) {
-      // Tier 0: Deep Background Snow Dust
       layer = 0;
       radius = 0.8 + Math.random() * 1.0;
       speed = 0.35 + Math.random() * 0.45;
       opacity = 0.25 + Math.random() * 0.25;
       spriteIdx = 0;
     } else if (r < 0.76) {
-      // Tier 1: Crisp Midground Floating Flakes
       layer = 1;
       radius = 1.8 + Math.random() * 1.6;
       speed = 0.75 + Math.random() * 0.75;
       opacity = 0.55 + Math.random() * 0.3;
       spriteIdx = 1;
     } else if (r < 0.92) {
-      // Tier 2: Foreground Luminous Flakes
       layer = 2;
       radius = 3.8 + Math.random() * 3.2;
       speed = 1.5 + Math.random() * 1.0;
       opacity = 0.75 + Math.random() * 0.22;
       spriteIdx = 2;
     } else {
-      // Tier 3: Cinematic Camera Bokeh Orb
       layer = 3;
       radius = (isMobile ? 8 : 12) + Math.random() * (isMobile ? 8 : 14);
       speed = 2.2 + Math.random() * 1.6;
@@ -230,22 +213,26 @@
       spriteIdx = 3;
     }
 
-    return {
-      x: Math.random() * (width + 120) - 60,
-      y: randomY ? Math.random() * height : -radius * 2.5 - Math.random() * 40,
-      radius,
-      speed,
-      opacity,
-      layer,
-      spriteIdx,
-      swayOffset: Math.random() * Math.PI * 2,
-      swaySpeed1: 0.0014 + Math.random() * 0.0016,
-      swaySpeed2: 0.0008 + Math.random() * 0.0012,
-      swayAmp: 0.8 + Math.random() * 1.8,
-      windDrift: 0.18 + Math.random() * 0.25,
-      twinkleOffset: Math.random() * Math.PI * 2,
-      twinkleSpeed: 0.002 + Math.random() * 0.003
-    };
+    flake.x = Math.random() * (width + 120) - 60;
+    flake.y = randomY ? Math.random() * height : -radius * 2.5 - Math.random() * 40;
+    flake.radius = radius;
+    flake.speed = speed;
+    flake.opacity = opacity;
+    flake.layer = layer;
+    flake.spriteIdx = spriteIdx;
+    flake.swayOffset = Math.random() * Math.PI * 2;
+    flake.swaySpeed1 = 0.0014 + Math.random() * 0.0016;
+    flake.swaySpeed2 = 0.0008 + Math.random() * 0.0012;
+    flake.swayAmp = 0.8 + Math.random() * 1.8;
+    flake.windDrift = 0.18 + Math.random() * 0.25;
+    flake.twinkleOffset = Math.random() * Math.PI * 2;
+    flake.twinkleSpeed = 0.002 + Math.random() * 0.003;
+    return flake;
+  }
+
+  function createSnowflake(randomY = true) {
+    const flake = {};
+    return resetSnowflake(flake, randomY);
   }
 
   // --- Initialize particles ---
@@ -261,12 +248,12 @@
     const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
 
     if (currentMode === 'rain') {
-      const dropCount = isMobile ? 38 : 140;
+      const dropCount = isMobile ? 26 : 100;
       for (let i = 0; i < dropCount; i++) {
         rainDrops.push(createRainDrop(true));
       }
     } else if (currentMode === 'snow') {
-      const flakeCount = isMobile ? 30 : 130;
+      const flakeCount = isMobile ? 22 : 90;
       for (let i = 0; i < flakeCount; i++) {
         snowflakes.push(createSnowflake(true));
       }
@@ -277,7 +264,6 @@
   function resizeCanvas() {
     if (!canvas) return;
     const isMobile = window.innerWidth < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
-    // Cap DPR to 1.0 on mobile to prevent excessive GPU fill-rate and battery drain
     dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.0 : 1.5);
     width = window.innerWidth;
     height = window.innerHeight;
@@ -296,7 +282,6 @@
   function renderRain(timestamp, dt, intensityFactor) {
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Cinematic Thunderstorm Double-Lightning
     if (lightningAlpha > 0) {
       ctx.fillStyle = `rgba(220, 235, 255, ${lightningAlpha})`;
       ctx.fillRect(0, 0, width, height);
@@ -305,30 +290,30 @@
       lightningTimer -= dt;
       if (lightningTimer <= 0) {
         if (lightningStep === 0) {
-          // Primary flash
           lightningAlpha = 0.06 + Math.random() * 0.06;
           lightningStep = 1;
-          lightningTimer = 60 + Math.random() * 40; // quick gap
+          lightningTimer = 60 + Math.random() * 40;
         } else if (lightningStep === 1) {
-          // Secondary echo flash
           lightningAlpha = 0.03 + Math.random() * 0.04;
           lightningStep = 0;
-          lightningTimer = 1200 + Math.random() * 1800; // Next thunder
+          lightningTimer = 1200 + Math.random() * 1800;
         }
       }
     }
 
-    // Dynamic wind angle with gentle undulating oscillation
     const windAngle = 0.13 + Math.sin(timestamp * 0.0006) * 0.035;
     const sinA = Math.sin(windAngle);
     const cosA = Math.cos(windAngle);
 
     ctx.lineCap = 'round';
-
     const speedMultiplier = (isPlayingMusic ? 1.05 : 0.85) * intensityFactor;
     const frameFactor = dt / 16.67;
 
-    // 2. Draw Rain Drops with Tapered Head/Tail Gradients
+    // 2. Batched rain streaks
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(215, 238, 255, 0.55)';
+    ctx.lineWidth = 1.2;
+
     for (let i = 0; i < rainDrops.length; i++) {
       const drop = rainDrops[i];
       const step = drop.speed * speedMultiplier * frameFactor;
@@ -339,29 +324,19 @@
       const tailX = drop.x - sinA * drop.length;
       const tailY = drop.y - cosA * drop.length;
 
-      // Draw tapered rain streak (bright at leading head, transparent at trailing tail)
-      const grad = ctx.createLinearGradient(tailX, tailY, drop.x, drop.y);
-      grad.addColorStop(0, 'rgba(180, 215, 255, 0)');
-      grad.addColorStop(0.65, `rgba(200, 230, 255, ${drop.opacity * 0.65})`);
-      grad.addColorStop(1, `rgba(240, 250, 255, ${drop.opacity})`);
-
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = drop.thickness;
-      ctx.beginPath();
       ctx.moveTo(tailX, tailY);
       ctx.lineTo(drop.x, drop.y);
-      ctx.stroke();
 
-      // Check ground collision
       if (drop.y > height - 8) {
-        if (drop.layer >= 1 && Math.random() < 0.42) {
+        if (drop.layer >= 1 && Math.random() < 0.35) {
           createRainImpact(drop.x, height - 2 - Math.random() * 6);
         }
-        rainDrops[i] = createRainDrop(false);
+        resetRainDrop(drop, false);
       } else if (drop.x > width + 70) {
-        rainDrops[i] = createRainDrop(false);
+        resetRainDrop(drop, false);
       }
     }
+    ctx.stroke();
 
     // 3. Render Ground Ripples
     for (let r = rainRipples.length - 1; r >= 0; r--) {
@@ -386,7 +361,7 @@
       const sp = rainSplashes[s];
       sp.x += sp.vx * frameFactor;
       sp.y += sp.vy * frameFactor;
-      sp.vy += 0.22 * frameFactor; // gravity
+      sp.vy += 0.22 * frameFactor;
       sp.alpha -= sp.decay * frameFactor;
 
       if (sp.alpha <= 0 || sp.y > height) {
@@ -394,61 +369,52 @@
         continue;
       }
 
-      ctx.fillStyle = `rgba(205, 230, 255, ${sp.alpha})`;
+      ctx.fillStyle = `rgba(235, 248, 255, ${sp.alpha})`;
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, sp.radius, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
-  // --- Update & render 4K Snow Overlay with Depth & Bokeh ---
+  // --- Update & render Hyper-Realistic Snow ---
   function renderSnow(timestamp, dt, intensityFactor) {
     ctx.clearRect(0, 0, width, height);
 
-    const speedMultiplier = (isPlayingMusic ? 1.12 : 0.85) * intensityFactor;
-    const timeSec = timestamp * 0.001;
+    const speedMultiplier = (isPlayingMusic ? 1.0 : 0.82) * intensityFactor;
     const frameFactor = dt / 16.67;
 
     for (let i = 0; i < snowflakes.length; i++) {
       const flake = snowflakes[i];
-      const step = flake.speed * speedMultiplier * frameFactor;
 
-      // Downward floating movement
-      flake.y += step;
+      const sway1 = Math.sin(timestamp * flake.swaySpeed1 + flake.swayOffset);
+      const sway2 = Math.cos(timestamp * flake.swaySpeed2 + flake.swayOffset * 1.5);
+      const sway = (sway1 * 0.65 + sway2 * 0.35) * flake.swayAmp;
 
-      // Dual harmonic sinusoidal swaying + gentle natural wind drift
-      const sway1 = Math.sin(flake.swayOffset + timestamp * flake.swaySpeed1) * flake.swayAmp;
-      const sway2 = Math.cos(flake.swayOffset * 1.4 + timestamp * flake.swaySpeed2) * (flake.swayAmp * 0.45);
-      flake.x += (flake.windDrift + (sway1 + sway2)) * frameFactor;
+      flake.x += (sway + flake.windDrift) * frameFactor;
+      flake.y += flake.speed * speedMultiplier * frameFactor;
 
-      // Soft twinkle pulse
-      const twinkle = 0.88 + 0.12 * Math.sin(flake.twinkleOffset + timeSec * 2);
-      const alpha = Math.min(1, Math.max(0, flake.opacity * twinkle));
+      const twinkle = 0.85 + 0.15 * Math.sin(timestamp * flake.twinkleSpeed + flake.twinkleOffset);
+      ctx.globalAlpha = Math.max(0, Math.min(1, flake.opacity * twinkle));
 
-      // Draw cached GPU offscreen sprite
       const sprite = snowSprites[flake.spriteIdx];
       if (sprite) {
-        const drawSize = flake.radius * 2;
-        ctx.globalAlpha = alpha;
         ctx.drawImage(
           sprite,
           flake.x - flake.radius,
           flake.y - flake.radius,
-          drawSize,
-          drawSize
+          flake.radius * 2,
+          flake.radius * 2
         );
       }
 
-      // Check viewport boundaries
       if (flake.y > height + flake.radius * 2.5) {
-        snowflakes[i] = createSnowflake(false);
+        resetSnowflake(flake, false);
       } else if (flake.x < -60) {
         flake.x = width + 50;
       } else if (flake.x > width + 60) {
         flake.x = -50;
       }
     }
-
     ctx.globalAlpha = 1.0;
   }
 
@@ -461,7 +427,7 @@
 
     if (!lastTimestamp) lastTimestamp = timestamp;
     const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
-    const minDelta = isMobile ? 32 : 16; // 30fps throttle on mobile
+    const minDelta = isMobile ? 33 : 16;
 
     if (timestamp - lastTimestamp < minDelta) {
       animationFrameId = requestAnimationFrame(animationLoop);
