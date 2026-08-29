@@ -1023,10 +1023,18 @@
     return candidates;
   }
 
-  function setupImageWithWaterfall(imgEl, track) {
+  function setupImageWithWaterfall(imgEl, track, isCritical = false) {
     if (!imgEl) return;
     imgEl.decoding = 'async';
-    imgEl.loading = 'lazy';
+    const isLcpElement = isCritical || imgEl.id === 'curr-cover-img' || (imgEl.parentElement && imgEl.parentElement.closest('#card-curr'));
+    if (isLcpElement) {
+      imgEl.removeAttribute('loading');
+      imgEl.setAttribute('fetchpriority', 'high');
+      if ('fetchPriority' in imgEl) imgEl.fetchPriority = 'high';
+    } else {
+      imgEl.setAttribute('loading', 'lazy');
+      if ('fetchPriority' in imgEl) imgEl.fetchPriority = 'low';
+    }
     const candidates = getArtworkWaterfallCandidates(track);
     imgEl._waterfallCandidates = candidates;
     imgEl._waterfallIndex = 0;
