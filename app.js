@@ -45,11 +45,47 @@
     } catch (e) {}
   }
 
+  // Seed configuration for instant 0ms cold-start hydration (SWR)
+  const DEFAULT_SEED_PLAYLIST = {
+    id: '25217e19-6e46-4e64-8d34-14a697b56f63',
+    name: 'GullyGang Special',
+    icon: '⚡️',
+    youtube_playlist_url: 'https://youtube.com/playlist?list=PLIQS0Hg0bqrV8JDs67xuNRI0C5UTfGAyt',
+    bg_image: 'romantic.png'
+  };
+
+  const DEFAULT_SEED_TRACKS = [
+    {
+      id: 'thS3-dmUvlg',
+      title: 'Ore Mora Saiyana',
+      artist: 'Aseema Panda',
+      thumbnail: 'https://i.ytimg.com/vi/thS3-dmUvlg/hqdefault.jpg',
+      playlistId: '25217e19-6e46-4e64-8d34-14a697b56f63',
+      position: 1
+    },
+    {
+      id: '1usErKKsNGM',
+      title: 'Suna Jhia',
+      artist: 'Humane Sagar',
+      thumbnail: 'https://i.ytimg.com/vi/1usErKKsNGM/hqdefault.jpg',
+      playlistId: '25217e19-6e46-4e64-8d34-14a697b56f63',
+      position: 2
+    },
+    {
+      id: '0DS5jYQeiw0',
+      title: 'Hai To Premare',
+      artist: 'Kuldeep Pattanaik',
+      thumbnail: 'https://i.ytimg.com/vi/0DS5jYQeiw0/hqdefault.jpg',
+      playlistId: '25217e19-6e46-4e64-8d34-14a697b56f63',
+      position: 3
+    }
+  ];
+
   // Global State
   const state = {
-    playlists: [],
-    currentPlaylist: null,
-    tracks: [],
+    playlists: [DEFAULT_SEED_PLAYLIST],
+    currentPlaylist: DEFAULT_SEED_PLAYLIST,
+    tracks: DEFAULT_SEED_TRACKS,
     currentIndex: 0,
     isPlaying: false,
     isShuffle: false,
@@ -456,8 +492,8 @@
         }
       }
 
-      // Initialize default artwork
-      loadLayerArtwork(stateA, 'romantic.png', ArtworkColorEngine.DEFAULT_PALETTE);
+      // Initialize default atmosphere with gradient nodes (zero redundant network transfer)
+      loadLayerArtwork(stateA, '', ArtworkColorEngine.DEFAULT_PALETTE);
 
       start();
     }
@@ -1044,12 +1080,14 @@
       if (imgEl._waterfallCandidates && imgEl._waterfallIndex < imgEl._waterfallCandidates.length) {
         imgEl.src = imgEl._waterfallCandidates[imgEl._waterfallIndex];
       } else {
-        imgEl.src = 'romantic.png';
         imgEl.onerror = null;
       }
     };
 
-    imgEl.src = candidates[0] || 'romantic.png';
+    const targetSrc = candidates[0];
+    if (targetSrc && imgEl.getAttribute('src') !== targetSrc && imgEl.src !== targetSrc) {
+      imgEl.src = targetSrc;
+    }
   }
 
   // ============================================================
@@ -1309,8 +1347,12 @@
         setPlaylistLoadingState(false);
       }
     } else {
-      // Only show full loading overlay if we have ZERO tracks
-      setPlaylistLoadingState(true, playlist.name, isManualTrigger);
+      // If we don't have cached tracks for this playlist yet, keep existing seed tracks rendered
+      if (!state.tracks || state.tracks.length === 0) {
+        setPlaylistLoadingState(true, playlist.name, isManualTrigger);
+      } else {
+        setPlaylistLoadingState(false);
+      }
     }
 
     // --- STEP 2: BACKGROUND REVALIDATION FROM INSFORGE BAAS ---
@@ -1686,15 +1728,30 @@
     }).catch(() => {});
   }
 
-  function setupCardsInitial() {
-    populateCardContent(cardRing[0], getTrackAtOffset(-2));
-    populateCardContent(cardRing[1], getTrackAtOffset(-1));
+  function setupCardsInitial(priorityCenterOnly = false) {
+    // 1. Center Active Card (LCP Target) - Synchronous instant render with high priority
     populateCardContent(cardRing[2], getTrackAtOffset(0));
-    populateCardContent(cardRing[3], getTrackAtOffset(1));
-    populateCardContent(cardRing[4], getTrackAtOffset(2));
 
-    for (let i = 0; i < 5; i++) {
-      cardRing[i].setAttribute('data-pos', POS_NAMES[i]);
+    // 2. Off-screen Flanks - Synchronous or deferred during cold initial boot to preserve 100% bandwidth for LCP
+    const renderFlanks = () => {
+      populateCardContent(cardRing[0], getTrackAtOffset(-2));
+      populateCardContent(cardRing[1], getTrackAtOffset(-1));
+      populateCardContent(cardRing[3], getTrackAtOffset(1));
+      populateCardContent(cardRing[4], getTrackAtOffset(2));
+      for (let i = 0; i < 5; i++) {
+        cardRing[i].setAttribute('data-pos', POS_NAMES[i]);
+      }
+    };
+
+    if (priorityCenterOnly) {
+      cardRing[2].setAttribute('data-pos', 'current');
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(renderFlanks, { timeout: 300 });
+      } else {
+        setTimeout(renderFlanks, 150);
+      }
+    } else {
+      renderFlanks();
     }
     updateDockUI();
   }
@@ -4733,7 +4790,7 @@
     initDropdownHandlers();
     initVisualsSystem();
     attachControlsListeners();
-    setupCardsInitial();
+    setupCardsInitial(true);
     loadInsForgePlaylists();
     loadInsForgeVisuals();
     AmbientAtmosphereEngine.init();
