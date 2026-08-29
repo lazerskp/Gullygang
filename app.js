@@ -3216,6 +3216,7 @@
           if (tempEl && parsed.temp) tempEl.textContent = parsed.temp;
           if (descEl && parsed.desc) descEl.textContent = parsed.desc;
           if (iconEl && parsed.icon) iconEl.innerHTML = weatherIconSvg(parsed.icon);
+          syncDropdownWeather(parsed.city, parsed.temp, parsed.desc);
           activeUserCoords = { lat: parsed.lat, lon: parsed.lon, city: parsed.city };
           return true;
         } else {
@@ -3224,6 +3225,18 @@
       }
     } catch (e) {}
     return false;
+  }
+
+  function syncDropdownWeather(city, temp, desc) {
+    const dLoc = document.getElementById('dropdown-weather-location');
+    const dTemp = document.getElementById('dropdown-weather-temp');
+    if (dLoc && city) {
+      dLoc.textContent = city;
+      dLoc.title = city;
+    }
+    if (dTemp) {
+      dTemp.textContent = temp || '--°C';
+    }
   }
 
   function setWeatherLocatingState() {
@@ -3240,6 +3253,7 @@
       locEl.classList.remove('weather-hub-denied-msg');
       locEl.title = 'Detecting your location...';
     }
+    syncDropdownWeather('Detecting...', '--°C', 'Atmosphere');
     if (tempEl) {
       tempEl.style.display = '';
       tempEl.textContent = '--°C';
@@ -3454,6 +3468,7 @@
           if (tempEl) tempEl.textContent = temp;
           if (descEl) descEl.textContent = info.desc;
           if (iconEl) iconEl.innerHTML = weatherIconSvg(info.icon);
+          syncDropdownWeather(city, temp, info.desc);
 
           activeUserCoords = { lat, lon, city };
 

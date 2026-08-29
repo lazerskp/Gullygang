@@ -274,8 +274,14 @@
 
         <!-- Vertical Dropdown Panel Directly Underneath Hide / Effects Bar -->
         <div id="weather-effects-dropdown-panel" class="weather-effects-dropdown-panel" role="menu" aria-label="Atmospheric effects" aria-hidden="true">
-          <div class="weather-effects-dropdown-header">
-            <span>ATMOSPHERE</span>
+          <div class="weather-effects-dropdown-header flex items-center justify-between">
+            <div class="dropdown-weather-live flex items-center gap-1.5 min-w-0">
+              <span class="dropdown-weather-dot-live" aria-hidden="true"></span>
+              <span class="dropdown-weather-location truncate" id="dropdown-weather-location">Detecting...</span>
+              <span class="dropdown-weather-divider" aria-hidden="true">•</span>
+              <strong class="dropdown-weather-temp font-bold" id="dropdown-weather-temp">--°C</strong>
+            </div>
+            <span class="dropdown-header-tag">ATMOSPHERE</span>
           </div>
 
           <div class="weather-effects-dropdown-list">

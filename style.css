@@ -401,13 +401,53 @@ img {
 }
 
 .weather-effects-dropdown-header {
-  padding: 4px 10px 8px;
-  font-size: 9px;
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  margin-bottom: 4px;
+}
+
+.dropdown-weather-live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.dropdown-weather-dot-live {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+  flex-shrink: 0;
+}
+
+.dropdown-weather-location {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.dropdown-weather-divider {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 8px;
+}
+
+.dropdown-weather-temp {
+  color: #38bdf8;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dropdown-header-tag {
+  font-size: 8.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.35);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  margin-bottom: 4px;
 }
 
 .weather-effects-dropdown-list {
@@ -533,54 +573,178 @@ body.is-stage-hidden .top-weather-hub {
   overflow: hidden !important;
 }
 
-@media (max-width: 640px) {
-  .weather-hub-primary {
-    font-size: 10.5px;
-    gap: 3px;
+/* ============================================================
+   MOBILE HEADER COMPACTNESS & MUSIC-FIRST STAGE OVERRIDES
+   ============================================================ */
+@media (max-width: 768px) {
+  .site-header {
+    top: max(10px, env(safe-area-inset-top, 10px));
+    left: max(14px, env(safe-area-inset-left, 14px));
+    right: max(14px, env(safe-area-inset-right, 14px));
+    height: 38px;
+    align-items: center;
   }
-  .weather-hub-location { max-width: 85px; }
-  .weather-hub-denied-msg { max-width: 140px !important; font-size: 9.5px; }
-  .weather-retry-btn { font-size: 9px; padding: 1.5px 5px; }
-  .weather-hub-desc { display: none; }
-  .weather-hub-secondary {
-    font-size: 9px;
-    gap: 3px;
+
+  .brand-logo-text {
+    font-size: 13.5px;
+    letter-spacing: 0.14em;
+    padding-top: 0;
+    line-height: 1;
   }
-  .weather-hub-date { display: none; }
+
+  .top-header-right {
+    gap: 6px;
+    align-items: center;
+  }
+
+  /* Hide bulky multi-row weather hub from topbar header on mobile */
+  .top-weather-hub {
+    display: none !important;
+  }
+
+  /* Compact single-row Support pill */
+  .header-support-pill {
+    height: 32px;
+    padding: 0 11px;
+    font-size: 11.5px;
+    gap: 5px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    background: rgba(236, 72, 153, 0.12);
+    border: 1px solid rgba(236, 72, 153, 0.3);
+  }
+  .header-support-pill .support-pill-text {
+    display: inline-block !important;
+  }
+
+  /* Compact single-row Effects bar */
   .effects-bar-pill {
-    padding: 2px 3px;
-    gap: 1px;
+    height: 32px;
+    padding: 0 3px;
+    border-radius: 999px;
   }
-  .top-hide-stage-btn {
-    width: 26px;
-    height: 26px;
-  }
+
   .top-effects-dropdown-btn {
-    height: 26px;
-    padding: 0 6px 0 4px;
-    font-size: 10px;
-    gap: 3px;
+    height: 30px;
+    padding: 0 9px 0 7px;
+    font-size: 11.5px;
+    gap: 4px;
   }
-  .effects-label-text {
-    display: inline;
-  }
+
   .weather-effects-dropdown-panel {
-    width: 195px;
-    padding: 6px 5px 5px;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 220px;
+    max-width: calc(100vw - 28px);
+    padding: 7px 6px 6px;
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
   }
+
   .weather-dropdown-item {
     padding: 7px 8px;
     gap: 8px;
   }
+
   .dropdown-item-icon-wrap {
     width: 26px;
     height: 26px;
   }
+
   .dropdown-item-title {
     font-size: 11.5px;
   }
+
   .dropdown-item-subtitle {
     font-size: 9px;
+  }
+
+  /* Music-First Stage Spacing & Sizing */
+  .bottom-stage-wrap {
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  }
+
+  .carousel-stage-container {
+    padding: 0 12px;
+  }
+
+  .stage-control-capsules {
+    margin-bottom: 6px;
+    gap: 6px;
+  }
+
+  .stage-vibe-pill {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .carousel-stage-height {
+    height: clamp(230px, 48vw, 290px);
+  }
+
+  .reference-player {
+    width: calc(100vw - 24px);
+    margin: 0 auto;
+  }
+
+  .player-bar-container {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .site-header {
+    top: max(8px, env(safe-area-inset-top, 8px));
+    left: max(10px, env(safe-area-inset-left, 10px));
+    right: max(10px, env(safe-area-inset-right, 10px));
+    height: 34px;
+  }
+
+  .brand-logo-text {
+    font-size: 12.5px;
+    letter-spacing: 0.12em;
+  }
+
+  .top-header-right {
+    gap: 5px;
+  }
+
+  .header-support-pill {
+    height: 30px;
+    padding: 0 9px;
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .effects-bar-pill {
+    height: 30px;
+    padding: 0 2px;
+  }
+
+  .top-effects-dropdown-btn {
+    height: 28px;
+    padding: 0 8px 0 6px;
+    font-size: 11px;
+    gap: 3.5px;
+  }
+
+  .weather-effects-dropdown-panel {
+    width: 215px;
+  }
+
+  .carousel-stage-container {
+    padding: 0 8px;
+  }
+
+  .reference-player {
+    width: calc(100vw - 16px);
+  }
+
+  .player-bar-container {
+    padding: 9px 10px;
   }
 }
 
@@ -3909,12 +4073,6 @@ body.is-stage-hidden .top-weather-hub {
   .editorial-support-copy {
     font-size: 13px;
     margin-bottom: 20px;
-  }
-  .header-support-pill .support-pill-text {
-    display: none;
-  }
-  .header-support-pill {
-    padding: 6px 10px;
   }
 }
 
