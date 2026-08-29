@@ -160,6 +160,44 @@ img {
   white-space: nowrap;
 }
 
+.weather-hub-denied-msg {
+  max-width: 230px !important;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+}
+
+.weather-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7.5px;
+  border-radius: 9999px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  line-height: 1.2;
+  margin-left: 3px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.weather-retry-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.weather-retry-btn:active {
+  transform: translateY(0.5px) scale(0.97);
+}
+
 .weather-hub-temp {
   font-weight: 700;
   color: #ffffff;
@@ -316,6 +354,8 @@ body.is-stage-hidden .carousel-stage-container {
     gap: 3px;
   }
   .weather-hub-location { max-width: 85px; }
+  .weather-hub-denied-msg { max-width: 140px !important; font-size: 9.5px; }
+  .weather-retry-btn { font-size: 9px; padding: 1.5px 5px; }
   .weather-hub-desc { display: none; }
   .weather-hub-secondary {
     font-size: 9px;

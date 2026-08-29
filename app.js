@@ -3138,41 +3138,190 @@
     return svgIcon(paths, 13, 'weather-hub-svg inline-block');
   }
 
-  // --- Real Geolocation & Weather Fetcher (Non-Blocking / User Permission Model) ---
-  async function fetchRealLocationAndWeather(userInitiated = false) {
-    if (userInitiated && 'geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          await loadWeatherForCoordinates(lat, lon);
-        },
-        async () => {
-          await loadWeatherFromIP();
-        },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
-      );
-      return;
-    }
+  // --- Active GPS Coordinates & Weather State ---
+  let activeUserCoords = null; // { lat: number, lon: number, city: string | null }
+  let isLocatingWeather = false;
 
-    await loadWeatherFromIP();
-  }
-
-  async function loadWeatherFromIP() {
+  function restoreCachedWeatherIfValid() {
     try {
-      const res = await fetchWithRetryAndTimeout('https://get.geojs.io/v1/ip/geo.json', {}, 1, 5000);
-      if (res.ok) {
-        const data = await res.json();
-        const lat = parseFloat(data.latitude);
-        const lon = parseFloat(data.longitude);
-        if (!isNaN(lat) && !isNaN(lon)) {
-          await loadWeatherForCoordinates(lat, lon, data.city || 'Bhubaneswar');
-          return;
+      const cached = sessionStorage.getItem('gullygang_cached_weather');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const hasValidCoords = typeof parsed.lat === 'number' && typeof parsed.lon === 'number' && parsed.city;
+        if (hasValidCoords && (Date.now() - parsed.timestamp < 1800000)) { // 30 min cache
+          const locEl = document.getElementById('weather-location');
+          const tempEl = document.getElementById('weather-temp');
+          const descEl = document.getElementById('weather-condition');
+          const iconEl = document.getElementById('weather-icon');
+          if (locEl && parsed.city) {
+            locEl.textContent = parsed.city;
+            locEl.title = parsed.city;
+            locEl.classList.remove('weather-hub-denied-msg');
+          }
+          if (tempEl && parsed.temp) tempEl.textContent = parsed.temp;
+          if (descEl && parsed.desc) descEl.textContent = parsed.desc;
+          if (iconEl && parsed.icon) iconEl.innerHTML = weatherIconSvg(parsed.icon);
+          activeUserCoords = { lat: parsed.lat, lon: parsed.lon, city: parsed.city };
+          return true;
+        } else {
+          sessionStorage.removeItem('gullygang_cached_weather');
         }
       }
     } catch (e) {}
+    return false;
+  }
 
-    await loadWeatherForCoordinates(20.2961, 85.8245, 'Bhubaneswar');
+  function setWeatherLocatingState() {
+    const locEl = document.getElementById('weather-location');
+    const tempEl = document.getElementById('weather-temp');
+    const descEl = document.getElementById('weather-condition');
+    const iconEl = document.getElementById('weather-icon');
+    const divider1 = document.getElementById('weather-divider-1');
+    const retryBtn = document.getElementById('weather-retry-btn');
+
+    if (retryBtn) retryBtn.remove();
+    if (locEl) {
+      locEl.textContent = 'Detecting...';
+      locEl.classList.remove('weather-hub-denied-msg');
+      locEl.title = 'Detecting your location...';
+    }
+    if (tempEl) {
+      tempEl.style.display = '';
+      tempEl.textContent = '--°C';
+    }
+    if (descEl) {
+      descEl.style.display = '';
+      descEl.textContent = 'Loading';
+    }
+    if (divider1) divider1.style.display = '';
+    if (iconEl) {
+      iconEl.style.display = '';
+      iconEl.innerHTML = weatherIconSvg('sunCloud');
+    }
+  }
+
+  function showWeatherLocationError(message = 'Location access is required for local weather', canRetry = true) {
+    const locEl = document.getElementById('weather-location');
+    const tempEl = document.getElementById('weather-temp');
+    const descEl = document.getElementById('weather-condition');
+    const iconEl = document.getElementById('weather-icon');
+    const divider1 = document.getElementById('weather-divider-1');
+    const primaryHub = document.querySelector('.weather-hub-primary');
+
+    if (locEl) {
+      locEl.textContent = message;
+      locEl.classList.add('weather-hub-denied-msg');
+      locEl.title = message;
+    }
+    if (tempEl) tempEl.style.display = 'none';
+    if (descEl) descEl.style.display = 'none';
+    if (divider1) divider1.style.display = 'none';
+    if (iconEl) iconEl.style.display = 'none';
+
+    let retryBtn = document.getElementById('weather-retry-btn');
+    if (canRetry) {
+      if (!retryBtn && primaryHub) {
+        retryBtn = document.createElement('button');
+        retryBtn.type = 'button';
+        retryBtn.id = 'weather-retry-btn';
+        retryBtn.className = 'weather-retry-btn';
+        retryBtn.setAttribute('aria-label', 'Retry location access');
+        retryBtn.title = 'Click to request location permission again';
+        retryBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span>Try Again</span>
+        `;
+        retryBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          fetchRealLocationAndWeather(true);
+        });
+        primaryHub.appendChild(retryBtn);
+      }
+    } else if (retryBtn) {
+      retryBtn.remove();
+    }
+  }
+
+  function handleGeolocationError(err) {
+    let message = 'Location access is required for local weather';
+    if (err) {
+      if (err.code === 1 || err.code === (err.PERMISSION_DENIED || 1)) {
+        message = 'Location access is required for local weather';
+        activeUserCoords = null;
+        try { sessionStorage.removeItem('gullygang_cached_weather'); } catch (e) {}
+      } else if (err.code === 2 || err.code === (err.POSITION_UNAVAILABLE || 2)) {
+        message = 'Location unavailable';
+      } else if (err.code === 3 || err.code === (err.TIMEOUT || 3)) {
+        message = 'Location request timed out';
+      }
+    }
+    showWeatherLocationError(message, true);
+  }
+
+  // --- Real Geolocation & Weather Fetcher (GPS Permission Model) ---
+  async function fetchRealLocationAndWeather(userInitiated = false) {
+    if (!('geolocation' in navigator)) {
+      showWeatherLocationError('Geolocation not supported by browser', false);
+      return;
+    }
+
+    // 1. If background refresh & we already have active valid user coordinates, reuse coords directly
+    if (!userInitiated && activeUserCoords && typeof activeUserCoords.lat === 'number' && typeof activeUserCoords.lon === 'number') {
+      await loadWeatherForCoordinates(activeUserCoords.lat, activeUserCoords.lon, activeUserCoords.city);
+      return;
+    }
+
+    // 2. Check Permissions API if supported
+    if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+      try {
+        const perm = await navigator.permissions.query({ name: 'geolocation' });
+
+        // Listen for live permission changes (e.g. user toggles permission in browser settings)
+        perm.onchange = () => {
+          if (perm.state === 'granted') {
+            requestGpsPosition();
+          } else if (perm.state === 'denied') {
+            activeUserCoords = null;
+            try { sessionStorage.removeItem('gullygang_cached_weather'); } catch (e) {}
+            showWeatherLocationError('Location access is required for local weather', true);
+          } else if (perm.state === 'prompt') {
+            requestGpsPosition();
+          }
+        };
+
+        if (perm.state === 'denied' && !userInitiated) {
+          showWeatherLocationError('Location access is required for local weather', true);
+          return;
+        }
+      } catch (e) {}
+    }
+
+    // 3. Request GPS coordinates
+    requestGpsPosition();
+  }
+
+  function requestGpsPosition() {
+    if (isLocatingWeather) return;
+    isLocatingWeather = true;
+    setWeatherLocatingState();
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        isLocatingWeather = false;
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        activeUserCoords = { lat, lon, city: null };
+        await loadWeatherForCoordinates(lat, lon);
+      },
+      (err) => {
+        isLocatingWeather = false;
+        handleGeolocationError(err);
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
   }
 
   async function loadWeatherForCoordinates(lat, lon, knownCity = null) {
@@ -3180,17 +3329,32 @@
     const tempEl = document.getElementById('weather-temp');
     const descEl = document.getElementById('weather-condition');
     const iconEl = document.getElementById('weather-icon');
+    const divider1 = document.getElementById('weather-divider-1');
+    const retryBtn = document.getElementById('weather-retry-btn');
 
-    // 1. Check cached weather for instant 0ms render
+    if (retryBtn) retryBtn.remove();
+    if (locEl) locEl.classList.remove('weather-hub-denied-msg');
+    if (tempEl) tempEl.style.display = '';
+    if (descEl) descEl.style.display = '';
+    if (divider1) divider1.style.display = '';
+    if (iconEl) iconEl.style.display = '';
+
+    // 1. Check cached weather for instant 0ms render (validate coordinates match)
     try {
       const cached = sessionStorage.getItem('gullygang_cached_weather');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Date.now() - parsed.timestamp < 1800000) { // 30 min cache
-          if (locEl && parsed.city) locEl.textContent = parsed.city;
+        const hasValidCoords = typeof parsed.lat === 'number' && typeof parsed.lon === 'number' && parsed.city;
+        const isMatch = hasValidCoords && Math.abs(parsed.lat - lat) < 0.08 && Math.abs(parsed.lon - lon) < 0.08;
+        if (isMatch && (Date.now() - parsed.timestamp < 1800000)) { // 30 min cache
+          if (locEl && parsed.city) {
+            locEl.textContent = parsed.city;
+            locEl.title = parsed.city;
+          }
           if (tempEl && parsed.temp) tempEl.textContent = parsed.temp;
           if (descEl && parsed.desc) descEl.textContent = parsed.desc;
           if (iconEl && parsed.icon) iconEl.innerHTML = weatherIconSvg(parsed.icon);
+          activeUserCoords = { lat, lon, city: parsed.city };
           return;
         }
       }
@@ -3200,16 +3364,24 @@
     let city = knownCity;
     if (!city) {
       try {
-        const geoRes = await fetchWithRetryAndTimeout(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`, {}, 1, 5000);
+        const geoRes = await fetchWithRetryAndTimeout(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`,
+          {}, 1, 5000
+        );
         if (geoRes.ok) {
           const geoData = await geoRes.json();
-          city = geoData.locality || geoData.city || geoData.principalSubdivision || 'My Location';
+          city = geoData.locality || geoData.city || geoData.principalSubdivision || geoData.countryName || 'Your Location';
         }
       } catch (e) {}
     }
 
-    if (locEl && city) {
+    if (!city) {
+      city = 'Your Location';
+    }
+
+    if (locEl) {
       locEl.textContent = city;
+      locEl.title = city;
     }
 
     // 3. Fetch live weather from Open-Meteo
@@ -3228,11 +3400,15 @@
           if (descEl) descEl.textContent = info.desc;
           if (iconEl) iconEl.innerHTML = weatherIconSvg(info.icon);
 
+          activeUserCoords = { lat, lon, city };
+
           try {
             sessionStorage.setItem('gullygang_cached_weather', JSON.stringify({
               timestamp: Date.now(),
-              city: city || 'Bhubaneswar',
-              temp: temp,
+              lat,
+              lon,
+              city,
+              temp,
               desc: info.desc,
               icon: info.icon
             }));
@@ -3240,8 +3416,9 @@
         }
       }
     } catch (e) {
-      if (tempEl && (tempEl.textContent === '--°C' || !tempEl.textContent)) tempEl.textContent = '26°C';
-      if (descEl && (descEl.textContent === 'Loading' || !descEl.textContent)) descEl.textContent = 'Overcast';
+      if (descEl && (descEl.textContent === 'Loading' || !descEl.textContent)) {
+        descEl.textContent = 'Sync failed';
+      }
     }
   }
 
@@ -4928,12 +5105,15 @@
     }
     startClockTimer();
 
+    // Immediately restore cached weather if valid to prevent blank UI or layout shift
+    restoreCachedWeatherIfValid();
+
     let lastWeatherFetch = 0;
-    function refreshWeatherIfStale() {
+    function refreshWeatherIfStale(force = false) {
       const now = Date.now();
-      if (now - lastWeatherFetch > 600000 && !document.hidden) {
+      if ((force || now - lastWeatherFetch > 600000) && !document.hidden) {
         lastWeatherFetch = now;
-        fetchRealLocationAndWeather();
+        fetchRealLocationAndWeather(force);
       }
     }
     // --- 1. CRITICAL INITIALIZATION (App Shell, Core Controls & Playlists) ---
@@ -4949,8 +5129,9 @@
       () => loadInsForgeVisuals(),
       () => initYouTubeAPI(),
       () => {
-        refreshWeatherIfStale();
-        setInterval(refreshWeatherIfStale, 600000);
+        const hasValidCache = restoreCachedWeatherIfValid();
+        refreshWeatherIfStale(!hasValidCache);
+        setInterval(() => refreshWeatherIfStale(false), 600000);
       },
       () => initEditorialExperienceAccordion(),
       () => initScrollReveal(),
