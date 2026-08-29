@@ -491,8 +491,6 @@
       canvas = document.getElementById('weather-canvas');
       ambientOverlay = document.getElementById('weather-ambient-overlay');
 
-      initSnowSprites();
-
       if (canvas) {
         ctx = canvas.getContext('2d', { alpha: true });
         resizeCanvas();
@@ -533,6 +531,10 @@
     setMode: function (mode, persist = true) {
       if (!VALID_MODES.includes(mode)) mode = 'off';
       currentMode = mode;
+
+      if (mode === 'snow' && snowSprites.length === 0) {
+        initSnowSprites();
+      }
 
       if (persist) {
         try {

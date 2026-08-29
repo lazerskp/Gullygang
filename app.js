@@ -4791,39 +4791,65 @@
     initVisualsSystem();
     attachControlsListeners();
     setupCardsInitial(true);
-    loadInsForgePlaylists();
-    loadInsForgeVisuals();
-    AmbientAtmosphereEngine.init();
 
-    // --- 2. DEFERRED SECONDARY INITIALIZATION (Executed in Idle Slice) ---
-    function initSecondaryModules() {
-      initYouTubeAPI();
-      refreshWeatherIfStale();
-      setInterval(refreshWeatherIfStale, 600000);
+    // --- 2. DEFERRED COOPERATIVE INITIALIZATION (Executed in Small Idle Time-Slices) ---
+    const deferredTasks = [
+      () => AmbientAtmosphereEngine.init(),
+      () => loadInsForgePlaylists(),
+      () => loadInsForgeVisuals(),
+      () => initYouTubeAPI(),
+      () => {
+        refreshWeatherIfStale();
+        setInterval(refreshWeatherIfStale, 600000);
+      },
+      () => initEditorialExperienceAccordion(),
+      () => initScrollReveal(),
+      () => initVisualMomentParallax(),
+      () => initGrandCta(),
+      () => initFaqAccordion(),
+      () => initStationCardClicks(),
+      () => initPremium3DTilt(),
+      () => LegalPagesEngine.init(),
+      () => SupportEngine.init(),
+      () => PlaylistSyncEngine.init(),
+      () => AdSenseEngine.init(),
+      () => {
+        if (window.WeatherEffects && typeof window.WeatherEffects.init === 'function') {
+          window.WeatherEffects.init();
+          updateWeatherUI(window.WeatherEffects.getMode());
+        }
+      }
+    ];
 
-      initEditorialExperienceAccordion();
-      initScrollReveal();
-      initVisualMomentParallax();
-      initGrandCta();
-      initFaqAccordion();
-      initStationCardClicks();
-      initPremium3DTilt();
+    let taskIndex = 0;
+    function processDeferredQueue(deadline) {
+      while (taskIndex < deferredTasks.length) {
+        // If deadline is provided and time remaining is <= 8ms, yield back to browser!
+        if (deadline && typeof deadline.timeRemaining === 'function' && deadline.timeRemaining() < 8) {
+          break;
+        }
+        try {
+          deferredTasks[taskIndex++]();
+        } catch (err) {
+          console.warn('[Bootstrap] Deferred task notice:', err);
+        }
+        // If no deadline object, execute 1 task per frame and yield
+        if (!deadline) break;
+      }
 
-      LegalPagesEngine.init();
-      SupportEngine.init();
-      PlaylistSyncEngine.init();
-      AdSenseEngine.init();
-
-      if (window.WeatherEffects && typeof window.WeatherEffects.init === 'function') {
-        window.WeatherEffects.init();
-        updateWeatherUI(window.WeatherEffects.getMode());
+      if (taskIndex < deferredTasks.length) {
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(processDeferredQueue, { timeout: 1500 });
+        } else {
+          setTimeout(processDeferredQueue, 40);
+        }
       }
     }
 
     if ('requestIdleCallback' in window) {
-      requestIdleCallback(initSecondaryModules, { timeout: 1200 });
+      requestIdleCallback(processDeferredQueue, { timeout: 1200 });
     } else {
-      setTimeout(initSecondaryModules, 100);
+      setTimeout(processDeferredQueue, 100);
     }
 
     // Auto-sync with InsForge on focus (throttled to 5 minutes to eliminate mobile battery drain)
