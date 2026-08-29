@@ -153,21 +153,23 @@
   const POS_NAMES = ['previous-2', 'previous-1', 'current', 'next-1', 'next-2'];
 
   // ============================================================
-  // ARTWORK COLOR EXTRACTION & PALETTE PARSER
+  // ARTWORK COLOR EXTRACTION & DYNAMIC PALETTE ENGINE
+  // Extracts dominant, secondary, accent, and deep shadow tones directly
+  // from the active song's center artwork
   // ============================================================
   const ArtworkColorEngine = (function () {
     const paletteCache = new Map();
     const sampleCanvas = document.createElement('canvas');
-    sampleCanvas.width = 40;
-    sampleCanvas.height = 40;
+    sampleCanvas.width = 48;
+    sampleCanvas.height = 48;
     const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
 
-    // Premium default palette (Rich cinematic burgundy, purple-magenta, and deep sapphire glow)
+    // Fallback palette: Rich crimson, deep ruby, nocturnal shadow base
     const DEFAULT_PALETTE = {
-      dominant: 'rgb(195, 30, 75)',
-      secondary: 'rgb(145, 32, 120)',
-      accent: 'rgb(35, 115, 205)',
-      darkBase: 'rgb(5, 6, 9)'
+      dominant: 'rgb(185, 28, 45)',
+      secondary: 'rgb(115, 18, 34)',
+      accent: 'rgb(225, 45, 65)',
+      darkBase: 'rgb(8, 4, 6)'
     };
 
     function rgbToHsl(r, g, b) {
@@ -189,115 +191,155 @@
       return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
     }
 
-    function hslToRgb(h, s, l) {
-      h /= 360; s /= 100; l /= 100;
-      let r, g, b;
-      if (s === 0) {
-        r = g = b = l;
-      } else {
-        const hue2rgb = (p, q, t) => {
-          if (t < 0) t += 1;
-          if (t > 1) t -= 1;
-          if (t < 1/6) return p + (q - p) * 6 * t;
-          if (t < 1/2) return q;
-          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-          return p;
+    function extractFromImageData(imgData) {
+      if (!imgData || imgData.length === 0) return DEFAULT_PALETTE;
+
+      const colorBuckets = [];
+      let totalR = 0, totalG = 0, totalB = 0, validPixelCount = 0;
+
+      for (let i = 0; i < imgData.length; i += 4) {
+        const r = imgData[i];
+        const g = imgData[i + 1];
+        const b = imgData[i + 2];
+        const a = imgData[i + 3];
+        if (a < 128) continue;
+
+        totalR += r;
+        totalG += g;
+        totalB += b;
+        validPixelCount++;
+
+        const [h, s, l] = rgbToHsl(r, g, b);
+        // Exclude blown out whites (L > 94) and pitch black (L < 4) from chromatic ranking
+        if (l < 4 || l > 94) continue;
+
+        // Vibrancy scoring: high saturation, balanced lightness
+        const score = (s * 2.2) + (100 - Math.abs(48 - l) * 1.3);
+        colorBuckets.push({ r, g, b, h, s, l, score });
+      }
+
+      if (colorBuckets.length === 0 && validPixelCount > 0) {
+        const avgR = Math.round(totalR / validPixelCount);
+        const avgG = Math.round(totalG / validPixelCount);
+        const avgB = Math.round(totalB / validPixelCount);
+        return {
+          dominant: `rgb(${avgR}, ${avgG}, ${avgB})`,
+          secondary: `rgb(${Math.round(avgR * 0.7)}, ${Math.round(avgG * 0.7)}, ${Math.round(avgB * 0.7)})`,
+          accent: `rgb(${Math.min(255, avgR + 35)}, ${Math.min(255, avgG + 35)}, ${Math.min(255, avgB + 35)})`,
+          darkBase: `rgb(${Math.max(4, Math.round(avgR * 0.08))}, ${Math.max(4, Math.round(avgG * 0.08))}, ${Math.max(6, Math.round(avgB * 0.08))})`
         };
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
       }
-      return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
-    }
 
-    function generateHashedPalette(keyStr) {
-      let hash = 0;
-      for (let i = 0; i < keyStr.length; i++) {
-        hash = ((hash << 5) - hash) + keyStr.charCodeAt(i);
-        hash |= 0;
-      }
-      const h1 = Math.abs(hash) % 360;
-      const h2 = (h1 + 55 + (Math.abs(hash >> 3) % 50)) % 360;
-      const h3 = (h1 + 150 + (Math.abs(hash >> 6) % 70)) % 360;
+      if (colorBuckets.length === 0) return DEFAULT_PALETTE;
 
-      const dRgb = hslToRgb(h1, 82, 40);
-      const sRgb = hslToRgb(h2, 78, 35);
-      const aRgb = hslToRgb(h3, 85, 48);
-      const bRgb = hslToRgb(h1, 45, 4);
+      // Sort by chromatic vibrancy and salience
+      colorBuckets.sort((a, b) => b.score - a.score);
+
+      // Dominant: Top representative vibrant color
+      const dom = colorBuckets[0];
+
+      // Secondary: Distinct hue or tone with perceptual distance
+      const sec = colorBuckets.find(c => Math.abs(c.h - dom.h) > 20 || Math.abs(c.l - dom.l) > 18)
+               || colorBuckets[Math.floor(colorBuckets.length * 0.35)]
+               || dom;
+
+      // Accent: High-saturation highlight
+      const acc = colorBuckets.find(c => c.s > 42 && (Math.abs(c.h - dom.h) > 30 || Math.abs(c.l - dom.l) > 22))
+               || colorBuckets.find(c => c.s > dom.s)
+               || colorBuckets[Math.floor(colorBuckets.length * 0.65)]
+               || dom;
+
+      // Dark Base: Atmospheric shadow tint derived proportionally from dominant hue
+      const darkR = Math.max(4, Math.min(22, Math.round(dom.r * 0.07 + 2)));
+      const darkG = Math.max(4, Math.min(22, Math.round(dom.g * 0.07 + 2)));
+      const darkB = Math.max(5, Math.min(26, Math.round(dom.b * 0.07 + 4)));
 
       return {
-        dominant: `rgb(${dRgb.r}, ${dRgb.g}, ${dRgb.b})`,
-        secondary: `rgb(${sRgb.r}, ${sRgb.g}, ${sRgb.b})`,
-        accent: `rgb(${aRgb.r}, ${aRgb.g}, ${aRgb.b})`,
-        darkBase: `rgb(${bRgb.r}, ${bRgb.g}, ${bRgb.b})`
+        dominant: `rgb(${dom.r}, ${dom.g}, ${dom.b})`,
+        secondary: `rgb(${sec.r}, ${sec.g}, ${sec.b})`,
+        accent: `rgb(${acc.r}, ${acc.g}, ${acc.b})`,
+        darkBase: `rgb(${darkR}, ${darkG}, ${darkB})`
       };
     }
 
-    function extractPalette(imgUrl, fallbackKey = '') {
-      if (!imgUrl && !fallbackKey) return Promise.resolve(DEFAULT_PALETTE);
-      const cacheKey = imgUrl || fallbackKey;
-      if (paletteCache.has(cacheKey)) return Promise.resolve(paletteCache.get(cacheKey));
-      if (fallbackKey && paletteCache.has(fallbackKey)) return Promise.resolve(paletteCache.get(fallbackKey));
+    function extractFromImageElement(imgEl) {
+      if (!imgEl) return null;
+      try {
+        if (!imgEl.complete || imgEl.naturalWidth === 0) return null;
+        sampleCtx.clearRect(0, 0, 48, 48);
+        sampleCtx.drawImage(imgEl, 0, 0, 48, 48);
+        const imgData = sampleCtx.getImageData(0, 0, 48, 48).data;
+        return extractFromImageData(imgData);
+      } catch (e) {
+        return null;
+      }
+    }
 
-      // Fast synchronous fallback for instant 60fps UI transitions
-      const fastPal = fallbackKey ? generateHashedPalette(fallbackKey) : DEFAULT_PALETTE;
-      paletteCache.set(cacheKey, fastPal);
-      if (fallbackKey) paletteCache.set(fallbackKey, fastPal);
-
-      // If local asset or HTTPS image, asynchronously sample for fine-tuning
-      if (imgUrl && (imgUrl.endsWith('.png') || imgUrl.endsWith('.jpg') || imgUrl.endsWith('.jpeg'))) {
-        const img = new Image();
-        img.decoding = 'async';
-        img.crossOrigin = 'Anonymous';
-
-        img.onload = () => {
-          try {
-            sampleCtx.clearRect(0, 0, 40, 40);
-            sampleCtx.drawImage(img, 0, 0, 40, 40);
-            const imgData = sampleCtx.getImageData(0, 0, 40, 40).data;
-
-            const samples = [];
-            for (let i = 0; i < imgData.length; i += 16) {
-              const r = imgData[i];
-              const g = imgData[i + 1];
-              const b = imgData[i + 2];
-              const a = imgData[i + 3];
-              if (a < 128) continue;
-
-              const [h, s, l] = rgbToHsl(r, g, b);
-              if (l < 8 || l > 94) continue;
-
-              samples.push({ r, g, b, h, s, l, score: s * 2.2 + (50 - Math.abs(50 - l) * 0.8) });
-            }
-
-            if (samples.length >= 4) {
-              samples.sort((a, b) => b.score - a.score);
-              const dom = samples[0];
-              const sec = samples.find(c => Math.abs(c.h - dom.h) > 25 || Math.abs(c.l - dom.l) > 20) || samples[Math.floor(samples.length * 0.4)] || dom;
-              const acc = samples.find(c => c.s > 45 && Math.abs(c.h - dom.h) > 35) || samples[Math.floor(samples.length * 0.7)] || dom;
-
-              const finePal = {
-                dominant: `rgb(${dom.r}, ${dom.g}, ${dom.b})`,
-                secondary: `rgb(${sec.r}, ${sec.g}, ${sec.b})`,
-                accent: `rgb(${acc.r}, ${acc.g}, ${acc.b})`,
-                darkBase: `rgb(${Math.max(3, Math.round(dom.r * 0.08))}, ${Math.max(3, Math.round(dom.g * 0.08))}, ${Math.max(5, Math.round(dom.b * 0.08))})`
-              };
-              paletteCache.set(cacheKey, finePal);
-              if (fallbackKey) paletteCache.set(fallbackKey, finePal);
-            }
-          } catch (e) {}
-        };
-        img.onerror = () => {};
-        img.src = imgUrl;
+    function extractPalette(imgUrl, track = null, onReadyCallback = null) {
+      const cacheKey = (typeof imgUrl === 'string' && imgUrl) ? imgUrl : (track?.id || String(track));
+      if (paletteCache.has(cacheKey)) {
+        return Promise.resolve(paletteCache.get(cacheKey));
       }
 
-      return Promise.resolve(fastPal);
+      // Check if center card image is already in the DOM and loaded
+      const centerCardImg = document.querySelector('.carousel-card[data-pos="current"] .card-cover')
+                         || DOM.dockThumb;
+      if (centerCardImg) {
+        const domPal = extractFromImageElement(centerCardImg);
+        if (domPal) {
+          paletteCache.set(cacheKey, domPal);
+          return Promise.resolve(domPal);
+        }
+      }
+
+      return new Promise((resolve) => {
+        if (!imgUrl) {
+          resolve(DEFAULT_PALETTE);
+          return;
+        }
+
+        const img = new Image();
+        img.decoding = 'async';
+        img.crossOrigin = 'anonymous';
+
+        let resolved = false;
+        const handleDone = (pal) => {
+          if (resolved) return;
+          resolved = true;
+          paletteCache.set(cacheKey, pal);
+          if (onReadyCallback) onReadyCallback(pal);
+          resolve(pal);
+        };
+
+        const timer = setTimeout(() => {
+          handleDone(DEFAULT_PALETTE);
+        }, 1200);
+
+        img.onload = () => {
+          clearTimeout(timer);
+          try {
+            sampleCtx.clearRect(0, 0, 48, 48);
+            sampleCtx.drawImage(img, 0, 0, 48, 48);
+            const imgData = sampleCtx.getImageData(0, 0, 48, 48).data;
+            const extracted = extractFromImageData(imgData);
+            handleDone(extracted);
+          } catch (e) {
+            handleDone(DEFAULT_PALETTE);
+          }
+        };
+
+        img.onerror = () => {
+          clearTimeout(timer);
+          handleDone(DEFAULT_PALETTE);
+        };
+
+        img.src = imgUrl;
+      });
     }
 
     return {
       extractPalette,
+      extractFromImageElement,
       DEFAULT_PALETTE
     };
   })();
@@ -832,38 +874,55 @@
       ctx.globalCompositeOperation = 'source-over';
     }
 
+    function updateCurrentLayerPalette(palette) {
+      const currentState = (activeLayer === 'b') ? stateB : stateA;
+      if (currentState && palette) {
+        applyPaletteToLayer(currentState, palette);
+      }
+    }
+
     return {
       init,
-      transitionToTrack
+      transitionToTrack,
+      updateCurrentLayerPalette
     };
   })();
 
   // Track Artwork Dynamic Atmosphere Dispatcher
-  let lastAppliedArtworkUrl = '';
+  let lastAppliedArtworkKey = '';
 
   async function updateDynamicArtworkBackground(track) {
     if (!track) return;
-    const artworkUrl = track.thumbnail || (track.id ? `https://i.ytimg.com/vi/${track.id}/hqdefault.jpg` : '');
-    if (artworkUrl && artworkUrl === lastAppliedArtworkUrl) return;
-    lastAppliedArtworkUrl = artworkUrl;
+    const artworkUrl = getTrackArtworkUrl(track);
+    const trackKey = (track.id || track.youtubeId || track.title) + '_' + artworkUrl;
+    if (trackKey === lastAppliedArtworkKey) return;
+    lastAppliedArtworkKey = trackKey;
 
-    const palette = await ArtworkColorEngine.extractPalette(artworkUrl, track.title || track.id);
-    
-    // Smoothly crossfade and animate the living liquid artwork background
-    AmbientAtmosphereEngine.transitionToTrack(artworkUrl, palette);
+    const applyPalette = (palette) => {
+      if (!palette || !palette.dominant) return;
+      AmbientAtmosphereEngine.transitionToTrack(artworkUrl, palette);
 
-    // Broadcast track accent and dominant glow to root and carousel container
-    const root = document.documentElement;
-    if (root && palette.accent && palette.dominant) {
-      root.style.setProperty('--track-accent-glow', `rgba(${palette.accent}, 0.22)`);
-      root.style.setProperty('--track-dominant-glow', `rgba(${palette.dominant}, 0.16)`);
-    }
+      const accRgb = palette.accent ? palette.accent.replace(/rgb\(|\)/g, '') : '225, 45, 65';
+      const domRgb = palette.dominant ? palette.dominant.replace(/rgb\(|\)/g, '') : '185, 28, 45';
 
-    const stageContainer = document.getElementById('stage-carousel-container');
-    if (stageContainer) {
-      stageContainer.style.setProperty('--track-accent-glow', `rgba(${palette.accent}, 0.22)`);
-      stageContainer.style.setProperty('--track-dominant-glow', `rgba(${palette.dominant}, 0.16)`);
-    }
+      const root = document.documentElement;
+      if (root) {
+        root.style.setProperty('--track-accent-glow', `rgba(${accRgb}, 0.25)`);
+        root.style.setProperty('--track-dominant-glow', `rgba(${domRgb}, 0.18)`);
+      }
+
+      const stageContainer = document.getElementById('stage-carousel-container');
+      if (stageContainer) {
+        stageContainer.style.setProperty('--track-accent-glow', `rgba(${accRgb}, 0.25)`);
+        stageContainer.style.setProperty('--track-dominant-glow', `rgba(${domRgb}, 0.18)`);
+      }
+    };
+
+    const palette = await ArtworkColorEngine.extractPalette(artworkUrl, track, (finePalette) => {
+      applyPalette(finePalette);
+    });
+
+    applyPalette(palette);
   }
 
   // --- Resilient Network Fetcher (Timeout, Exponential Backoff Retry & In-Flight Deduplication) ---
