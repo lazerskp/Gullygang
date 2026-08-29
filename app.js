@@ -2581,7 +2581,7 @@
       dropdownEl.style.zIndex = '999999';
 
       // 3. Constrain max width for mobile & measure dimensions
-      const isMobile = viewportWidth < 640;
+      const isMobile = viewportWidth < 768;
       const maxAllowedWidth = Math.min(viewportWidth - (VIEWPORT_PADDING * 2), type === 'visuals' ? 300 : 280);
       dropdownEl.style.maxWidth = `${maxAllowedWidth}px`;
       dropdownEl.style.width = isMobile ? `${maxAllowedWidth}px` : 'max-content';
@@ -2590,9 +2590,14 @@
       const dropdownWidth = dropdownRect.width || maxAllowedWidth;
       const dropdownHeight = dropdownRect.height || 260;
 
-      // 4. Horizontal Positioning (Centered over trigger, clamped to viewport [12px, viewportWidth - 12px])
-      const triggerCenterX = triggerRect.left + (triggerRect.width / 2);
-      let left = triggerCenterX - (dropdownWidth / 2);
+      // 4. Horizontal Positioning (Centered relative to viewport/hero on mobile, anchored to trigger on desktop)
+      let left;
+      if (isMobile) {
+        left = Math.round((viewportWidth - dropdownWidth) / 2);
+      } else {
+        const triggerCenterX = triggerRect.left + (triggerRect.width / 2);
+        left = Math.round(triggerCenterX - (dropdownWidth / 2));
+      }
 
       const minLeft = VIEWPORT_PADDING;
       const maxLeft = viewportWidth - dropdownWidth - VIEWPORT_PADDING;

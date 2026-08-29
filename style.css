@@ -574,55 +574,96 @@ body.is-stage-hidden .top-weather-hub {
 }
 
 /* ============================================================
-   MOBILE HEADER COMPACTNESS & MUSIC-FIRST STAGE OVERRIDES
+   MOBILE HEADER, WEATHER & MUSIC-FIRST STAGE OVERRIDES
    ============================================================ */
+@media (min-width: 769px) {
+  .top-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .top-header-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    order: 2;
+  }
+  .top-weather-hub {
+    order: 1;
+  }
+}
+
 @media (max-width: 768px) {
   .site-header {
     top: max(10px, env(safe-area-inset-top, 10px));
     left: max(14px, env(safe-area-inset-left, 14px));
     right: max(14px, env(safe-area-inset-right, 14px));
-    height: 38px;
-    align-items: center;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    pointer-events: none;
+    z-index: 50;
   }
 
   .brand-logo-text {
     font-size: 13.5px;
     letter-spacing: 0.14em;
-    padding-top: 0;
+    padding-top: 5px;
     line-height: 1;
   }
 
+  /* Right column on Mobile: row 1 has controls, row 2 has compact right-aligned weather */
   .top-header-right {
-    gap: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    pointer-events: auto;
+  }
+
+  .top-header-controls-row {
+    order: 1;
+    display: flex;
     align-items: center;
+    gap: 6px;
   }
 
-  /* Hide bulky multi-row weather hub from topbar header on mobile */
-  .top-weather-hub {
-    display: none !important;
-  }
-
-  /* Compact single-row Support pill */
+  /* Support button: Icon-Only Heart on mobile */
   .header-support-pill {
+    width: 32px;
     height: 32px;
-    padding: 0 11px;
-    font-size: 11.5px;
-    gap: 5px;
-    border-radius: 999px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0 !important;
+    border-radius: 50%;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     background: rgba(236, 72, 153, 0.12);
     border: 1px solid rgba(236, 72, 153, 0.3);
   }
+
   .header-support-pill .support-pill-text {
-    display: inline-block !important;
+    display: none !important;
   }
 
-  /* Compact single-row Effects bar */
+  .support-heart-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Effects button: compact pill */
   .effects-bar-pill {
     height: 32px;
-    padding: 0 3px;
+    padding: 0 4px;
     border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+  }
+
+  .top-hide-stage-btn.desktop-only-inline,
+  .effects-bar-divider.desktop-only-inline {
+    display: none !important;
   }
 
   .top-effects-dropdown-btn {
@@ -630,6 +671,66 @@ body.is-stage-hidden .top-weather-hub {
     padding: 0 9px 0 7px;
     font-size: 11.5px;
     gap: 4px;
+  }
+
+  /* Mobile Weather: Visible, 2 right-aligned lines directly beneath controls */
+  .top-weather-hub {
+    order: 2;
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    opacity: 0.88;
+    margin-top: 1px;
+    gap: 1.5px;
+  }
+
+  .weather-hub-primary {
+    font-size: 11px;
+    font-weight: 600;
+    gap: 4px;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.2;
+  }
+
+  .weather-hub-location {
+    max-width: 115px;
+    font-size: 11px;
+  }
+
+  .weather-hub-temp {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .weather-hub-desc,
+  .weather-hub-icon {
+    display: none !important;
+  }
+
+  .weather-hub-secondary {
+    font-size: 9.5px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.6);
+    gap: 4px;
+    line-height: 1.2;
+    margin-top: 0;
+  }
+
+  .weather-hub-date {
+    display: none !important;
+  }
+
+  .weather-hub-day {
+    font-size: 9.5px;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 600;
+  }
+
+  .weather-hub-clock {
+    font-size: 9.5px;
+    color: rgba(255, 255, 255, 0.85);
   }
 
   .weather-effects-dropdown-panel {
@@ -660,7 +761,7 @@ body.is-stage-hidden .top-weather-hub {
     font-size: 9px;
   }
 
-  /* Music-First Stage Spacing & Sizing */
+  /* Music-First Stage Spacing & Centered Capsules */
   .bottom-stage-wrap {
     padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
   }
@@ -670,14 +771,18 @@ body.is-stage-hidden .top-weather-hub {
   }
 
   .stage-control-capsules {
-    margin-bottom: 6px;
-    gap: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 8px;
+    gap: 7px;
   }
 
   .stage-vibe-pill {
-    height: 30px;
-    padding: 0 10px;
-    font-size: 11px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 11.5px;
   }
 
   .carousel-stage-height {
@@ -700,28 +805,32 @@ body.is-stage-hidden .top-weather-hub {
     top: max(8px, env(safe-area-inset-top, 8px));
     left: max(10px, env(safe-area-inset-left, 10px));
     right: max(10px, env(safe-area-inset-right, 10px));
-    height: 34px;
   }
 
   .brand-logo-text {
     font-size: 12.5px;
     letter-spacing: 0.12em;
+    padding-top: 3px;
   }
 
   .top-header-right {
+    gap: 2px;
+  }
+
+  .top-header-controls-row {
     gap: 5px;
   }
 
   .header-support-pill {
+    width: 30px;
     height: 30px;
-    padding: 0 9px;
-    font-size: 11px;
-    gap: 4px;
+    min-width: 30px;
+    min-height: 30px;
   }
 
   .effects-bar-pill {
     height: 30px;
-    padding: 0 2px;
+    padding: 0 3px;
   }
 
   .top-effects-dropdown-btn {
@@ -731,12 +840,53 @@ body.is-stage-hidden .top-weather-hub {
     gap: 3.5px;
   }
 
+  .top-weather-hub {
+    gap: 1px;
+  }
+
+  .weather-hub-primary {
+    font-size: 10px;
+    gap: 3px;
+  }
+
+  .weather-hub-location {
+    max-width: 95px;
+    font-size: 10px;
+  }
+
+  .weather-hub-temp {
+    font-size: 10px;
+  }
+
+  .weather-hub-secondary {
+    font-size: 9px;
+    gap: 3px;
+  }
+
+  .weather-hub-day {
+    font-size: 9px;
+  }
+
+  .weather-hub-clock {
+    font-size: 9px;
+  }
+
   .weather-effects-dropdown-panel {
     width: 215px;
   }
 
   .carousel-stage-container {
     padding: 0 8px;
+  }
+
+  .stage-control-capsules {
+    gap: 5px;
+  }
+
+  .stage-vibe-pill {
+    height: 29px;
+    padding: 0 9px;
+    font-size: 11px;
   }
 
   .reference-player {
@@ -826,6 +976,14 @@ body.is-stage-hidden .top-weather-hub {
   border-color: rgba(255, 255, 255, 0.14);
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+.stage-playlist-icon-static {
+  font-size: 11px;
+  line-height: 1;
+  color: #fbbf24;
+  margin-right: 1px;
+  display: inline-flex;
+  align-items: center;
 }
 .stage-playlist-name {
   font-size: 11.5px;
