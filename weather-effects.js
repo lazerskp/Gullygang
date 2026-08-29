@@ -1,8 +1,13 @@
 /**
  * GULLYGANG — Atmospheric Weather Effects Engine
- * Hyper-realistic 4K Cinematic Rain & Snow simulation with motion-blur gradients,
- * multi-layered crystalline snowflake physics, 3D tumbling rotation, aerodynamic harmonic sway,
- * ground ripple physics, dynamic wind turbulence, and ultra-smooth 60fps rendering.
+ * Selectable simulations:
+ *  - 🌧️ Realistic Rain (multi-depth layers, wind angle, surface splashes & ripples, rain mist)
+ *  - ⛈️ Heavy Rain (dense downpour, high velocity, mist overlay)
+ *  - ⚡ Thunderstorm (fast 1–3s initial strike, dark storm clouds, wind turbulence, multi-stage lightning & distant branching bolts)
+ *  - ❄️ Realistic Snow (multi-layered crystalline sprites, 3D rotation, aerodynamic sway)
+ *  - 🌨️ Blizzard (dense flakes, lateral wind gusts, cold haze)
+ *  - 💨 Shared Dynamic Wind Vector (smooth continuous wind oscillations across all modes)
+ *  - ⭕ Off (immediate canvas clearing & loop cancellation)
  */
 
 (function (root, factory) {
@@ -17,7 +22,7 @@
   'use strict';
 
   const STORAGE_KEY = 'odiverse_weather_mode';
-  const VALID_MODES = ['off', 'rain', 'snow'];
+  const VALID_MODES = ['off', 'rain', 'heavy_rain', 'snow', 'blizzard', 'storm'];
 
   let canvas = null;
   let ctx = null;
@@ -32,23 +37,34 @@
   let isTabActive = true;
   let prefersReducedMotion = false;
 
-  // Particle pools (pre-allocated to avoid GC churn)
+  // Particle pools
   let rainDrops = [];
   let rainSplashes = [];
   let rainRipples = [];
   let snowflakes = [];
+  let stormClouds = [];
 
-  // Lightning state
-  let lightningTimer = 0;
-  let lightningAlpha = 0;
-  let lightningStep = 0;
+  // Multi-stage Lightning State
+  let lightningState = {
+    timer: 1500, // First strike in 1.2–2.7s
+    stage: 0,    // 0: idle, 1: pre-glow, 2: main flash, 3: return flicker, 4: fading
+    stageTimer: 0,
+    alpha: 0,
+    bolt: null,
+    boltLife: 0,
+    cloudIllumination: 0
+  };
 
-  // Pre-rendered offscreen sprite cache for 60fps realistic snow rendering
+  // Shared dynamic wind vector
+  let sharedWind = 0;
+
+  // Pre-rendered offscreen sprite cache for realistic crystalline snow
   let snowSprites = [];
 
   // --- Initialize Realistic Snow Crystal Sprites ---
   function initSnowSprites() {
     snowSprites = [];
+    if (typeof document === 'undefined') return;
 
     function makeSprite(size, drawFn) {
       const offCanvas = document.createElement('canvas');
@@ -61,7 +77,7 @@
       return offCanvas;
     }
 
-    // Sprite 0: Micro atmospheric dust motes (ultra-distant background)
+    // Sprite 0: Micro atmospheric dust motes
     snowSprites[0] = makeSprite(6, (c, cx, cy) => {
       const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 5);
       grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
@@ -73,7 +89,7 @@
       c.fill();
     });
 
-    // Sprite 1: Background soft circular flake with subtle outer aura
+    // Sprite 1: Background soft circular flake
     snowSprites[1] = makeSprite(12, (c, cx, cy) => {
       const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 10);
       grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
@@ -86,9 +102,8 @@
       c.fill();
     });
 
-    // Sprite 2: Midground 6-pointed crystalline star snowflake
+    // Sprite 2: Midground 6-pointed crystalline star
     snowSprites[2] = makeSprite(20, (c, cx, cy) => {
-      // Soft radial bloom underlay
       const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 16);
       grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
       grad.addColorStop(0.35, 'rgba(240, 248, 255, 0.6)');
@@ -99,7 +114,6 @@
       c.arc(cx, cy, 16, 0, Math.PI * 2);
       c.fill();
 
-      // Sharp crystalline 6-arm geometry
       c.strokeStyle = 'rgba(255, 255, 255, 0.95)';
       c.lineWidth = 1.4;
       c.lineCap = 'round';
@@ -113,7 +127,6 @@
         c.lineTo(cx + cos * armLen, cy + sin * armLen);
         c.stroke();
 
-        // Sub-branch v-prongs
         const branchDist = armLen * 0.6;
         const bx = cx + cos * branchDist;
         const by = cy + sin * branchDist;
@@ -127,16 +140,14 @@
         c.lineTo(bx + Math.cos(bAngle2) * bLen, by + Math.sin(bAngle2) * bLen);
         c.stroke();
       }
-      // Center nucleus
       c.fillStyle = '#ffffff';
       c.beginPath();
       c.arc(cx, cy, 2.2, 0, Math.PI * 2);
       c.fill();
     });
 
-    // Sprite 3: Foreground intricate dendritic snow crystal
+    // Sprite 3: Foreground dendritic crystal
     snowSprites[3] = makeSprite(36, (c, cx, cy) => {
-      // Atmospheric bloom glow
       const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 32);
       grad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
       grad.addColorStop(0.3, 'rgba(240, 250, 255, 0.6)');
@@ -147,7 +158,6 @@
       c.arc(cx, cy, 32, 0, Math.PI * 2);
       c.fill();
 
-      // Intricate 6-arm crystal structure
       c.strokeStyle = 'rgba(255, 255, 255, 0.98)';
       c.lineWidth = 1.8;
       c.lineCap = 'round';
@@ -158,13 +168,11 @@
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
 
-        // Main arm
         c.beginPath();
         c.moveTo(cx, cy);
         c.lineTo(cx + cos * armLen, cy + sin * armLen);
         c.stroke();
 
-        // 2 tiers of chevron branches
         [0.45, 0.75].forEach((ratio, idx) => {
           const bDist = armLen * ratio;
           const bx = cx + cos * bDist;
@@ -182,7 +190,6 @@
         });
       }
 
-      // Central hexagonal crystal plate
       c.fillStyle = 'rgba(255, 255, 255, 0.95)';
       c.beginPath();
       for (let i = 0; i < 6; i++) {
@@ -196,7 +203,7 @@
       c.fill();
     });
 
-    // Sprite 4: Lens Bokeh orb (ultra close out-of-focus foreground)
+    // Sprite 4: Lens Bokeh orb
     snowSprites[4] = makeSprite(64, (c, cx, cy) => {
       const grad = c.createRadialGradient(cx, cy, 0, cx, cy, 58);
       grad.addColorStop(0, 'rgba(255, 255, 255, 0.32)');
@@ -211,9 +218,9 @@
     });
   }
 
-  // --- Rain Splash Sparks & Water Rings ---
+  // --- Rain Impact Ripples & Splashes ---
   function createRainImpact(x, y) {
-    if (rainRipples.length < 16 && Math.random() < 0.45) {
+    if (rainRipples.length < 24 && Math.random() < 0.45) {
       rainRipples.push({
         x,
         y,
@@ -225,7 +232,7 @@
       });
     }
 
-    if (rainSplashes.length < 22) {
+    if (rainSplashes.length < 30) {
       const angle = Math.PI + (Math.random() - 0.5) * 1.5;
       const speed = 1.8 + Math.random() * 2.8;
       rainSplashes.push({
@@ -240,35 +247,36 @@
     }
   }
 
-  function resetRainDrop(drop, randomY = false) {
+  function resetRainDrop(drop, randomY = false, mode = 'rain') {
     const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+    const isHeavy = mode === 'heavy_rain' || mode === 'storm';
     const r = Math.random();
     let layer, speed, length, thickness, opacity;
 
-    if (r < 0.50) {
+    if (r < 0.45) {
       // Layer 0: Background fine drizzle
       layer = 0;
-      speed = 18 + Math.random() * 12;
-      length = 16 + Math.random() * 16;
+      speed = (isHeavy ? 26 : 18) + Math.random() * 14;
+      length = (isHeavy ? 24 : 16) + Math.random() * 18;
       thickness = 0.9;
-      opacity = 0.22 + Math.random() * 0.18;
-    } else if (r < 0.84) {
+      opacity = (isHeavy ? 0.32 : 0.22) + Math.random() * 0.18;
+    } else if (r < 0.82) {
       // Layer 1: Midground raindrops
       layer = 1;
-      speed = 28 + Math.random() * 16;
-      length = 28 + Math.random() * 22;
-      thickness = 1.3;
-      opacity = 0.52 + Math.random() * 0.24;
+      speed = (isHeavy ? 38 : 28) + Math.random() * 18;
+      length = (isHeavy ? 42 : 28) + Math.random() * 24;
+      thickness = isHeavy ? 1.5 : 1.3;
+      opacity = (isHeavy ? 0.65 : 0.52) + Math.random() * 0.24;
     } else {
       // Layer 2: Foreground prominent rain streaks
       layer = 2;
-      speed = (isMobile ? 36 : 44) + Math.random() * 18;
-      length = (isMobile ? 42 : 56) + Math.random() * 32;
-      thickness = 1.8;
+      speed = (isHeavy ? 54 : (isMobile ? 36 : 44)) + Math.random() * 22;
+      length = (isHeavy ? 72 : (isMobile ? 42 : 56)) + Math.random() * 36;
+      thickness = isHeavy ? 2.2 : 1.8;
       opacity = 0.80 + Math.random() * 0.20;
     }
 
-    drop.x = Math.random() * (width + 160) - 80;
+    drop.x = Math.random() * (width + 240) - 120;
     drop.y = randomY ? Math.random() * height : -length - Math.random() * 60;
     drop.speed = speed;
     drop.length = length;
@@ -278,59 +286,55 @@
     return drop;
   }
 
-  function createRainDrop(randomY = true) {
+  function createRainDrop(randomY = true, mode = 'rain') {
     const drop = {};
-    return resetRainDrop(drop, randomY);
+    return resetRainDrop(drop, randomY, mode);
   }
 
-  function resetSnowflake(flake, randomY = true) {
+  function resetSnowflake(flake, randomY = true, mode = 'snow') {
     const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+    const isBlizzard = mode === 'blizzard';
     const r = Math.random();
     let layer, radius, speed, opacity, spriteIdx, rotatable;
 
     if (r < 0.35) {
-      // Layer 0: Distant micro dust motes
       layer = 0;
       radius = 0.8 + Math.random() * 1.0;
-      speed = 0.28 + Math.random() * 0.35;
-      opacity = 0.20 + Math.random() * 0.25;
+      speed = (isBlizzard ? 0.7 : 0.28) + Math.random() * 0.45;
+      opacity = (isBlizzard ? 0.35 : 0.20) + Math.random() * 0.25;
       spriteIdx = 0;
       rotatable = false;
     } else if (r < 0.68) {
-      // Layer 1: Background soft flakes
       layer = 1;
       radius = 1.6 + Math.random() * 1.6;
-      speed = 0.55 + Math.random() * 0.55;
-      opacity = 0.45 + Math.random() * 0.30;
+      speed = (isBlizzard ? 1.4 : 0.55) + Math.random() * 0.75;
+      opacity = (isBlizzard ? 0.60 : 0.45) + Math.random() * 0.30;
       spriteIdx = 1;
       rotatable = false;
     } else if (r < 0.88) {
-      // Layer 2: Midground crisp 6-point stellar crystals
       layer = 2;
       radius = 3.2 + Math.random() * 2.8;
-      speed = 0.95 + Math.random() * 0.85;
+      speed = (isBlizzard ? 2.2 : 0.95) + Math.random() * 1.1;
       opacity = 0.70 + Math.random() * 0.25;
       spriteIdx = 2;
       rotatable = true;
     } else if (r < 0.96) {
-      // Layer 3: Foreground prominent dendritic snow crystals
       layer = 3;
       radius = 5.8 + Math.random() * 4.2;
-      speed = 1.6 + Math.random() * 1.1;
+      speed = (isBlizzard ? 3.4 : 1.6) + Math.random() * 1.4;
       opacity = 0.82 + Math.random() * 0.18;
       spriteIdx = 3;
       rotatable = true;
     } else {
-      // Layer 4: Cinematic Camera Bokeh Orb
       layer = 4;
       radius = (isMobile ? 12 : 18) + Math.random() * (isMobile ? 10 : 18);
-      speed = 2.0 + Math.random() * 1.4;
-      opacity = 0.06 + Math.random() * 0.08;
+      speed = (isBlizzard ? 4.0 : 2.0) + Math.random() * 1.6;
+      opacity = (isBlizzard ? 0.12 : 0.06) + Math.random() * 0.08;
       spriteIdx = 4;
       rotatable = false;
     }
 
-    flake.x = Math.random() * (width + 160) - 80;
+    flake.x = Math.random() * (width + 240) - 120;
     flake.y = randomY ? Math.random() * height : -radius * 3 - Math.random() * 60;
     flake.radius = radius;
     flake.speed = speed;
@@ -339,57 +343,128 @@
     flake.spriteIdx = spriteIdx;
     flake.rotatable = rotatable;
     flake.rot = Math.random() * Math.PI * 2;
-    flake.rotSpeed = (Math.random() - 0.5) * (0.015 + Math.random() * 0.025);
+    flake.rotSpeed = (Math.random() - 0.5) * (0.015 + Math.random() * (isBlizzard ? 0.05 : 0.025));
     flake.swayOffset1 = Math.random() * Math.PI * 2;
     flake.swayOffset2 = Math.random() * Math.PI * 2;
     flake.swayOffset3 = Math.random() * Math.PI * 2;
     flake.swaySpeed1 = 0.0012 + Math.random() * 0.0018;
     flake.swaySpeed2 = 0.0007 + Math.random() * 0.0011;
     flake.swaySpeed3 = 0.0022 + Math.random() * 0.0015;
-    flake.swayAmp = 0.6 + Math.random() * 1.6;
-    flake.windDrift = 0.12 + Math.random() * 0.22;
+    flake.swayAmp = (isBlizzard ? 1.4 : 0.6) + Math.random() * 1.6;
+    flake.windDrift = (isBlizzard ? 1.8 : 0.12) + Math.random() * (isBlizzard ? 1.4 : 0.22);
     flake.twinkleOffset = Math.random() * Math.PI * 2;
     flake.twinkleSpeed = 0.0018 + Math.random() * 0.0028;
     return flake;
   }
 
-  function createSnowflake(randomY = true) {
+  function createSnowflake(randomY = true, mode = 'snow') {
     const flake = {};
-    return resetSnowflake(flake, randomY);
+    return resetSnowflake(flake, randomY, mode);
   }
 
-  // --- Initialize particles ---
+  // --- Dark Storm Atmospheric Clouds ---
+  function initStormClouds() {
+    stormClouds = [];
+    const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+    const count = isMobile ? 5 : 9;
+
+    for (let i = 0; i < count; i++) {
+      stormClouds.push({
+        baseX: (i / count) + (Math.random() - 0.5) * 0.2,
+        baseY: 0.05 + Math.random() * 0.45,
+        radiusRatio: 0.45 + Math.random() * 0.35,
+        speedX: 0.00012 + (i % 3) * 0.00006,
+        phaseX: Math.random() * 6.28,
+        phaseY: Math.random() * 6.28,
+        baseAlpha: 0.32 + Math.random() * 0.22
+      });
+    }
+  }
+
+  // --- Procedural Branching Distant Lightning Bolt Generator ---
+  function generateLightningBolt() {
+    const isLeft = Math.random() < 0.5;
+    const startX = isLeft
+      ? width * (0.08 + Math.random() * 0.26)
+      : width * (0.66 + Math.random() * 0.26);
+    const startY = 0;
+    const endX = startX + (Math.random() - 0.5) * (width * 0.22);
+    const endY = height * (0.28 + Math.random() * 0.32);
+
+    const segments = [];
+
+    function buildBranch(x1, y1, x2, y2, depth, maxDepth) {
+      if (depth >= maxDepth) {
+        segments.push({ x1, y1, x2, y2, depth });
+        return;
+      }
+
+      const midX = (x1 + x2) / 2 + (Math.random() - 0.5) * (width * 0.04);
+      const midY = (y1 + y2) / 2 + (Math.random() - 0.5) * (height * 0.02);
+
+      buildBranch(x1, y1, midX, midY, depth + 1, maxDepth);
+      buildBranch(midX, midY, x2, y2, depth + 1, maxDepth);
+
+      if (depth === 2 && Math.random() < 0.65) {
+        const forkEndX = midX + (Math.random() - 0.5) * (width * 0.10);
+        const forkEndY = midY + height * (0.08 + Math.random() * 0.12);
+        buildBranch(midX, midY, forkEndX, forkEndY, depth + 1, maxDepth);
+      }
+    }
+
+    buildBranch(startX, startY, endX, endY, 0, 4);
+    return segments;
+  }
+
+  // --- Initialize particles per mode ---
   function initParticles() {
     rainDrops = [];
     rainSplashes = [];
     rainRipples = [];
     snowflakes = [];
-    lightningTimer = 400 + Math.random() * 600;
-    lightningAlpha = 0;
-    lightningStep = 0;
+    stormClouds = [];
+
+    // Responsive initial strike: first lightning occurs within 1.2 to 2.7 seconds
+    lightningState = {
+      timer: 1200 + Math.random() * 1500,
+      stage: 0,
+      stageTimer: 0,
+      alpha: 0,
+      bolt: null,
+      boltLife: 0,
+      cloudIllumination: 0
+    };
 
     const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
 
     if (currentMode === 'rain') {
-      const dropCount = isMobile ? 32 : 105;
-      for (let i = 0; i < dropCount; i++) {
-        rainDrops.push(createRainDrop(true));
-      }
+      const count = isMobile ? 36 : 110;
+      for (let i = 0; i < count; i++) rainDrops.push(createRainDrop(true, 'rain'));
+    } else if (currentMode === 'heavy_rain') {
+      const count = isMobile ? 75 : 220;
+      for (let i = 0; i < count; i++) rainDrops.push(createRainDrop(true, 'heavy_rain'));
+    } else if (currentMode === 'storm') {
+      const count = isMobile ? 85 : 240;
+      for (let i = 0; i < count; i++) rainDrops.push(createRainDrop(true, 'storm'));
+      initStormClouds();
     } else if (currentMode === 'snow') {
-      const flakeCount = isMobile ? 36 : 95;
-      for (let i = 0; i < flakeCount; i++) {
-        snowflakes.push(createSnowflake(true));
-      }
+      const count = isMobile ? 38 : 105;
+      for (let i = 0; i < count; i++) snowflakes.push(createSnowflake(true, 'snow'));
+    } else if (currentMode === 'blizzard') {
+      const count = isMobile ? 70 : 190;
+      for (let i = 0; i < count; i++) snowflakes.push(createSnowflake(true, 'blizzard'));
     }
   }
 
-  // --- Resize canvas to viewport ---
+  // --- Resize canvas to viewport (Full Hero Coverage on Mobile & Desktop) ---
   function resizeCanvas() {
     if (!canvas) return;
-    const isMobile = window.innerWidth < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
-    dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.0 : 1.5);
-    width = window.innerWidth;
-    height = window.innerHeight;
+    const isMobile = (typeof window !== 'undefined') && (window.innerWidth < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1));
+    dpr = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, isMobile ? 1.0 : 1.5);
+
+    // Guaranteed full viewport coverage across all device screens & orientation changes
+    width = Math.max(window.innerWidth, document.documentElement.clientWidth || 0);
+    height = Math.max(window.innerHeight, document.documentElement.clientHeight || 0);
 
     canvas.width = Math.floor(width * dpr);
     canvas.height = Math.floor(height * dpr);
@@ -401,41 +476,152 @@
     }
   }
 
-  // --- Update & render Hyper-Realistic Rain ---
-  function renderRain(timestamp, dt, intensityFactor) {
+  // --- Update Multi-Stage Thunderstorm Lightning Events ---
+  function updateLightning(dt) {
+    const ls = lightningState;
+
+    if (ls.stage === 0) {
+      ls.timer -= dt;
+      if (ls.timer <= 0) {
+        // Stage 1: Subtle pre-glow (30–60ms)
+        ls.stage = 1;
+        ls.stageTimer = 35 + Math.random() * 30;
+        ls.alpha = 0.09 + Math.random() * 0.05;
+        ls.cloudIllumination = 0.45;
+      }
+    } else if (ls.stage === 1) {
+      ls.stageTimer -= dt;
+      if (ls.stageTimer <= 0) {
+        // Stage 2: Main bright lightning flash & branching bolt (60–110ms)
+        ls.stage = 2;
+        ls.stageTimer = 65 + Math.random() * 45;
+        ls.alpha = 0.34 + Math.random() * 0.22;
+        ls.cloudIllumination = 0.95;
+        ls.bolt = (Math.random() < 0.75) ? generateLightningBolt() : null;
+        ls.boltLife = ls.stageTimer;
+      }
+    } else if (ls.stage === 2) {
+      ls.stageTimer -= dt;
+      if (ls.stageTimer <= 0) {
+        // Stage 3: Occasional rapid secondary pulse / return stroke (35–55ms)
+        if (Math.random() < 0.65) {
+          ls.stage = 3;
+          ls.stageTimer = 35 + Math.random() * 25;
+          ls.alpha = 0.16 + Math.random() * 0.08;
+          ls.cloudIllumination = 0.6;
+        } else {
+          ls.stage = 4;
+          ls.stageTimer = 160;
+        }
+        ls.bolt = null;
+      }
+    } else if (ls.stage === 3) {
+      ls.stageTimer -= dt;
+      if (ls.stageTimer <= 0) {
+        ls.stage = 4;
+        ls.stageTimer = 160;
+      }
+    } else if (ls.stage === 4) {
+      // Stage 4: Rapid smooth decay back to dark storm atmosphere
+      ls.alpha = Math.max(0, ls.alpha - dt * 0.004);
+      ls.cloudIllumination = Math.max(0, ls.cloudIllumination - dt * 0.005);
+      ls.stageTimer -= dt;
+      if (ls.stageTimer <= 0 && ls.alpha <= 0.01) {
+        ls.stage = 0;
+        ls.alpha = 0;
+        ls.cloudIllumination = 0;
+        ls.bolt = null;
+
+        // Natural strike frequency: 4–8 seconds, with occasional 8–12 second pause
+        const useLongerGap = Math.random() < 0.25;
+        ls.timer = useLongerGap
+          ? (8000 + Math.random() * 4000)
+          : (4000 + Math.random() * 4000);
+      }
+    }
+  }
+
+  // --- Render Rain, Heavy Rain & Thunderstorm ---
+  function renderRainSystem(timestamp, dt, intensityFactor, mode) {
     ctx.clearRect(0, 0, width, height);
 
-    if (lightningAlpha > 0) {
-      ctx.fillStyle = `rgba(220, 235, 255, ${lightningAlpha})`;
+    const isStorm = mode === 'storm';
+    const isHeavy = mode === 'heavy_rain' || isStorm;
+    const minDim = Math.min(width, height);
+
+    // 1. STORM DARK ATMOSPHERE & DRIFTING STORM CLOUDS
+    if (isStorm) {
+      updateLightning(dt);
+
+      // Dark storm ambient sky underlay
+      ctx.fillStyle = 'rgba(4, 7, 14, 0.48)';
       ctx.fillRect(0, 0, width, height);
-      lightningAlpha = Math.max(0, lightningAlpha - dt * 0.007);
-    } else {
-      lightningTimer -= dt;
-      if (lightningTimer <= 0) {
-        if (lightningStep === 0) {
-          lightningAlpha = 0.06 + Math.random() * 0.06;
-          lightningStep = 1;
-          lightningTimer = 60 + Math.random() * 40;
-        } else if (lightningStep === 1) {
-          lightningAlpha = 0.03 + Math.random() * 0.04;
-          lightningStep = 0;
-          lightningTimer = 1200 + Math.random() * 1800;
+
+      // Drifting dark storm clouds
+      for (let i = 0; i < stormClouds.length; i++) {
+        const cloud = stormClouds[i];
+        const cx = (cloud.baseX + Math.sin(timestamp * cloud.speedX + cloud.phaseX) * 0.15) * width;
+        const cy = (cloud.baseY + Math.cos(timestamp * 0.00008 + cloud.phaseY) * 0.06) * height;
+        const cr = minDim * cloud.radiusRatio;
+
+        const cGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+        const ill = lightningState.cloudIllumination;
+        const rC = Math.round(18 + ill * 160);
+        const gC = Math.round(24 + ill * 180);
+        const bC = Math.round(38 + ill * 220);
+        const aC = Math.min(0.85, cloud.baseAlpha + ill * 0.25);
+
+        cGrad.addColorStop(0, `rgba(${rC}, ${gC}, ${bC}, ${aC.toFixed(3)})`);
+        cGrad.addColorStop(0.5, `rgba(${rC}, ${gC}, ${bC}, ${(aC * 0.5).toFixed(3)})`);
+        cGrad.addColorStop(1, `rgba(${rC}, ${gC}, ${bC}, 0)`);
+
+        ctx.fillStyle = cGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Distant Branching Lightning Bolt
+      if (lightningState.bolt && lightningState.bolt.length > 0) {
+        ctx.save();
+        ctx.strokeStyle = `rgba(235, 248, 255, ${Math.min(1, lightningState.alpha * 2.2).toFixed(3)})`;
+        ctx.lineWidth = 1.6;
+        ctx.shadowColor = 'rgba(180, 225, 255, 0.9)';
+        ctx.shadowBlur = 10;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        for (let b = 0; b < lightningState.bolt.length; b++) {
+          const seg = lightningState.bolt[b];
+          ctx.moveTo(seg.x1, seg.y1);
+          ctx.lineTo(seg.x2, seg.y2);
         }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Ambient Lightning Sheet Illumination
+      if (lightningState.alpha > 0) {
+        ctx.fillStyle = `rgba(215, 235, 255, ${lightningState.alpha.toFixed(3)})`;
+        ctx.fillRect(0, 0, width, height);
       }
     }
 
-    const windAngle = 0.12 + Math.sin(timestamp * 0.00045) * 0.032;
-    const sinA = Math.sin(windAngle);
-    const cosA = Math.cos(windAngle);
+    // 2. SHARED DYNAMIC WIND & ANGLE
+    const baseWind = isStorm ? 0.38 : (isHeavy ? 0.24 : 0.12);
+    sharedWind = baseWind + Math.sin(timestamp * 0.00035) * (isStorm ? 0.16 : 0.04);
+    const sinA = Math.sin(sharedWind);
+    const cosA = Math.cos(sharedWind);
 
     ctx.lineCap = 'round';
     const speedMultiplier = (isPlayingMusic ? 1.05 : 0.85) * intensityFactor;
     const frameFactor = dt / 16.67;
 
-    // Batched rain streaks
+    // 3. BATCHED RAIN STREAKS
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(215, 238, 255, 0.55)';
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = isHeavy ? 'rgba(210, 235, 255, 0.65)' : 'rgba(215, 238, 255, 0.55)';
+    ctx.lineWidth = isHeavy ? 1.4 : 1.2;
 
     for (let i = 0; i < rainDrops.length; i++) {
       const drop = rainDrops[i];
@@ -451,17 +637,26 @@
       ctx.lineTo(drop.x, drop.y);
 
       if (drop.y > height - 8) {
-        if (drop.layer >= 1 && Math.random() < 0.35) {
+        if (drop.layer >= 1 && Math.random() < (isHeavy ? 0.55 : 0.35)) {
           createRainImpact(drop.x, height - 2 - Math.random() * 6);
         }
-        resetRainDrop(drop, false);
-      } else if (drop.x > width + 70) {
-        resetRainDrop(drop, false);
+        resetRainDrop(drop, false, mode);
+      } else if (drop.x > width + 120) {
+        resetRainDrop(drop, false, mode);
       }
     }
     ctx.stroke();
 
-    // Render Ground Ripples
+    // 4. RAIN MIST LAYER
+    if (isHeavy) {
+      const mistGrad = ctx.createLinearGradient(0, height * 0.5, 0, height);
+      mistGrad.addColorStop(0, 'rgba(180, 215, 245, 0)');
+      mistGrad.addColorStop(1, 'rgba(180, 215, 245, 0.045)');
+      ctx.fillStyle = mistGrad;
+      ctx.fillRect(0, height * 0.5, width, height * 0.5);
+    }
+
+    // 5. GROUND RIPPLES
     for (let r = rainRipples.length - 1; r >= 0; r--) {
       const rp = rainRipples[r];
       rp.radius += rp.growth * frameFactor;
@@ -472,14 +667,14 @@
         continue;
       }
 
-      ctx.strokeStyle = `rgba(195, 225, 255, ${rp.alpha})`;
+      ctx.strokeStyle = `rgba(195, 225, 255, ${rp.alpha.toFixed(3)})`;
       ctx.lineWidth = 0.8;
       ctx.beginPath();
       ctx.ellipse(rp.x, rp.y, rp.radius, rp.radius * 0.32, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    // Render Splashes
+    // 6. SPLASHES
     for (let s = rainSplashes.length - 1; s >= 0; s--) {
       const sp = rainSplashes[s];
       sp.x += sp.vx * frameFactor;
@@ -492,39 +687,38 @@
         continue;
       }
 
-      ctx.fillStyle = `rgba(235, 248, 255, ${sp.alpha})`;
+      ctx.fillStyle = `rgba(235, 248, 255, ${sp.alpha.toFixed(3)})`;
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, sp.radius, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
-  // --- Update & render Hyper-Realistic Snow ---
-  function renderSnow(timestamp, dt, intensityFactor) {
+  // --- Render Snow & Blizzard ---
+  function renderSnowSystem(timestamp, dt, intensityFactor, mode) {
     ctx.clearRect(0, 0, width, height);
 
+    const isBlizzard = mode === 'blizzard';
     const speedMultiplier = (isPlayingMusic ? 1.0 : 0.82) * intensityFactor;
     const frameFactor = dt / 16.67;
-    const globalWind = Math.sin(timestamp * 0.00035) * 0.25;
+
+    sharedWind = (isBlizzard ? 1.4 : 0.22) + Math.sin(timestamp * 0.00035) * (isBlizzard ? 0.65 : 0.25);
 
     for (let i = 0; i < snowflakes.length; i++) {
       const flake = snowflakes[i];
 
-      // Multi-harmonic aerodynamic sway
       const s1 = Math.sin(timestamp * flake.swaySpeed1 + flake.swayOffset1);
       const s2 = Math.cos(timestamp * flake.swaySpeed2 + flake.swayOffset2);
       const s3 = Math.sin(timestamp * flake.swaySpeed3 + flake.swayOffset3);
       const sway = (s1 * 0.55 + s2 * 0.32 + s3 * 0.13) * flake.swayAmp;
 
-      flake.x += (sway + flake.windDrift + globalWind) * frameFactor;
+      flake.x += (sway + flake.windDrift + sharedWind) * frameFactor;
       flake.y += flake.speed * speedMultiplier * frameFactor;
 
-      // Subtle rotation for midground and foreground crystalline flakes
       if (flake.rotatable) {
         flake.rot += flake.rotSpeed * frameFactor;
       }
 
-      // Natural luminosity twinkling
       const twinkle = 0.82 + 0.18 * Math.sin(timestamp * flake.twinkleSpeed + flake.twinkleOffset);
       const alpha = Math.max(0, Math.min(1, flake.opacity * twinkle));
 
@@ -555,19 +749,18 @@
         }
       }
 
-      // Wrap / Respawn boundaries
       if (flake.y > height + flake.radius * 3) {
-        resetSnowflake(flake, false);
-      } else if (flake.x < -80) {
-        flake.x = width + 60;
-      } else if (flake.x > width + 80) {
-        flake.x = -60;
+        resetSnowflake(flake, false, mode);
+      } else if (flake.x < -100) {
+        flake.x = width + 80;
+      } else if (flake.x > width + 100) {
+        flake.x = -80;
       }
     }
     ctx.globalAlpha = 1.0;
   }
 
-  // --- Main Animation Loop with Time Normalization ---
+  // --- Main Animation Loop with Frame Budgeting (30 FPS mobile, 60 FPS desktop) ---
   function animationLoop(timestamp) {
     if (!isTabActive || prefersReducedMotion || currentMode === 'off') {
       stopLoop();
@@ -576,7 +769,7 @@
 
     if (!lastTimestamp) lastTimestamp = timestamp;
     const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
-    const minDelta = isMobile ? 24 : 14;
+    const minDelta = isMobile ? 32 : 14;
 
     if (timestamp - lastTimestamp < minDelta) {
       animationFrameId = requestAnimationFrame(animationLoop);
@@ -586,12 +779,12 @@
     const dt = Math.min(timestamp - lastTimestamp, 40);
     lastTimestamp = timestamp;
 
-    const intensityFactor = isPlayingMusic ? 1.0 : 0.82;
+    const intensityFactor = isPlayingMusic ? 1.0 : 0.85;
 
-    if (currentMode === 'rain') {
-      renderRain(timestamp, dt, intensityFactor);
-    } else if (currentMode === 'snow') {
-      renderSnow(timestamp, dt, intensityFactor);
+    if (currentMode === 'rain' || currentMode === 'heavy_rain' || currentMode === 'storm') {
+      renderRainSystem(timestamp, dt, intensityFactor, currentMode);
+    } else if (currentMode === 'snow' || currentMode === 'blizzard') {
+      renderSnowSystem(timestamp, dt, intensityFactor, currentMode);
     } else {
       ctx?.clearRect(0, 0, width, height);
       return;
@@ -602,18 +795,22 @@
 
   // --- Start / Stop Loop ---
   function startLoop() {
-    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    if (animationFrameId && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(animationFrameId);
+    }
     lastTimestamp = 0;
     if (currentMode !== 'off' && !prefersReducedMotion && isTabActive) {
       initParticles();
-      animationFrameId = requestAnimationFrame(animationLoop);
+      if (typeof requestAnimationFrame === 'function') {
+        animationFrameId = requestAnimationFrame(animationLoop);
+      }
     } else if (ctx) {
       ctx.clearRect(0, 0, width, height);
     }
   }
 
   function stopLoop() {
-    if (animationFrameId) {
+    if (animationFrameId && typeof cancelAnimationFrame === 'function') {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
     }
@@ -625,18 +822,28 @@
   // --- Update Ambient Overlay ---
   function updateAmbientOverlay() {
     if (!ambientOverlay) return;
-    ambientOverlay.classList.remove('ambient-rain', 'ambient-snow', 'is-active');
+    ambientOverlay.classList.remove(
+      'ambient-rain', 'ambient-heavy-rain', 'ambient-storm',
+      'ambient-snow', 'ambient-blizzard', 'is-active'
+    );
 
     if (currentMode === 'rain') {
       ambientOverlay.classList.add('ambient-rain', 'is-active');
+    } else if (currentMode === 'heavy_rain') {
+      ambientOverlay.classList.add('ambient-heavy-rain', 'is-active');
+    } else if (currentMode === 'storm') {
+      ambientOverlay.classList.add('ambient-storm', 'is-active');
     } else if (currentMode === 'snow') {
       ambientOverlay.classList.add('ambient-snow', 'is-active');
+    } else if (currentMode === 'blizzard') {
+      ambientOverlay.classList.add('ambient-blizzard', 'is-active');
     }
   }
 
   // --- Public API ---
   return {
     init: function () {
+      if (typeof document === 'undefined') return;
       canvas = document.getElementById('weather-canvas');
       ambientOverlay = document.getElementById('weather-ambient-overlay');
 
@@ -644,9 +851,9 @@
         ctx = canvas.getContext('2d', { alpha: true });
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas, { passive: true });
+        window.addEventListener('orientationchange', resizeCanvas, { passive: true });
       }
 
-      // Check motion preference
       try {
         const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
         prefersReducedMotion = motionQuery.matches;
@@ -657,7 +864,6 @@
         });
       } catch (e) {}
 
-      // Handle tab visibility pause/resume
       document.addEventListener('visibilitychange', () => {
         isTabActive = !document.hidden;
         if (isTabActive) {
@@ -667,7 +873,6 @@
         }
       });
 
-      // Restore persisted mode from localStorage
       let savedMode = 'off';
       try {
         savedMode = localStorage.getItem(STORAGE_KEY) || 'off';
@@ -681,11 +886,11 @@
       if (!VALID_MODES.includes(mode)) mode = 'off';
       currentMode = mode;
 
-      if (mode === 'snow' && snowSprites.length === 0) {
+      if ((mode === 'snow' || mode === 'blizzard') && snowSprites.length === 0) {
         initSnowSprites();
       }
 
-      if (persist) {
+      if (persist && typeof localStorage !== 'undefined') {
         try {
           localStorage.setItem(STORAGE_KEY, mode);
         } catch (e) {}
@@ -699,10 +904,11 @@
         startLoop();
       }
 
-      // Dispatch custom event for UI updates
-      window.dispatchEvent(new CustomEvent('odiverse:weather-mode-change', {
-        detail: { mode }
-      }));
+      if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('odiverse:weather-mode-change', {
+          detail: { mode }
+        }));
+      }
     },
 
     getMode: function () {
@@ -715,7 +921,10 @@
 
     destroy: function () {
       stopLoop();
-      window.removeEventListener('resize', resizeCanvas);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', resizeCanvas);
+        window.removeEventListener('orientationchange', resizeCanvas);
+      }
     }
   };
 });

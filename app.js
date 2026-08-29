@@ -412,6 +412,49 @@
       }
     ];
 
+    function createParticles(count) {
+      const particles = [];
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          baseX: 0.1 + (i / count) * 0.8 + (Math.random() - 0.5) * 0.1,
+          baseY: 0.15 + (Math.random() * 0.7),
+          speedX: 0.00018 + (i % 5) * 0.00008,
+          speedY: 0.00015 + ((i + 2) % 5) * 0.00007,
+          phaseX: (i * 1.37) % 6.28,
+          phaseY: (i * 2.19) % 6.28,
+          spreadX: 0.07 + (i % 4) * 0.03,
+          spreadY: 0.06 + ((i + 1) % 4) * 0.025,
+          baseRadiusRatio: 0.035 + ((i * 7) % 10) * 0.006,
+          baseAlpha: 0.05 + ((i * 11) % 10) * 0.012,
+          role: i % 3 === 0 ? 'accent' : (i % 3 === 1 ? 'highlight' : 'secondary')
+        });
+      }
+      return particles;
+    }
+
+    function createFogNodes() {
+      return [
+        {
+          cx: 0.32, cy: 0.42,
+          speedX: 0.00014, speedY: 0.00011,
+          phaseX: 1.2, phaseY: 2.8,
+          spreadX: 0.22, spreadY: 0.18,
+          radiusRatio: 0.82,
+          baseAlpha: 0.16,
+          role: 'dominant'
+        },
+        {
+          cx: 0.72, cy: 0.58,
+          speedX: 0.00011, speedY: 0.00015,
+          phaseX: 3.7, phaseY: 0.9,
+          spreadX: 0.24, spreadY: 0.20,
+          radiusRatio: 0.92,
+          baseAlpha: 0.14,
+          role: 'secondary'
+        }
+      ];
+    }
+
     function createLayerState(timeSeed) {
       return {
         img: null,
@@ -430,12 +473,15 @@
           ...cfg,
           current: { r: 195, g: 30, b: 75 },
           target: { r: 195, g: 30, b: 75 }
-        }))
+        })),
+        fogNodes: createFogNodes(),
+        particles: createParticles(14)
       };
     }
 
     let stateA = createLayerState(0);
     let stateB = createLayerState(10000);
+    let liveAudioPulse = 1.0;
 
     function parseRgb(colorStr) {
       if (!colorStr) return { r: 195, g: 30, b: 75 };
@@ -556,6 +602,8 @@
         b: Math.round(dom.b * 0.55 + sec.b * 0.45)
       };
 
+      layerState.paletteColors = { dom, sec, acc, highlight, mid };
+
       layerState.nodes.forEach(node => {
         if (node.role === 'dominant') node.target = { ...dom };
         else if (node.role === 'secondary') node.target = { ...sec };
@@ -615,20 +663,25 @@
       lastRenderTime = now;
       lastTime = now;
 
+      // Smooth audio-reactive pulse transition
+      const isMusicActive = Boolean(state.isPlaying);
+      const targetPulse = isMusicActive ? (1.0 + 0.045 * Math.sin(now * 0.0032) + 0.025 * Math.cos(now * 0.0055)) : 1.0;
+      liveAudioPulse += (targetPulse - liveAudioPulse) * Math.min(1.0, (dt / 1000) * 3.5);
+
       // Only render crossfading inactive layer during active transition
       const isCrossfading = now < crossfadeEndTime;
       if (activeLayer === 'a') {
-        if (canvasA && ctxA) renderLayer(ctxA, canvasA, stateA, now, dt);
-        if (isCrossfading && canvasB && ctxB) renderLayer(ctxB, canvasB, stateB, now, dt);
+        if (canvasA && ctxA) renderLayer(ctxA, canvasA, stateA, now, dt, isMobile);
+        if (isCrossfading && canvasB && ctxB) renderLayer(ctxB, canvasB, stateB, now, dt, isMobile);
       } else {
-        if (canvasB && ctxB) renderLayer(ctxB, canvasB, stateB, now, dt);
-        if (isCrossfading && canvasA && ctxA) renderLayer(ctxA, canvasA, stateA, now, dt);
+        if (canvasB && ctxB) renderLayer(ctxB, canvasB, stateB, now, dt, isMobile);
+        if (isCrossfading && canvasA && ctxA) renderLayer(ctxA, canvasA, stateA, now, dt, isMobile);
       }
 
       animId = requestAnimationFrame(loop);
     }
 
-    function renderLayer(ctx, canvas, state, now, dt) {
+    function renderLayer(ctx, canvas, state, now, dt, isMobile) {
       const w = canvas.width;
       const h = canvas.height;
       const minDim = Math.min(w, h);
@@ -682,9 +735,29 @@
         ctx.restore();
       }
 
-      // 3. MOVING CHROMATIC FLUID LIGHT BLOOMS (Liquid Additive/Screen Overlay)
+      // 3. ATMOSPHERIC DRIFTING HAZE / VOLUMETRIC FOG BLOOMS
       ctx.globalCompositeOperation = 'screen';
+      if (state.fogNodes && state.paletteColors) {
+        for (let i = 0; i < state.fogNodes.length; i++) {
+          const fog = state.fogNodes[i];
+          const colorObj = fog.role === 'dominant' ? state.paletteColors.dom : state.paletteColors.sec;
+          const fx = (fog.cx + Math.sin(t * fog.speedX + fog.phaseX) * fog.spreadX) * w;
+          const fy = (fog.cy + Math.cos(t * fog.speedY + fog.phaseY) * fog.spreadY) * h;
+          const fRadius = minDim * fog.radiusRatio * (1.0 + 0.08 * Math.sin(t * 0.0004 + fog.phaseX));
 
+          const fogGrad = ctx.createRadialGradient(fx, fy, 0, fx, fy, fRadius);
+          fogGrad.addColorStop(0, `rgba(${colorObj.r}, ${colorObj.g}, ${colorObj.b}, ${fog.baseAlpha.toFixed(3)})`);
+          fogGrad.addColorStop(0.5, `rgba(${colorObj.r}, ${colorObj.g}, ${colorObj.b}, ${(fog.baseAlpha * 0.4).toFixed(3)})`);
+          fogGrad.addColorStop(1, `rgba(${colorObj.r}, ${colorObj.g}, ${colorObj.b}, 0)`);
+
+          ctx.fillStyle = fogGrad;
+          ctx.beginPath();
+          ctx.arc(fx, fy, fRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // 4. MOVING CHROMATIC FLUID LIGHT BLOOMS (Liquid Additive/Screen Overlay)
       for (let i = 0; i < state.nodes.length; i++) {
         const node = state.nodes[i];
 
@@ -711,12 +784,12 @@
         const posX = (node.cx + dx * node.spreadX) * w;
         const posY = (node.cy + dy * node.spreadY) * h;
 
-        // Dynamic breathing radius
-        const rPulse = 1.0 + 0.26 * Math.sin(st * node.fr1 * 1.3247 + node.pr) + 0.14 * Math.cos(st * node.fr2 * 2.71828);
+        // Dynamic breathing radius modulated by music activity pulse
+        const rPulse = (1.0 + 0.26 * Math.sin(st * node.fr1 * 1.3247 + node.pr) + 0.14 * Math.cos(st * node.fr2 * 2.71828)) * liveAudioPulse;
         const radius = Math.max(40, node.baseRadiusRatio * minDim * rPulse);
 
         // Dynamic luminescence pulse
-        const aPulse = 1.0 + 0.20 * Math.sin(st * node.fa * 1.61803 + node.pa);
+        const aPulse = (1.0 + 0.20 * Math.sin(st * node.fa * 1.61803 + node.pa)) * liveAudioPulse;
         const alpha = Math.max(0.20, Math.min(0.98, node.baseAlpha * aPulse));
 
         // Soft volumetric radial gradient bloom
@@ -730,6 +803,30 @@
         ctx.beginPath();
         ctx.arc(posX, posY, radius, 0, Math.PI * 2);
         ctx.fill();
+      }
+
+      // 5. SOFT FLOATING LIGHT PARTICLES (Dreamy Ambient Motility)
+      if (state.particles && state.paletteColors) {
+        const pCount = isMobile ? 7 : state.particles.length;
+        for (let i = 0; i < pCount; i++) {
+          const p = state.particles[i];
+          const col = p.role === 'highlight' ? state.paletteColors.highlight : (p.role === 'accent' ? state.paletteColors.acc : state.paletteColors.sec);
+
+          const px = (p.baseX + Math.sin(t * p.speedX + p.phaseX) * p.spreadX) * w;
+          const py = (p.baseY + Math.cos(t * p.speedY + p.phaseY) * p.spreadY) * h;
+          const pr = Math.max(8, minDim * p.baseRadiusRatio * (1.0 + 0.15 * Math.sin(t * 0.001 + p.phaseX)));
+          const pa = p.baseAlpha * (1.0 + 0.25 * Math.sin(t * 0.0015 + p.phaseY)) * liveAudioPulse;
+
+          const pGrad = ctx.createRadialGradient(px, py, 0, px, py, pr);
+          pGrad.addColorStop(0, `rgba(${col.r}, ${col.g}, ${col.b}, ${(pa * 0.8).toFixed(3)})`);
+          pGrad.addColorStop(0.45, `rgba(${col.r}, ${col.g}, ${col.b}, ${(pa * 0.35).toFixed(3)})`);
+          pGrad.addColorStop(1, `rgba(${col.r}, ${col.g}, ${col.b}, 0)`);
+
+          ctx.fillStyle = pGrad;
+          ctx.beginPath();
+          ctx.arc(px, py, pr, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       ctx.globalCompositeOperation = 'source-over';
@@ -755,10 +852,17 @@
     // Smoothly crossfade and animate the living liquid artwork background
     AmbientAtmosphereEngine.transitionToTrack(artworkUrl, palette);
 
-    // Broadcast track accent glow
+    // Broadcast track accent and dominant glow to root and carousel container
+    const root = document.documentElement;
+    if (root && palette.accent && palette.dominant) {
+      root.style.setProperty('--track-accent-glow', `rgba(${palette.accent}, 0.22)`);
+      root.style.setProperty('--track-dominant-glow', `rgba(${palette.dominant}, 0.16)`);
+    }
+
     const stageContainer = document.getElementById('stage-carousel-container');
     if (stageContainer) {
-      stageContainer.style.setProperty('--track-accent-glow', palette.accent);
+      stageContainer.style.setProperty('--track-accent-glow', `rgba(${palette.accent}, 0.22)`);
+      stageContainer.style.setProperty('--track-dominant-glow', `rgba(${palette.dominant}, 0.16)`);
     }
   }
 
@@ -961,23 +1065,30 @@
 
     const itemsHtml = state.playlists.map(pl => {
       const isActive = state.currentPlaylist?.id === pl.id;
-      const icon = pl.icon ? playlistIconSvg(pl.icon) + ' ' : '';
       const safeName = escapeHTML(pl.name);
       const safeId = escapeHTML(String(pl.id));
+      const isCustomBadge = pl.isCustomUserPlaylist ? ` <span style="font-size:8px;padding:1px 4px;border-radius:4px;background:rgba(52,211,153,0.2);color:#34d399;font-weight:700;margin-left:4px;">YOURS</span>` : '';
       return `
         <button type="button" class="playlist-option-btn ${isActive ? 'is-active' : ''}" data-pl-id="${safeId}">
-          <div class="flex items-end gap-[2px] h-[12px] ${isActive ? '' : 'opacity-0'}">
-            <span class="w-[2.5px] bg-green-400 rounded-full animate-eq-1"></span>
-            <span class="w-[2.5px] bg-green-400 rounded-full animate-eq-2"></span>
-            <span class="w-[2.5px] bg-green-400 rounded-full animate-eq-3"></span>
-          </div>
-          <span class="text-[12px] truncate flex-1">${icon}${safeName}</span>
+          <span class="text-[12px] truncate flex-1">${safeName}${isCustomBadge}</span>
         </button>
       `;
     }).join('');
 
-    const syncFooterHtml = `
-      <div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;padding:6px 8px 4px;">
+    const customEntryHtml = `
+      <div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;padding:5px 6px 3px;">
+        <button type="button" id="btn-open-user-playlist-modal" class="playlist-custom-entry-btn">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span style="flex:1;text-align:left;">Listen Your Playlist</span>
+        </button>
+      </div>
+    `;
+
+    const isOfficialCurrent = !state.currentPlaylist?.isCustomUserPlaylist;
+    const syncFooterHtml = isOfficialCurrent ? `
+      <div style="padding:2px 6px 4px;">
         <button type="button" id="btn-refresh-playlist" class="playlist-refresh-btn playlist-sync-btn">
           <svg class="refresh-icon sync-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;max-width:12px;max-height:12px;flex-shrink:0;display:inline-block;">
             <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -985,9 +1096,9 @@
           <span id="refresh-playlist-status" style="font-size:11px;font-weight:600;">Refresh Playlist</span>
         </button>
       </div>
-    `;
+    ` : '';
 
-    container.innerHTML = itemsHtml + syncFooterHtml;
+    container.innerHTML = itemsHtml + customEntryHtml + syncFooterHtml;
   }
 
   async function selectPlaylist(playlist, isInitialBootHydration = false) {
@@ -1001,6 +1112,18 @@
     });
 
     renderPlaylistMenus();
+
+    if (playlist.isCustomUserPlaylist) {
+      state.tracks = playlist.tracks || [];
+      state.currentIndex = 0;
+      setupCardsInitial();
+      updateDockUI();
+      if (state.tracks.length > 0) {
+        loadTrackAtIndex(0, true, 'direct');
+      }
+      return;
+    }
+
     await loadPlaylistSongs(playlist, false, false, isInitialBootHydration);
   }
 
@@ -1645,6 +1768,194 @@
     }
   }
 
+  // ============================================================
+  // BACKGROUND VISUAL QUALITY ENGINE (FOR bgYtPlayer & bgVideo ONLY)
+  // Does NOT touch music playback or state.ytPlayer
+  // ============================================================
+  const VISUAL_QUALITY_MAP = {
+    'auto': 'default',
+    '720p': 'hd720',
+    '1080p': 'hd1080',
+    '1440p': 'hd1440',
+    '2160p': 'hd2160'
+  };
+
+  const VISUAL_QUALITY_LABELS = {
+    'hd2160': '2160p',
+    'hd1440': '1440p',
+    'hd1080': '1080p',
+    'hd720': '720p',
+    'large': '480p',
+    'medium': '360p',
+    'small': '240p',
+    'tiny': '144p',
+    'auto': 'Auto',
+    'default': 'Auto'
+  };
+
+  let requestedVisualQuality = 'auto'; // 'auto' | '720p' | '1080p' | '1440p' | '2160p'
+  let actualVisualQuality = 'default';
+  let activeBgYtVideoId = null;
+
+  function applyRequestedVisualQuality() {
+    const bgVideo = document.getElementById('bg-video');
+    const bgYtContainer = document.getElementById('bg-yt-container');
+
+    // 1. YouTube Background Visual
+    if (bgYtContainer && bgYtContainer.classList.contains('is-active') && bgYtPlayer && typeof bgYtPlayer.setPlaybackQuality === 'function') {
+      const targetYtQuality = VISUAL_QUALITY_MAP[requestedVisualQuality] || 'default';
+      try {
+        bgYtPlayer.setPlaybackQuality(targetYtQuality);
+      } catch (e) {}
+
+      // Multi-tier polling to capture YouTube's real negotiated stream quality
+      [300, 800, 1600].forEach(delay => {
+        setTimeout(() => {
+          detectActualVisualQuality();
+        }, delay);
+      });
+      return;
+    }
+
+    // 2. HTML5 MP4 Background Visual
+    if (bgVideo && bgVideo.classList.contains('is-active')) {
+      actualVisualQuality = requestedVisualQuality;
+      updateVisualQualityUI();
+      return;
+    }
+
+    // 3. Default Artwork mode
+    updateVisualQualityUI();
+  }
+
+  function detectActualVisualQuality() {
+    const bgVideo = document.getElementById('bg-video');
+    const bgYtContainer = document.getElementById('bg-yt-container');
+
+    if (bgYtContainer && bgYtContainer.classList.contains('is-active') && bgYtPlayer && typeof bgYtPlayer.getPlaybackQuality === 'function') {
+      try {
+        const q = bgYtPlayer.getPlaybackQuality();
+        if (q && q !== 'unknown') {
+          actualVisualQuality = q;
+          updateVisualQualityUI();
+        }
+      } catch (e) {}
+      return;
+    }
+
+    if (bgVideo && bgVideo.classList.contains('is-active')) {
+      actualVisualQuality = requestedVisualQuality;
+      updateVisualQualityUI();
+    }
+  }
+
+  function updateVisualQualityUI() {
+    const statusBadge = document.getElementById('quality-actual-status');
+    if (!statusBadge) return;
+
+    const bgYtContainer = document.getElementById('bg-yt-container');
+    const bgVideo = document.getElementById('bg-video');
+
+    const reqLabel = (requestedVisualQuality === 'auto') ? 'Auto' : requestedVisualQuality;
+
+    if (bgYtContainer && bgYtContainer.classList.contains('is-active')) {
+      const realQualityLabel = VISUAL_QUALITY_LABELS[actualVisualQuality] || actualVisualQuality || 'Auto';
+      statusBadge.textContent = `Requested: ${reqLabel} · Actual: ${realQualityLabel}`;
+    } else if (bgVideo && bgVideo.classList.contains('is-active')) {
+      statusBadge.textContent = `Requested: ${reqLabel} · Actual: ${reqLabel}`;
+    } else {
+      statusBadge.textContent = `Requested: ${reqLabel} · Actual: Auto`;
+    }
+  }
+
+  function setVisualQuality(quality, persist = true) {
+    const validQualities = ['auto', '720p', '1080p', '1440p', '2160p'];
+    if (!validQualities.includes(quality)) quality = 'auto';
+    requestedVisualQuality = quality;
+
+    if (persist) {
+      try {
+        localStorage.setItem('odiverse_visual_quality', quality);
+      } catch (e) {}
+    }
+
+    const qualityOptionsList = document.getElementById('quality-options-list');
+    if (qualityOptionsList) {
+      const btns = qualityOptionsList.querySelectorAll('.quality-option-btn');
+      btns.forEach(btn => {
+        const q = btn.getAttribute('data-quality');
+        btn.classList.toggle('is-active', q === quality);
+      });
+    }
+
+    const bgYtContainer = document.getElementById('bg-yt-container');
+    const bgVideo = document.getElementById('bg-video');
+    const targetYtQuality = VISUAL_QUALITY_MAP[requestedVisualQuality] || 'default';
+
+    // 1. YouTube Background Visual: reload from 0:00 with requested suggestedQuality
+    if (bgYtContainer && bgYtContainer.classList.contains('is-active') && bgYtPlayer) {
+      let currentYtId = activeBgYtVideoId;
+      if (!currentYtId && typeof bgYtPlayer.getVideoData === 'function') {
+        const vData = bgYtPlayer.getVideoData();
+        if (vData && vData.video_id) currentYtId = vData.video_id;
+      }
+      if (!currentYtId) {
+        const currentPresets = (state.visuals && state.visuals.length > 0) ? state.visuals : DEFAULT_VISUAL_PRESETS;
+        const preset = currentPresets.find(p => p.id === state.currentVisual);
+        if (preset && preset.url) currentYtId = extractYouTubeVideoId(preset.url);
+      }
+
+      if (currentYtId && typeof bgYtPlayer.loadVideoById === 'function') {
+        try {
+          if (typeof bgYtPlayer.stopVideo === 'function') {
+            bgYtPlayer.stopVideo();
+          }
+          bgYtPlayer.loadVideoById({
+            videoId: currentYtId,
+            startSeconds: 0,
+            suggestedQuality: targetYtQuality
+          });
+          bgYtPlayer.mute();
+          bgYtPlayer.playVideo();
+          if (typeof bgYtPlayer.setPlaybackQuality === 'function') {
+            bgYtPlayer.setPlaybackQuality(targetYtQuality);
+          }
+        } catch (e) {}
+      } else if (typeof bgYtPlayer.setPlaybackQuality === 'function') {
+        try {
+          bgYtPlayer.setPlaybackQuality(targetYtQuality);
+        } catch (e) {}
+      }
+
+      [300, 800, 1600].forEach(delay => {
+        setTimeout(() => {
+          detectActualVisualQuality();
+        }, delay);
+      });
+      return;
+    }
+
+    // 2. Seamless HTML5 MP4 quality source switching
+    if (bgVideo && bgVideo.classList.contains('is-active')) {
+      const currentPresets = (state.visuals && state.visuals.length > 0) ? state.visuals : DEFAULT_VISUAL_PRESETS;
+      const preset = currentPresets.find(p => p.id === state.currentVisual);
+      if (preset && preset.sources) {
+        const targetSrc = preset.sources[quality] || preset.sources['1080p'] || preset.url;
+        if (targetSrc) {
+          bgVideo.src = targetSrc;
+          bgVideo.currentTime = 0;
+          bgVideo.load();
+          bgVideo.play().catch(() => {});
+        }
+      }
+      actualVisualQuality = requestedVisualQuality;
+      updateVisualQualityUI();
+      return;
+    }
+
+    applyRequestedVisualQuality();
+  }
+
   // --- YouTube IFrame API ---
   let ytApiInjected = false;
   function initYouTubeAPI() {
@@ -1699,10 +2010,6 @@
       event.target.setVolume(state.volume * 100);
     } catch (e) {}
 
-    // CANONICAL SYNC: the player may have been created with a seed video that
-    // no longer matches a re-rendered state (cache/remote hydration can land
-    // before onReady). Lock state.currentIndex to the REAL loaded video and
-    // render its metadata before any playback starts.
     reconcileCurrentTrack(true);
 
     if (state.pendingAction === 'play') {
@@ -1735,10 +2042,6 @@
       state.isPlaying = true;
       setPlayState(true);
       startProgressTracker();
-      // CANONICAL SYNC: reconcile UI to the video YouTube reports as ACTUALLY
-      // playing. This is the final authority — it guarantees no persistent
-      // YouTube=SongA / UI=SongB drift regardless of which async hydration
-      // (cache, InsForge, realtime sync) landed out of order during boot.
       reconcileCurrentTrack(true);
     } else if (pState === 2) { // PAUSED
       state.isPlaying = false;
@@ -2308,6 +2611,31 @@
     }
   }
 
+  // --- Foreground & Lifecycle State Reconciler ---
+  function reconcilePlaybackOnForeground() {
+    if (!state.isPlayerReady || !state.ytPlayer) return;
+    try {
+      const pState = typeof state.ytPlayer.getPlayerState === 'function' ? state.ytPlayer.getPlayerState() : -1;
+      if (pState === 1) { // Playing
+        state.isPlaying = true;
+        setPlayState(true);
+        startProgressTracker();
+        updateProgressUI();
+      } else if (pState === 2 || pState === 0 || pState === 5 || pState === -1) {
+        // Paused, cued, or suspended by browser
+        state.isPlaying = false;
+        setPlayState(false);
+        stopProgressTracker();
+        updateProgressUI();
+      }
+
+      const curTrack = state.tracks[state.currentIndex];
+      if (curTrack) {
+        updateMediaSessionMetadata(curTrack);
+      }
+    } catch (e) {}
+  }
+
   function formatTime(seconds) {
     const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
     return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, '0')}`;
@@ -2720,11 +3048,19 @@
   }
 
   function ensureBgYouTubePlayer(ytId, onReadyCallback) {
+    activeBgYtVideoId = ytId;
+    const targetYtQuality = VISUAL_QUALITY_MAP[requestedVisualQuality] || 'default';
+
     if (bgYtPlayer && typeof bgYtPlayer.loadVideoById === 'function') {
       try {
-        bgYtPlayer.loadVideoById({ videoId: ytId, startSeconds: 0 });
+        bgYtPlayer.loadVideoById({
+          videoId: ytId,
+          startSeconds: 0,
+          suggestedQuality: targetYtQuality
+        });
         bgYtPlayer.mute();
         bgYtPlayer.playVideo();
+        applyRequestedVisualQuality();
         if (onReadyCallback) onReadyCallback();
         return;
       } catch (e) {}
@@ -2746,17 +3082,27 @@
             iv_load_policy: 3,
             disablekb: 1,
             playsinline: 1,
-            fs: 0
+            fs: 0,
+            suggestedQuality: targetYtQuality
           },
           events: {
             onReady: (event) => {
               bgYtReady = true;
               event.target.mute();
               event.target.playVideo();
+              applyRequestedVisualQuality();
               if (onReadyCallback) onReadyCallback();
             },
+            onPlaybackQualityChange: (event) => {
+              if (event && event.data) {
+                actualVisualQuality = event.data;
+                updateVisualQualityUI();
+              }
+            },
             onStateChange: (event) => {
-              if (event.data === 0) {
+              if (event.data === 1 || event.data === 3) {
+                applyRequestedVisualQuality();
+              } else if (event.data === 0) {
                 event.target.playVideo(); // Loop back to start
               }
             }
@@ -2930,6 +3276,45 @@
       }
     });
 
+    // YouTube Video & Audio Playback Quality Controls
+    const btnQualityToggle = document.getElementById('btn-visuals-quality-toggle');
+    const qualityPanel = document.getElementById('visuals-quality-panel');
+    const qualityOptionsList = document.getElementById('quality-options-list');
+
+    btnQualityToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = qualityPanel?.classList.contains('hidden');
+      qualityPanel?.classList.toggle('hidden', !isHidden);
+      btnQualityToggle?.classList.toggle('is-active', isHidden);
+      if (isHidden) {
+        detectActualVisualQuality();
+      }
+      if (visualsDropdown && btnVisuals) {
+        DropdownPositioner.position(visualsDropdown, btnVisuals, 'visuals');
+      }
+    });
+
+    qualityOptionsList?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const qBtn = e.target.closest('.quality-option-btn');
+      if (qBtn) {
+        const quality = qBtn.getAttribute('data-quality');
+        setVisualQuality(quality, true);
+        qualityPanel?.classList.add('hidden');
+        btnQualityToggle?.classList.remove('is-active');
+        if (visualsDropdown && btnVisuals) {
+          DropdownPositioner.position(visualsDropdown, btnVisuals, 'visuals');
+        }
+      }
+    });
+
+    // Restore saved Visual quality preference
+    let savedVisualQuality = 'auto';
+    try {
+      savedVisualQuality = localStorage.getItem('odiverse_visual_quality') || 'auto';
+    } catch (e) {}
+    setVisualQuality(savedVisualQuality, false);
+
     // Restore saved visual mode
     let savedVisual = 'off';
     let savedCustomUrl = '';
@@ -3042,14 +3427,16 @@
         }
       }
       if (bgVideo) {
-        if (bgVideo.src !== targetRawUrl) {
-          bgVideo.src = targetRawUrl;
+        const resolvedUrl = (preset && preset.sources && (preset.sources[requestedVisualQuality] || preset.sources['1080p'])) || targetRawUrl;
+        if (bgVideo.src !== resolvedUrl) {
+          bgVideo.src = resolvedUrl;
           bgVideo.load();
         }
         bgVideo.play().catch(e => console.log('[Visuals] Autoplay note:', e.message));
         bgVideo.classList.add('is-active');
       }
       if (dynamicArtworkBg) dynamicArtworkBg.style.opacity = '0.5';
+      applyRequestedVisualQuality();
     }
   }
 
@@ -3108,6 +3495,11 @@
 
     playlistDropdown?.addEventListener('click', (e) => {
       e.stopPropagation();
+      const openUserBtn = e.target.closest('#btn-open-user-playlist-modal');
+      if (openUserBtn) {
+        UserPlaylistEngine.open();
+        return;
+      }
       const optionBtn = e.target.closest('.playlist-option-btn');
       if (optionBtn) {
         const plId = optionBtn.getAttribute('data-pl-id');
@@ -4541,15 +4933,21 @@
             <h2 class="editorial-chapter-title">INQUIRY FORM</h2>
             <div class="editorial-chapter-body">
               <form id="gullygang-contact-form" class="editorial-contact-form-wrap" novalidate>
+                <!-- Anti-Spam Honeypot Field (Invisible to human users) -->
+                <div style="position: absolute; left: -9999px; opacity: 0; pointer-events: none;" aria-hidden="true" tabindex="-1">
+                  <label for="contact-hp-website">Website (Leave empty)</label>
+                  <input type="text" id="contact-hp-website" name="website" tabindex="-1" autocomplete="off" />
+                </div>
+
                 <div class="editorial-form-row">
                   <div class="editorial-form-group">
                     <label for="contact-name" class="editorial-form-label">Your Name</label>
-                    <input type="text" id="contact-name" name="name" class="editorial-form-input" placeholder="e.g. Priyabrata Mohanty" required />
+                    <input type="text" id="contact-name" name="name" class="editorial-form-input" placeholder="e.g. Priyabrata Mohanty" maxlength="100" required />
                   </div>
 
                   <div class="editorial-form-group">
                     <label for="contact-email" class="editorial-form-label">Your Email</label>
-                    <input type="email" id="contact-email" name="email" class="editorial-form-input" placeholder="name@example.com" required />
+                    <input type="email" id="contact-email" name="email" class="editorial-form-input" placeholder="name@example.com" maxlength="255" required />
                   </div>
                 </div>
 
@@ -4566,7 +4964,7 @@
 
                 <div class="editorial-form-group">
                   <label for="contact-message" class="editorial-form-label">Message</label>
-                  <textarea id="contact-message" name="message" class="editorial-form-textarea" placeholder="How can we assist you?" required></textarea>
+                  <textarea id="contact-message" name="message" class="editorial-form-textarea" placeholder="How can we assist you?" maxlength="3000" required></textarea>
                 </div>
 
                 <div class="editorial-submit-action">
@@ -4575,7 +4973,7 @@
                   </button>
                 </div>
 
-                <div id="contact-form-status" class="contact-status-msg hidden mt-4"></div>
+                <div id="contact-form-status" class="contact-status-msg hidden mt-4" role="status" aria-live="polite"></div>
               </form>
             </div>
           </section>
@@ -4684,6 +5082,8 @@
       }
     }
 
+    let isContactSubmitting = false;
+
     function attachContactFormHandler() {
       const form = document.getElementById('gullygang-contact-form') || document.getElementById('odiverse-contact-form');
       const statusEl = document.getElementById('contact-form-status');
@@ -4691,57 +5091,130 @@
 
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const name = form.name.value.trim();
-        const email = form.email.value.trim();
-        const category = form.category.value;
-        const message = form.message.value.trim();
+        if (isContactSubmitting) return; // Prevent duplicate clicks
 
-        if (!name || !email || !message) {
+        const name = (form.name?.value || '').trim();
+        const email = (form.email?.value || '').trim();
+        const message = (form.message?.value || '').trim();
+        const honeypot = (form.website?.value || '').trim();
+
+        // 1. Anti-Spam: If honeypot is filled, silently simulate success
+        if (honeypot.length > 0) {
+          form.reset();
           if (statusEl) {
-            statusEl.textContent = 'Please fill in all required fields.';
-            statusEl.className = 'contact-status-msg text-rose-400';
+            statusEl.innerHTML = `<div class="text-emerald-400 font-semibold mb-1">Message sent successfully.</div>`;
+            statusEl.className = 'contact-status-msg text-emerald-400';
             statusEl.classList.remove('hidden');
           }
           return;
         }
 
+        // 2. Validate input fields
+        if (!name) {
+          if (statusEl) {
+            statusEl.textContent = 'Please enter your name.';
+            statusEl.className = 'contact-status-msg text-rose-400';
+            statusEl.classList.remove('hidden');
+          }
+          form.name?.focus();
+          return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email || !emailRegex.test(email)) {
+          if (statusEl) {
+            statusEl.textContent = 'Please enter a valid email address.';
+            statusEl.className = 'contact-status-msg text-rose-400';
+            statusEl.classList.remove('hidden');
+          }
+          form.email?.focus();
+          return;
+        }
+
+        if (!message) {
+          if (statusEl) {
+            statusEl.textContent = 'Please enter a message.';
+            statusEl.className = 'contact-status-msg text-rose-400';
+            statusEl.classList.remove('hidden');
+          }
+          form.message?.focus();
+          return;
+        }
+
         const submitBtn = document.getElementById('btn-submit-contact');
+        isContactSubmitting = true;
         if (submitBtn) {
           submitBtn.disabled = true;
-          submitBtn.textContent = 'SENDING...';
+          submitBtn.textContent = 'Sending...';
+        }
+        if (statusEl) {
+          statusEl.classList.add('hidden');
         }
 
         try {
-          // Attempt InsForge contact message record persistence
-          if (INSFORGE_CONFIG.baseUrl && INSFORGE_CONFIG.apiKey) {
-            await insforgeFetch('/api/database/records/contact_messages', {
+          // 3. Submit data to InsForge via first-party endpoint with REST fallback
+          let sentSuccessfully = false;
+
+          try {
+            const apiRes = await fetch(`${API_BASE}/api/contact`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, email, message, website: honeypot })
+            });
+
+            if (apiRes.ok) {
+              sentSuccessfully = true;
+            } else if (apiRes.status === 429) {
+              throw new Error('RATE_LIMITED');
+            }
+          } catch (apiErr) {
+            if (apiErr.message === 'RATE_LIMITED') throw apiErr;
+          }
+
+          // Fallback directly to InsForge REST records table if api route had network issue
+          if (!sentSuccessfully && INSFORGE_CONFIG.baseUrl && INSFORGE_CONFIG.apiKey) {
+            const restRes = await insforgeFetch('/api/database/records/contact_messages', {
               method: 'POST',
               body: JSON.stringify([{
                 name,
                 email,
-                category,
                 message,
                 created_at: new Date().toISOString()
               }])
             });
+            if (restRes.ok || restRes.status === 201) {
+              sentSuccessfully = true;
+            }
           }
 
-          if (statusEl) {
-            statusEl.innerHTML = `
-              <div class="text-emerald-400 font-semibold mb-1">Message sent successfully.</div>
-              <div class="text-white/60 text-xs">Thanks for reaching out. We&rsquo;ll get back to you if a response is needed.</div>
-            `;
-            statusEl.className = 'contact-status-msg text-emerald-400';
-            statusEl.classList.remove('hidden');
+          if (sentSuccessfully) {
+            // 4. On success: clear form & show clean success message
+            form.reset();
+            if (statusEl) {
+              statusEl.innerHTML = `
+                <div class="text-emerald-400 font-semibold mb-1">Message sent successfully.</div>
+                <div class="text-white/60 text-xs">Thanks for reaching out. We&rsquo;ll review your message promptly.</div>
+              `;
+              statusEl.className = 'contact-status-msg text-emerald-400';
+              statusEl.classList.remove('hidden');
+            }
+          } else {
+            throw new Error('SUBMIT_FAILED');
           }
-          form.reset();
         } catch (err) {
+          // 5. On failure: keep entered data & show user-friendly error
+          console.error('[GULLYGANG CONTACT SUBMISSION ERROR]', err);
           if (statusEl) {
-            statusEl.textContent = 'Unable to send message at this moment. Please check your connection and try again.';
+            if (err.message === 'RATE_LIMITED') {
+              statusEl.textContent = 'Too many messages sent. Please wait a few minutes before trying again.';
+            } else {
+              statusEl.textContent = "Couldn't send your message. Please try again.";
+            }
             statusEl.className = 'contact-status-msg text-rose-400';
             statusEl.classList.remove('hidden');
           }
         } finally {
+          isContactSubmitting = false;
           if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.textContent = 'SEND MESSAGE \u2192';
@@ -4836,6 +5309,362 @@
     return {
       init,
       openPage,
+      close
+    };
+  })();
+
+  // ============================================================
+  // "LISTEN YOUR PLAYLIST" — TEMPORARY USER PLAYLIST ENGINE
+  // User can import any YouTube playlist or single song for their session
+  // Pure client-side in-memory queue (ZERO database persistence)
+  // ============================================================
+  const UserPlaylistEngine = (() => {
+    const modal = document.getElementById('user-playlist-modal');
+    const inputEl = document.getElementById('input-user-playlist');
+    const clearBtn = document.getElementById('btn-clear-user-playlist');
+    const submitBtn = document.getElementById('btn-load-user-playlist');
+    const btnText = document.getElementById('user-playlist-btn-text');
+    const spinner = document.getElementById('user-playlist-spinner');
+    const feedback = document.getElementById('user-playlist-feedback');
+
+    function open() {
+      if (!modal) return;
+      closeAllDropdowns();
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+      clearFeedback();
+      setTimeout(() => {
+        inputEl?.focus();
+      }, 100);
+    }
+
+    function close() {
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      setLoading(false);
+    }
+
+    function setLoading(isLoading) {
+      if (submitBtn) submitBtn.disabled = isLoading;
+      if (spinner) spinner.classList.toggle('hidden', !isLoading);
+      if (btnText) btnText.textContent = isLoading ? 'Loading...' : 'Load Playlist';
+    }
+
+    function showFeedback(message, type = 'error') {
+      if (!feedback) return;
+      feedback.textContent = message;
+      feedback.className = `user-playlist-feedback is-${type}`;
+      feedback.classList.remove('hidden');
+    }
+
+    function clearFeedback() {
+      if (!feedback) return;
+      feedback.textContent = '';
+      feedback.className = 'user-playlist-feedback hidden';
+    }
+
+    function parseInput(rawInput) {
+      if (!rawInput || typeof rawInput !== 'string') return null;
+      const raw = rawInput.trim();
+
+      // 1. Check for playlist URL (e.g. ?list=PLxxx or &list=PLxxx)
+      const listMatch = raw.match(/[?&]list=([A-Za-z0-9_-]+)/);
+      if (listMatch && listMatch[1]) {
+        return { type: 'playlist', id: listMatch[1] };
+      }
+
+      // 2. Check for raw playlist ID (starts with PL, UU, LL, RD, OLAK5uy_)
+      if (/^(?:PL|UU|LL|RD|OLAK5uy_)[A-Za-z0-9_-]{8,}$/.test(raw)) {
+        return { type: 'playlist', id: raw };
+      }
+
+      // 3. Check for standard YouTube video URLs (youtu.be/xxx, watch?v=xxx, embed/xxx, shorts/xxx)
+      const vidMatch = raw.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|live\/|shorts\/))([A-Za-z0-9_-]{11})/);
+      if (vidMatch && vidMatch[1]) {
+        return { type: 'video', id: vidMatch[1] };
+      }
+
+      // 4. Check for direct 11-char video ID
+      if (/^[A-Za-z0-9_-]{11}$/.test(raw)) {
+        return { type: 'video', id: raw };
+      }
+
+      return null;
+    }
+
+    async function fetchTracks(input) {
+      const parsed = parseInput(input);
+      if (!parsed) {
+        throw new Error('INVALID_LINK');
+      }
+
+      // 1. Try first-party serverless resolver
+      try {
+        const apiUrl = `${API_BASE}/api/youtube/fetch?input=${encodeURIComponent(input)}`;
+        const res = await fetch(apiUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && Array.isArray(data.tracks)) {
+            // Strictly sanitize and extract real 11-char video IDs ONLY
+            const validTracks = data.tracks
+              .map((t, idx) => {
+                const vidId = t.videoId || t.id;
+                if (!vidId || typeof vidId !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(vidId)) {
+                  return null; // Strip any invalid or playlist ID
+                }
+                return {
+                  id: vidId,
+                  videoId: vidId,
+                  title: t.title || 'Untitled Track',
+                  artist: t.artist || 'YouTube Artist',
+                  thumbnail: normalizeThumbnailUrl(t.thumbnail, vidId),
+                  position: idx + 1
+                };
+              })
+              .filter(Boolean);
+
+            if (validTracks.length > 0) {
+              return {
+                type: data.type,
+                id: data.playlistId || data.id,
+                title: data.title || (data.type === 'video' ? 'Your Song' : 'Your Playlist'),
+                tracks: validTracks
+              };
+            }
+          }
+
+          if (data.code === 'PRIVATE_OR_UNAVAILABLE') {
+            throw new Error('PRIVATE_OR_UNAVAILABLE');
+          } else if (data.code === 'EMPTY_PLAYLIST') {
+            throw new Error('EMPTY_PLAYLIST');
+          }
+        } else if (res.status === 429) {
+          const data = await res.json().catch(() => ({}));
+          if (data.code === 'QUOTA_EXCEEDED') {
+            throw new Error('QUOTA_EXCEEDED');
+          }
+          throw new Error('RATE_LIMITED');
+        } else if (res.status === 404) {
+          throw new Error('PRIVATE_OR_UNAVAILABLE');
+        }
+      } catch (apiErr) {
+        if (
+          apiErr.message === 'PRIVATE_OR_UNAVAILABLE' ||
+          apiErr.message === 'EMPTY_PLAYLIST' ||
+          apiErr.message === 'INVALID_LINK' ||
+          apiErr.message === 'RATE_LIMITED' ||
+          apiErr.message === 'QUOTA_EXCEEDED'
+        ) {
+          throw apiErr;
+        }
+      }
+
+      // 2. Client-side fallback for single video via oEmbed
+      if (parsed.type === 'video' && /^[A-Za-z0-9_-]{11}$/.test(parsed.id)) {
+        let title = 'YouTube Song';
+        let artist = 'YouTube Artist';
+        let thumb = `https://i.ytimg.com/vi/${parsed.id}/hqdefault.jpg`;
+        try {
+          const oeRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${encodeURIComponent(parsed.id)}&format=json`);
+          if (oeRes.ok) {
+            const oeData = await oeRes.json();
+            if (oeData.title) title = oeData.title.trim();
+            if (oeData.author_name) artist = oeData.author_name.trim();
+            if (oeData.thumbnail_url) thumb = oeData.thumbnail_url;
+          }
+        } catch (e) {}
+
+        return {
+          type: 'video',
+          id: parsed.id,
+          title,
+          tracks: [
+            {
+              id: parsed.id,
+              videoId: parsed.id,
+              title,
+              artist,
+              thumbnail: normalizeThumbnailUrl(thumb, parsed.id),
+              position: 1
+            }
+          ]
+        };
+      } else if (parsed.type === 'playlist') {
+        // Client-side fallback with browser API key if available
+        const clientApiKey = (typeof window !== 'undefined' && (
+          window.__ENV__?.YOUTUBE_API_KEY ||
+          window.ENV?.YOUTUBE_API_KEY ||
+          localStorage.getItem('odiverse_yt_api_key')
+        )) || '';
+
+        if (clientApiKey) {
+          const ytTracks = await fetchViaYouTubeDataAPI(parsed.id, clientApiKey);
+          const validYtTracks = (ytTracks || [])
+            .map((t, idx) => {
+              const vidId = t.id || t.youtube_id;
+              if (!vidId || typeof vidId !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(vidId)) {
+                return null;
+              }
+              return {
+                id: vidId,
+                videoId: vidId,
+                title: t.title || 'Untitled Track',
+                artist: t.artist || 'YouTube Artist',
+                thumbnail: normalizeThumbnailUrl(t.thumbnail, vidId),
+                playlistId: `custom-user-${parsed.id}`,
+                position: idx + 1
+              };
+            })
+            .filter(Boolean);
+
+          if (validYtTracks.length > 0) {
+            return {
+              type: 'playlist',
+              id: parsed.id,
+              title: 'Your Playlist',
+              tracks: validYtTracks
+            };
+          }
+        }
+      }
+
+      throw new Error('COULD_NOT_LOAD');
+    }
+
+    function selectUserCustomPlaylist(customData) {
+      const playlistId = `custom-user-session`;
+      const userPlaylist = {
+        id: playlistId,
+        name: customData.title || (customData.type === 'video' ? 'Your Song' : 'Your Playlist'),
+        isCustomUserPlaylist: true,
+        icon: 'music',
+        youtube_playlist_url: customData.type === 'video'
+          ? `https://youtube.com/watch?v=${customData.tracks[0].id}`
+          : `https://youtube.com/playlist?list=${customData.id}`,
+        tracks: customData.tracks
+      };
+
+      // Replace or prepend in-memory playlists list
+      state.playlists = state.playlists.filter(p => !p.isCustomUserPlaylist);
+      state.playlists.unshift(userPlaylist);
+
+      state.currentPlaylist = userPlaylist;
+      state.tracks = userPlaylist.tracks;
+      state.currentIndex = 0;
+
+      updatePlaylistLabels(userPlaylist.name);
+      renderPlaylistMenus();
+      setupCardsInitial();
+      updateDockUI();
+
+      trackEvent('user_playlist_loaded', {
+        type: customData.type,
+        trackCount: customData.tracks.length
+      });
+
+      if (state.tracks.length > 0) {
+        loadTrackAtIndex(0, true, 'direct');
+      }
+    }
+
+    async function handleImport() {
+      const raw = inputEl?.value?.trim() || '';
+      if (!raw) {
+        showFeedback('Please paste a YouTube playlist URL, ID, or video link.', 'error');
+        inputEl?.focus();
+        return;
+      }
+
+      setLoading(true);
+      showFeedback('Loading playlist…', 'info');
+
+      try {
+        const data = await fetchTracks(raw);
+        if (!data || !data.tracks || data.tracks.length === 0) {
+          showFeedback('Playlist is empty', 'error');
+          setLoading(false);
+          return;
+        }
+
+        // REQUIRED DEBUG LOGS
+        console.log('[GULLYGANG] USER PLAYLIST INPUT:', raw);
+        console.log('[GULLYGANG] INPUT TYPE:', data.type);
+        console.log('[GULLYGANG] PLAYLIST ID:', data.type === 'playlist' ? (data.id || data.playlistId) : 'N/A (Single Video)');
+        console.log('[GULLYGANG] FETCHED TRACK COUNT:', data.tracks.length);
+        console.log('[GULLYGANG] FIRST VIDEO ID:', data.tracks[0]?.id);
+
+        const countText = data.tracks.length === 1 ? '1 song' : `${data.tracks.length} songs`;
+        showFeedback(`Playlist loaded — ${countText}`, 'success');
+
+        // Apply to player session
+        selectUserCustomPlaylist(data);
+
+        // Auto close modal
+        setTimeout(() => {
+          close();
+          if (inputEl) inputEl.value = '';
+          if (clearBtn) clearBtn.classList.add('hidden');
+        }, 500);
+      } catch (err) {
+        setLoading(false);
+        if (err.message === 'RATE_LIMITED') {
+          showFeedback('Too many requests. Please wait a minute and try again.', 'error');
+        } else if (err.message === 'QUOTA_EXCEEDED') {
+          showFeedback('YouTube API quota reached. Please try again later.', 'error');
+        } else if (err.message === 'INVALID_LINK') {
+          showFeedback('Invalid YouTube playlist link', 'error');
+        } else if (err.message === 'PRIVATE_OR_UNAVAILABLE') {
+          showFeedback('Private or unavailable playlist', 'error');
+        } else if (err.message === 'EMPTY_PLAYLIST') {
+          showFeedback('Playlist is empty', 'error');
+        } else {
+          showFeedback('Couldn’t load playlist', 'error');
+        }
+      }
+    }
+
+    function init() {
+      document.getElementById('btn-close-user-playlist')?.addEventListener('click', close);
+      document.getElementById('user-playlist-modal-backdrop')?.addEventListener('click', close);
+
+      inputEl?.addEventListener('input', () => {
+        clearFeedback();
+        if (clearBtn) {
+          clearBtn.classList.toggle('hidden', !inputEl.value.trim());
+        }
+      });
+
+      clearBtn?.addEventListener('click', () => {
+        if (inputEl) {
+          inputEl.value = '';
+          inputEl.focus();
+        }
+        clearBtn.classList.add('hidden');
+        clearFeedback();
+      });
+
+      document.getElementById('form-user-playlist')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleImport();
+      });
+
+      document.getElementById('btn-load-user-playlist')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleImport();
+      });
+
+      // Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+          close();
+        }
+      });
+    }
+
+    return {
+      init,
+      open,
       close
     };
   })();
@@ -5277,6 +6106,7 @@
       () => initStationCardClicks(),
       () => initPremium3DTilt(),
       () => LegalPagesEngine.init(),
+      () => UserPlaylistEngine.init(),
       () => SupportEngine.init(),
       () => PlaylistSyncEngine.init(),
       () => AdSenseEngine.init(),
@@ -5322,6 +6152,7 @@
     // Auto-sync with InsForge on focus (throttled to 5 minutes to eliminate mobile battery drain)
     let lastFocusSync = Date.now();
     window.addEventListener('focus', () => {
+      reconcilePlaybackOnForeground();
       const now = Date.now();
       if (now - lastFocusSync > 300000) {
         lastFocusSync = now;
@@ -5330,13 +6161,17 @@
       }
     });
 
-    // Central Visibility Manager for progress and clock
+    // Page Lifecycle Manager (bfcache & foreground return)
+    window.addEventListener('pageshow', () => {
+      updateLiveDateTime();
+      reconcilePlaybackOnForeground();
+    });
+
+    // Central Visibility Manager for progress, audio reconciliation and clock
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
         updateLiveDateTime();
-        if (state.isPlaying) {
-          startProgressTracker();
-        }
+        reconcilePlaybackOnForeground();
       } else {
         stopProgressTracker();
       }
