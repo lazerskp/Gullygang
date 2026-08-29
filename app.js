@@ -950,10 +950,9 @@
     return svgIcon(def.paths, def.size);
   }
 
-  function updatePlaylistLabels(name, icon) {
+  function updatePlaylistLabels(name) {
     if (!DOM.activePlaylistLabel) return;
-    const iconHtml = icon ? playlistIconSvg(icon) + ' ' : '';
-    DOM.activePlaylistLabel.innerHTML = `${iconHtml}${escapeHTML(name)}`;
+    DOM.activePlaylistLabel.textContent = name || 'GullyGang Special';
   }
 
   function renderPlaylistMenus() {

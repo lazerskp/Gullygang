@@ -604,6 +604,30 @@ body.is-stage-hidden .top-weather-hub {
     gap: 8px;
     order: 2;
   }
+  .top-header-controls-upper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .top-hide-stage-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .top-hide-stage-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
   .top-weather-hub {
     order: 1;
     display: flex;
@@ -619,7 +643,7 @@ body.is-stage-hidden .top-weather-hub {
     left: max(14px, env(safe-area-inset-left, 14px));
     right: max(14px, env(safe-area-inset-right, 14px));
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     pointer-events: none;
     z-index: 50;
@@ -628,19 +652,29 @@ body.is-stage-hidden .top-weather-hub {
   .brand-logo-text {
     font-size: 13.5px;
     letter-spacing: 0.14em;
-    padding-top: 0;
+    padding-top: 3px;
     line-height: 1;
   }
 
-  /* Right controls row on Mobile: [♡] Support + [ 👁 Hide | ☁ Effects ▾ ] */
+  /* Right controls area on Mobile:
+     Row 1: [♥] Support + [☁ Effects ▾]
+     Row 2: [Hide] */
   .top-header-right {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
     pointer-events: auto;
   }
 
   .top-header-controls-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .top-header-controls-upper {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -648,10 +682,10 @@ body.is-stage-hidden .top-weather-hub {
 
   /* Support button: Icon-Only Heart on mobile */
   .header-support-pill {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
     padding: 0 !important;
     border-radius: 50%;
     display: inline-flex;
@@ -659,6 +693,7 @@ body.is-stage-hidden .top-weather-hub {
     justify-content: center;
     background: rgba(236, 72, 153, 0.12);
     border: 1px solid rgba(236, 72, 153, 0.3);
+    color: #ec4899;
   }
 
   .header-support-pill .support-pill-text {
@@ -670,28 +705,35 @@ body.is-stage-hidden .top-weather-hub {
     height: 14px;
   }
 
-  /* Effects & Hide bar pill */
-  .effects-bar-pill {
-    height: 32px;
-    padding: 0 4px;
+  /* Effects dropdown button on mobile */
+  .top-effects-dropdown-btn {
+    height: 30px;
+    padding: 0 10px 0 8px;
+    font-size: 11.5px;
+    font-weight: 500;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
+    color: rgba(255, 255, 255, 0.9);
+    display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
   }
 
+  /* Independent compact Hide button */
   .top-hide-stage-btn {
-    width: 28px;
-    height: 28px;
+    height: 24px;
+    padding: 0 9px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    gap: 4px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
     color: rgba(255, 255, 255, 0.7);
-    background: transparent;
-    border: none;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     cursor: pointer;
     transition: all 0.2s ease;
   }
@@ -701,36 +743,21 @@ body.is-stage-hidden .top-weather-hub {
     background: rgba(255, 255, 255, 0.1);
   }
 
-  .effects-bar-divider {
-    width: 1px;
-    height: 14px;
-    background: rgba(255, 255, 255, 0.12);
-    display: inline-block;
-  }
-
-  .top-effects-dropdown-btn {
-    height: 28px;
-    padding: 0 8px 0 6px;
-    font-size: 11.5px;
-    gap: 3.5px;
-  }
-
   /* Weather information: EXACTLY CENTERED horizontally in mobile viewport */
   .top-weather-hub {
-    position: fixed;
-    top: max(48px, calc(env(safe-area-inset-top, 10px) + 38px));
-    left: 50%;
-    transform: translateX(-50%);
+    position: absolute;
+    top: max(80px, calc(env(safe-area-inset-top, 10px) + 70px));
+    left: 0;
+    right: 0;
+    width: 100%;
     display: flex !important;
     flex-direction: column;
     align-items: center !important;
     justify-content: center !important;
     text-align: center !important;
     margin: 0 auto;
-    width: max-content;
-    max-width: calc(100vw - 28px);
-    z-index: 40;
-    opacity: 0.9;
+    z-index: 30;
+    opacity: 0.88;
     gap: 1.5px;
     pointer-events: auto;
   }
@@ -740,37 +767,30 @@ body.is-stage-hidden .top-weather-hub {
     align-items: center;
     justify-content: center;
     text-align: center;
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 600;
     gap: 4px;
     color: rgba(255, 255, 255, 0.92);
     line-height: 1.2;
   }
 
-  .weather-hub-icon {
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    order: -1;
-    color: #38bdf8;
-    margin-right: 2px;
-  }
-
   .weather-hub-location {
-    max-width: 135px;
+    max-width: 160px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12px;
+    font-size: 12.5px;
+    font-weight: 500;
   }
 
   .weather-hub-temp {
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 700;
     color: #ffffff;
   }
 
-  .weather-hub-desc {
+  .weather-hub-desc,
+  .weather-hub-icon {
     display: none !important;
   }
 
@@ -779,12 +799,11 @@ body.is-stage-hidden .top-weather-hub {
     align-items: center;
     justify-content: center;
     text-align: center;
-    font-size: 10px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.6);
+    font-size: 10.5px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.55);
     gap: 4px;
     line-height: 1.2;
-    margin-top: 0;
   }
 
   .weather-hub-date {
@@ -792,14 +811,13 @@ body.is-stage-hidden .top-weather-hub {
   }
 
   .weather-hub-day {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.65);
-    font-weight: 600;
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.6);
   }
 
   .weather-hub-clock {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.85);
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.8);
   }
 
   .weather-effects-dropdown-panel {
@@ -812,25 +830,7 @@ body.is-stage-hidden .top-weather-hub {
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 
-  .weather-dropdown-item {
-    padding: 7px 8px;
-    gap: 8px;
-  }
-
-  .dropdown-item-icon-wrap {
-    width: 26px;
-    height: 26px;
-  }
-
-  .dropdown-item-title {
-    font-size: 11.5px;
-  }
-
-  .dropdown-item-subtitle {
-    font-size: 9px;
-  }
-
-  /* Music-First Stage Spacing & Centered Capsules */
+  /* Centered Row for Playlist & Visuals */
   .bottom-stage-wrap {
     padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
   }
@@ -844,14 +844,45 @@ body.is-stage-hidden .top-weather-hub {
     align-items: center;
     justify-content: center;
     width: 100%;
-    margin-bottom: 8px;
-    gap: 7px;
+    margin-bottom: 10px;
+    gap: 8px;
+    position: relative;
+    z-index: 25;
   }
 
   .stage-vibe-pill {
-    height: 32px;
+    height: 30px;
     padding: 0 12px;
     font-size: 11.5px;
+    gap: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .stage-playlist-name {
+    font-size: 11.5px;
+    font-weight: 600;
+    max-width: 130px;
+  }
+
+  .stage-playlist-badge,
+  .stage-playlist-icon-static {
+    display: none !important;
+  }
+
+  /* Dropdowns: Centered relative to viewport, overlay without pushing layout */
+  .stage-playlist-dropdown,
+  .stage-visuals-dropdown {
+    position: fixed;
+    top: auto;
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 140px);
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: min(320px, calc(100vw - 32px)) !important;
+    max-height: 280px;
+    z-index: 100;
   }
 
   .carousel-stage-height {
@@ -881,86 +912,47 @@ body.is-stage-hidden .top-weather-hub {
     letter-spacing: 0.12em;
   }
 
-  .top-header-right {
-    gap: 4px;
-  }
-
-  .top-header-controls-row {
-    gap: 4px;
-  }
-
-  .header-support-pill {
-    width: 30px;
-    height: 30px;
-    min-width: 30px;
-    min-height: 30px;
-  }
-
-  .effects-bar-pill {
-    height: 30px;
-    padding: 0 3px;
-  }
-
-  .top-hide-stage-btn {
-    width: 26px;
-    height: 26px;
-  }
-
-  .top-effects-dropdown-btn {
-    height: 26px;
-    padding: 0 7px 0 5px;
-    font-size: 10.5px;
-    gap: 3px;
-  }
-
   .top-weather-hub {
-    top: max(44px, calc(env(safe-area-inset-top, 8px) + 36px));
+    top: max(74px, calc(env(safe-area-inset-top, 8px) + 64px));
   }
 
   .weather-hub-primary {
-    font-size: 11px;
-    gap: 3px;
+    font-size: 12px;
   }
 
   .weather-hub-location {
-    max-width: 120px;
-    font-size: 11px;
+    max-width: 140px;
+    font-size: 12px;
   }
 
   .weather-hub-temp {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .weather-hub-secondary {
-    font-size: 9.5px;
-    gap: 3px;
+    font-size: 10px;
   }
 
   .weather-hub-day,
   .weather-hub-clock {
-    font-size: 9.5px;
+    font-size: 10px;
   }
 
   .stage-control-capsules {
-    gap: 5px;
-    margin-bottom: 6px;
+    gap: 6px;
+    margin-bottom: 8px;
   }
 
   .stage-vibe-pill {
     height: 29px;
-    padding: 0 8px;
-    font-size: 10.5px;
+    padding: 0 10px;
+    font-size: 11px;
     gap: 4px;
   }
 
   .stage-playlist-name {
-    max-width: 105px;
-    font-size: 10.5px;
-  }
-
-  .stage-playlist-badge {
-    font-size: 7.5px;
-    padding: 1px 4px;
+    max-width: 115px;
+    font-size: 11px;
   }
 
   .reference-player {
