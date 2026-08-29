@@ -1479,12 +1479,21 @@
   }
 
   // --- YouTube IFrame API ---
+  let ytApiInjected = false;
   function initYouTubeAPI() {
+    if (ytApiInjected && window.YT && window.YT.Player) {
+      if (!state.ytPlayer) createYTPlayer();
+      return;
+    }
+    if (ytApiInjected) return;
+    ytApiInjected = true;
+
     if (window.YT && window.YT.Player) {
       createYTPlayer();
     } else {
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
+      tag.async = true;
       const firstScriptTag = document.getElementsByTagName('script')[0];
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
       window.onYouTubeIframeAPIReady = createYTPlayer;
@@ -1525,9 +1534,6 @@
     if (state.pendingAction === 'play') {
       state.pendingAction = null;
       playCurrent();
-    } else {
-      setupCardsInitial();
-      updateDockUI();
     }
   }
 
@@ -1658,7 +1664,7 @@
     return state.tracks[idx];
   }
 
-  async function populateCardContent(cardEl, track) {
+  function populateCardContent(cardEl, track) {
     if (!cardEl || !track) return;
     const img = cardEl.querySelector('.card-cover');
     const title = cardEl.querySelector('.card-title');
@@ -1671,12 +1677,13 @@
     if (title) title.textContent = track.title;
     if (artist) artist.textContent = track.artist;
 
-    // Subtle artwork-derived gradient tint on card surface
-    const palette = await ArtworkColorEngine.extractPalette(thumb, track.title || track.id);
-    if (palette && palette.dominant) {
-      cardEl.style.setProperty('--card-glow-color', palette.accent);
-      cardEl.style.setProperty('--card-ambient-bg', palette.darkBase);
-    }
+    // Subtle artwork-derived gradient tint on card surface (deferred / non-blocking)
+    ArtworkColorEngine.extractPalette(thumb, track.title || track.id).then(palette => {
+      if (palette && palette.dominant && cardEl) {
+        cardEl.style.setProperty('--card-glow-color', palette.accent);
+        cardEl.style.setProperty('--card-ambient-bg', palette.darkBase);
+      }
+    }).catch(() => {});
   }
 
   function setupCardsInitial() {
@@ -4727,13 +4734,13 @@
     initVisualsSystem();
     attachControlsListeners();
     setupCardsInitial();
-    initYouTubeAPI();
     loadInsForgePlaylists();
     loadInsForgeVisuals();
     AmbientAtmosphereEngine.init();
 
     // --- 2. DEFERRED SECONDARY INITIALIZATION (Executed in Idle Slice) ---
     function initSecondaryModules() {
+      initYouTubeAPI();
       refreshWeatherIfStale();
       setInterval(refreshWeatherIfStale, 600000);
 
