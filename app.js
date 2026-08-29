@@ -1405,7 +1405,7 @@
     }
   }
 
-  // Explicit user-triggered refresh
+  // Explicit user-triggered refresh & YouTube sync
   async function refreshCurrentPlaylist() {
     if (!state.currentPlaylist) return;
     const plUrl = state.currentPlaylist.youtube_playlist_url || '';
@@ -1413,10 +1413,41 @@
     const listId = match ? match[1] : plUrl;
     const cacheKey = state.currentPlaylist.id || listId;
 
-    if (cacheKey) {
-      PlaylistCacheEngine.invalidate(cacheKey);
+    const refreshStatusEl = document.getElementById('refresh-playlist-status') || document.getElementById('sync-playlist-status');
+    const refreshIconEl = document.querySelector('.refresh-icon') || document.querySelector('.sync-icon');
+
+    if (refreshStatusEl) refreshStatusEl.textContent = 'Syncing YouTube...';
+    refreshIconEl?.classList.add('animate-spin');
+
+    try {
+      // 1. Authoritative Backend Synchronization from YouTube to InsForge
+      if (state.currentPlaylist.id) {
+        try {
+          const syncRes = await fetch(`${API_BASE}/api/playlists/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ playlist_id: state.currentPlaylist.id })
+          });
+          const syncData = await syncRes.json();
+          if (syncData && syncData.results && syncData.results[0]) {
+            const stats = syncData.results[0].stats;
+            console.log('[Sync] Backend sync result for playlist:', state.currentPlaylist.name, stats);
+          }
+        } catch (syncErr) {
+          console.warn('[Sync] Backend sync notice, loading cached/database tracks:', syncErr);
+        }
+      }
+
+      // 2. Invalidate cache in memory & localStorage
+      if (cacheKey) {
+        PlaylistCacheEngine.invalidate(cacheKey);
+      }
+
+      // 3. Load freshly reconciled songs into player & UI
+      await loadPlaylistSongs(state.currentPlaylist, true, true);
+    } finally {
+      refreshIconEl?.classList.remove('animate-spin');
     }
-    await loadPlaylistSongs(state.currentPlaylist, true, true);
   }
 
   // --- YouTube IFrame API ---
@@ -4381,13 +4412,20 @@
             PlaylistCacheEngine.invalidate(playlistId);
           } else {
             // Invalidate all
-            syncData.forEach(p => PlaylistCacheEngine.invalidate(p.id));
+            if (syncData && syncData.length > 0) {
+              syncData.forEach(p => PlaylistCacheEngine.invalidate(p.id));
+            }
           }
 
           // Reload InsForge playlists
-          loadInsForgePlaylists(true);
+          await loadInsForgePlaylists(true);
 
-          // Reload UI cards
+          // If active playlist was synchronized, reload songs immediately into UI & player
+          if (state.currentPlaylist && (!playlistId || state.currentPlaylist.id === playlistId)) {
+            await loadPlaylistSongs(state.currentPlaylist, true, false);
+          }
+
+          // Reload UI cards in admin modal
           await loadSyncStatus();
         } else {
           alert(`Sync warning: ${data?.error || (data?.errors?.[0]?.error) || 'Failed to complete synchronization'}`);

@@ -55,46 +55,57 @@ async function fetchYouTubePlaylistWithDataAPI(listId, apiKey) {
   const seenIds = new Set();
   let nextPageToken = '';
   let pageCount = 0;
+  let isComplete = true;
 
-  do {
-    pageCount++;
-    const apiUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,status&playlistId=${encodeURIComponent(listId)}&maxResults=50${nextPageToken ? `&pageToken=${encodeURIComponent(nextPageToken)}` : ''}&key=${encodeURIComponent(apiKey)}`;
-    
-    const res = await fetch(apiUrl);
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`YouTube API returned ${res.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const data = await res.json();
-    const items = data.items || [];
-
-    for (const item of items) {
-      const vidId = item.snippet?.resourceId?.videoId;
-      const title = (item.snippet?.title || '').trim();
-      const artist = (item.snippet?.videoOwnerChannelTitle || item.snippet?.channelTitle || 'Odia Music').trim();
-
-      // Skip invalid, deleted, private, or duplicate videos safely
-      if (!vidId || seenIds.has(vidId) || isUnavailableTitle(title)) {
-        continue;
+  try {
+    do {
+      pageCount++;
+      const apiUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,status&playlistId=${encodeURIComponent(listId)}&maxResults=50${nextPageToken ? `&pageToken=${encodeURIComponent(nextPageToken)}` : ''}&key=${encodeURIComponent(apiKey)}`;
+      
+      const res = await fetch(apiUrl);
+      if (!res.ok) {
+        isComplete = false;
+        break;
       }
-      seenIds.add(vidId);
 
-      const thumbs = item.snippet?.thumbnails || {};
-      const rawThumb = thumbs.maxres?.url || thumbs.standard?.url || thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url || '';
+      const data = await res.json();
+      const items = data.items || [];
 
-      tracks.push({
-        youtube_id: vidId,
-        title: title || 'Untitled Track',
-        artist: artist || 'Odia Artist',
-        thumbnail: getNormalizedThumbnail(rawThumb, vidId)
-      });
-    }
+      for (const item of items) {
+        const vidId = item.snippet?.resourceId?.videoId;
+        const title = (item.snippet?.title || '').trim();
+        const artist = (item.snippet?.videoOwnerChannelTitle || item.snippet?.channelTitle || 'Odia Music').trim();
 
-    nextPageToken = data.nextPageToken || '';
-  } while (nextPageToken && pageCount < 200);
+        // Skip invalid, deleted, private, or duplicate videos safely
+        if (!vidId || seenIds.has(vidId) || isUnavailableTitle(title)) {
+          continue;
+        }
+        seenIds.add(vidId);
 
-  return tracks;
+        const thumbs = item.snippet?.thumbnails || {};
+        const rawThumb = thumbs.maxres?.url || thumbs.standard?.url || thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url || '';
+
+        tracks.push({
+          youtube_id: vidId,
+          title: title || 'Untitled Track',
+          artist: artist || 'Odia Artist',
+          thumbnail: getNormalizedThumbnail(rawThumb, vidId)
+        });
+      }
+
+      nextPageToken = data.nextPageToken || '';
+    } while (nextPageToken && pageCount < 200);
+  } catch (err) {
+    isComplete = false;
+  }
+
+  return {
+    tracks,
+    complete: isComplete && !nextPageToken,
+    source: 'youtube-data-api',
+    pagesFetched: pageCount,
+    totalRawItems: tracks.length
+  };
 }
 
 /**
@@ -240,7 +251,9 @@ async function fetchYouTubePlaylistWithCrawler(listId) {
   if (!res.ok) throw new Error(`YouTube Playlist Web fetch returned HTTP ${res.status}`);
   const html = await res.text();
   const jsonMatches = [...html.matchAll(/var ytInitialData = ({.+?});<\/script>/g)];
-  if (jsonMatches.length === 0) return tracks;
+  if (jsonMatches.length === 0) {
+    return { tracks: [], complete: false, source: 'web-crawler', pagesFetched: 0, totalRawItems: 0 };
+  }
 
   const data = JSON.parse(jsonMatches[0][1]);
   const continuationTokens = [];
@@ -249,6 +262,7 @@ async function fetchYouTubePlaylistWithCrawler(listId) {
 
   const processedTokens = new Set();
   let pageCount = 1;
+  let hadContinuationError = false;
 
   while (continuationTokens.length > 0 && pageCount < 200) {
     pageCount++;
@@ -256,20 +270,33 @@ async function fetchYouTubePlaylistWithCrawler(listId) {
     if (!token || processedTokens.has(token)) continue;
     processedTokens.add(token);
 
-    const contData = await fetchYouTubeBrowseContinuation(token);
-    if (!contData) continue;
-
-    const actions = contData.onResponseReceivedActions || contData.onResponseReceivedEndpoints || [];
-    for (const act of actions) {
-      const items = act.appendContinuationItemsAction?.continuationItems ||
-                    act.reloadContinuationItemsCommand?.continuationItems;
-      if (items) {
-        walkPlaylistTree(items, tracks, seenIds, continuationTokens, cleanListId);
+    try {
+      const contData = await fetchYouTubeBrowseContinuation(token);
+      if (!contData) {
+        hadContinuationError = true;
+        continue;
       }
+
+      const actions = contData.onResponseReceivedActions || contData.onResponseReceivedEndpoints || [];
+      for (const act of actions) {
+        const items = act.appendContinuationItemsAction?.continuationItems ||
+                      act.reloadContinuationItemsCommand?.continuationItems;
+        if (items) {
+          walkPlaylistTree(items, tracks, seenIds, continuationTokens, cleanListId);
+        }
+      }
+    } catch (e) {
+      hadContinuationError = true;
     }
   }
 
-  return tracks;
+  return {
+    tracks,
+    complete: !hadContinuationError && continuationTokens.length === 0,
+    source: 'web-crawler',
+    pagesFetched: pageCount,
+    totalRawItems: tracks.length
+  };
 }
 
 /**
@@ -334,30 +361,37 @@ async function fetchYouTubeTracks(listId) {
   // Tier 1: Official Data API v3 if API key available
   if (YOUTUBE_API_KEY) {
     try {
-      const tracks = await fetchYouTubePlaylistWithDataAPI(listId, YOUTUBE_API_KEY);
-      if (tracks && tracks.length > 0) {
-        console.log(`[Sync Engine] Data API v3 fetched ${tracks.length} tracks for ${listId}`);
-        return tracks;
+      const dataApiRes = await fetchYouTubePlaylistWithDataAPI(listId, YOUTUBE_API_KEY);
+      if (dataApiRes && dataApiRes.tracks && dataApiRes.tracks.length > 0) {
+        console.log(`[Sync Engine] Data API v3 fetched ${dataApiRes.tracks.length} tracks for ${listId} (complete: ${dataApiRes.complete})`);
+        return dataApiRes;
       }
     } catch (apiErr) {
-      console.warn(`[Sync Engine] Data API v3 warning for ${listId}:`, apiErr.message);
+      console.warn(`[Sync Engine] Data API v3 notice for ${listId}:`, apiErr.message);
     }
   }
 
   // Tier 2: Universal Multi-Page Web/InnerTube Crawler
   try {
-    const crawlerTracks = await fetchYouTubePlaylistWithCrawler(listId);
-    if (crawlerTracks && crawlerTracks.length > 0) {
-      console.log(`[Sync Engine] Web crawler fetched ${crawlerTracks.length} tracks for ${listId}`);
-      return crawlerTracks;
+    const crawlerRes = await fetchYouTubePlaylistWithCrawler(listId);
+    if (crawlerRes && crawlerRes.tracks && crawlerRes.tracks.length > 0) {
+      console.log(`[Sync Engine] Web crawler fetched ${crawlerRes.tracks.length} tracks for ${listId} (complete: ${crawlerRes.complete})`);
+      return crawlerRes;
     }
   } catch (crawlerErr) {
-    console.warn(`[Sync Engine] Crawler warning for ${listId}:`, crawlerErr.message);
+    console.warn(`[Sync Engine] Crawler notice for ${listId}:`, crawlerErr.message);
   }
 
-  // Tier 3: RSS Feed Fallback
+  // Tier 3: RSS Feed Fallback (Marked as complete: false because RSS only has 15 items max)
   console.log(`[Sync Engine] Fallback to RSS feed for ${listId}`);
-  return await fetchYouTubePlaylistWithRSS(listId);
+  const rssTracks = await fetchYouTubePlaylistWithRSS(listId);
+  return {
+    tracks: rssTracks,
+    complete: false,
+    source: 'rss-fallback',
+    pagesFetched: 1,
+    totalRawItems: rssTracks.length
+  };
 }
 
 /**
@@ -381,7 +415,9 @@ async function syncSinglePlaylist(playlist) {
   `);
 
   // 2. Fetch authoritative YouTube playlist items
-  const ytTracks = await fetchYouTubeTracks(listId);
+  const fetchResult = await fetchYouTubeTracks(listId);
+  const ytTracks = fetchResult.tracks || [];
+  const isCompleteFetch = fetchResult.complete === true;
 
   // 3. Fetch existing InsForge database records
   const existingRows = await queryInsForge(`
@@ -409,15 +445,17 @@ async function syncSinglePlaylist(playlist) {
 
   const ytTrackIds = new Set(ytTracks.map(t => t.youtube_id));
 
-  // 5. Detect and remove songs no longer present in YouTube playlist
-  const songsToRemove = existingRows.filter(row => !ytTrackIds.has(row.youtube_id));
-  if (songsToRemove.length > 0) {
-    const idsToDelete = songsToRemove.map(s => `'${escapeSql(s.id)}'`).join(',');
-    await queryInsForge(`
-      DELETE FROM playlist_songs
-      WHERE id IN (${idsToDelete});
-    `);
-    removedCount = songsToRemove.length;
+  // 5. Detect and remove songs no longer present in YouTube playlist (ONLY IF FETCH WAS 100% COMPLETE)
+  if (isCompleteFetch) {
+    const songsToRemove = existingRows.filter(row => !ytTrackIds.has(row.youtube_id));
+    if (songsToRemove.length > 0) {
+      const idsToDelete = songsToRemove.map(s => `'${escapeSql(s.id)}'`).join(',');
+      await queryInsForge(`
+        DELETE FROM playlist_songs
+        WHERE id IN (${idsToDelete});
+      `);
+      removedCount = songsToRemove.length;
+    }
   }
 
   // 6. Partition tracks into new vs existing
@@ -501,6 +539,10 @@ async function syncSinglePlaylist(playlist) {
   `);
   const finalStoredCount = countVerification[0]?.count || 0;
 
+  if (isCompleteFetch && finalStoredCount !== ytTracks.length) {
+    console.warn(`[Sync Verification] Stored count (${finalStoredCount}) differs from YouTube tracks count (${ytTracks.length}) for playlist ${playlist.name}`);
+  }
+
   // 10. Update playlist sync stats and status
   const stats = {
     total: finalStoredCount,
@@ -508,7 +550,10 @@ async function syncSinglePlaylist(playlist) {
     added: addedCount,
     removed: removedCount,
     updated: updatedCount,
-    reordered: reorderedCount
+    reordered: reorderedCount,
+    source: fetchResult.source,
+    complete: isCompleteFetch,
+    pagesFetched: fetchResult.pagesFetched
   };
 
   await queryInsForge(`
