@@ -889,8 +889,18 @@ body.is-stage-hidden .carousel-stage-container {
 }
 
 /* ============================================================
-   EQUALIZER BARS (GPU-Composited scaleY for Zero Layout Reflow)
+   EQUALIZER BARS (GPU-Composited scaleY with Layout Containment)
    ============================================================ */
+.equalizer-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: 12px;
+  height: 12px;
+  contain: strict;
+  flex-shrink: 0;
+}
+
 @keyframes eq-1 { 0%, 100% { transform: scaleY(0.28); } 25% { transform: scaleY(0.95); } 50% { transform: scaleY(0.38); } 75% { transform: scaleY(1); } }
 @keyframes eq-2 { 0%, 100% { transform: scaleY(0.75); } 30% { transform: scaleY(0.28); } 60% { transform: scaleY(1); } 80% { transform: scaleY(0.42); } }
 @keyframes eq-3 { 0%, 100% { transform: scaleY(0.38); } 20% { transform: scaleY(0.95); } 45% { transform: scaleY(0.28); } 70% { transform: scaleY(0.85); } }
@@ -898,6 +908,8 @@ body.is-stage-hidden .carousel-stage-container {
 .animate-eq-1,
 .animate-eq-2,
 .animate-eq-3 {
+  display: inline-block;
+  width: 2px;
   height: 11px !important;
   transform-origin: bottom;
   will-change: transform;
