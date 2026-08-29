@@ -291,17 +291,20 @@ img {
 .top-hide-stage-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
+  gap: 4px;
   height: 28px;
+  padding: 0 8px 0 6px;
   border-radius: 999px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.65);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  padding: 0;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .top-hide-stage-btn:hover {
@@ -312,6 +315,13 @@ img {
 .top-hide-stage-btn.is-active {
   background: rgba(56, 189, 248, 0.16);
   color: #38bdf8;
+}
+
+.hide-btn-text {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-block;
 }
 
 /* Effects Dropdown Trigger Button */
