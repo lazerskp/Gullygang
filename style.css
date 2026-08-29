@@ -3605,6 +3605,7 @@ body.is-stage-hidden .carousel-stage-container {
   display: block;
   width: 200px;
   max-width: 100%;
+  aspect-ratio: 350 / 85;
   height: auto;
   border-radius: 8px;
 }

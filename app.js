@@ -1543,11 +1543,12 @@
   }
 
   function createYTPlayer() {
-    const curTrack = state.tracks[state.currentIndex] || { id: "zG9QDxr8-Wc" };
+    const curTrack = state.tracks[state.currentIndex] || { id: "thS3-dmUvlg" };
     state.ytPlayer = new YT.Player('yt-player', {
       height: '180',
       width: '320',
       videoId: curTrack.id,
+      host: 'https://www.youtube-nocookie.com',
       playerVars: {
         autoplay: 0,
         controls: 0,
@@ -2976,47 +2977,35 @@
     99: { desc: 'Heavy Thunderstorm with Hail', icon: '⛈️' }
   };
 
-  // --- Real Geolocation & Weather Fetcher (No Demo Data) ---
-  async function fetchRealLocationAndWeather() {
-    if ('geolocation' in navigator) {
+  // --- Real Geolocation & Weather Fetcher (Non-Blocking / User Permission Model) ---
+  async function fetchRealLocationAndWeather(userInitiated = false) {
+    if (userInitiated && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
           await loadWeatherForCoordinates(lat, lon);
         },
-        async (error) => {
-          console.log('[Weather] Geolocation denied/unavailable, loading from IP:', error.message);
+        async () => {
           await loadWeatherFromIP();
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
       );
-    } else {
-      await loadWeatherFromIP();
+      return;
     }
+
+    await loadWeatherFromIP();
   }
 
   async function loadWeatherFromIP() {
     try {
-      const res = await fetchWithRetryAndTimeout('https://ipapi.co/json/', {}, 1, 6000);
+      const res = await fetchWithRetryAndTimeout('https://get.geojs.io/v1/ip/geo.json', {}, 1, 5000);
       if (res.ok) {
         const data = await res.json();
-        if (data.latitude && data.longitude) {
-          const cityName = data.city || data.region || 'Bhubaneswar';
-          await loadWeatherForCoordinates(data.latitude, data.longitude, cityName);
-          return;
-        }
-      }
-    } catch (e) {}
-
-    try {
-      const res2 = await fetchWithRetryAndTimeout('https://get.geojs.io/v1/ip/geo.json', {}, 1, 6000);
-      if (res2.ok) {
-        const data2 = await res2.json();
-        const lat = parseFloat(data2.latitude);
-        const lon = parseFloat(data2.longitude);
+        const lat = parseFloat(data.latitude);
+        const lon = parseFloat(data.longitude);
         if (!isNaN(lat) && !isNaN(lon)) {
-          await loadWeatherForCoordinates(lat, lon, data2.city || 'Bhubaneswar');
+          await loadWeatherForCoordinates(lat, lon, data.city || 'Bhubaneswar');
           return;
         }
       }
