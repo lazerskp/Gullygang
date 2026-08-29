@@ -1,0 +1,23 @@
+{
+  "name": "gullygang",
+  "version": "1.0.0",
+  "description": "GULLYGANG — Music That Feels Different",
+  "main": "app.js",
+  "scripts": {
+    "dev": "python3 -m http.server 3000",
+    "start": "python3 -m http.server 3000",
+    "build": "echo 'Build complete'"
+  },
+  "keywords": [
+    "music",
+    "radio",
+    "gullygang",
+    "insforge",
+    "streaming"
+  ],
+  "author": "GULLYGANG",
+  "license": "MIT",
+  "dependencies": {
+    "@insforge/sdk": "^1.5.2"
+  }
+}

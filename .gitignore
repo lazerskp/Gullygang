@@ -1,0 +1,54 @@
+
+# Environment & Secrets (NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+*.env
+.env.production
+.env.development
+
+# InsForge & BaaS Configuration
+.insforge
+.insforge/
+.insforge/*.json
+
+# Dependencies & Build Artefacts
+node_modules/
+dist/
+build/
+.cache/
+
+# OS & System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs & Debugging
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE & AI Agent Directories
+.idea/
+.vscode/
+*.swp
+*.swo
+.agent
+.agents
+.augment
+.claude
+.cline
+.github/copilot*
+.kilocode
+.qoder
+.qwen
+.roo
+.trae
+.windsurf
+.system_generated/
