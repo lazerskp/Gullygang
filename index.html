@@ -2,7 +2,7 @@
 <html lang="en-IN" class="h-full antialiased">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0a0a0a" />
   <meta name="color-scheme" content="dark" />
 
@@ -227,14 +227,14 @@
           <span class="weather-hub-divider" aria-hidden="true">•</span>
           <!-- Inline Atmospheric Weather Switcher -->
           <div class="weather-fx-inline" role="group" aria-label="Atmosphere effects">
-            <button type="button" class="fx-inline-btn weather-mode-btn is-active" data-weather-mode="off" title="Turn atmosphere off" aria-label="Atmosphere off">
-              <span>✕</span>
+            <button type="button" class="fx-inline-btn weather-mode-btn is-active" data-weather-mode="off" title="Turn atmosphere off" aria-label="Disable atmosphere effects">
+              <span aria-hidden="true">✕</span>
             </button>
-            <button type="button" class="fx-inline-btn weather-mode-btn" data-weather-mode="rain" title="Rain atmosphere" aria-label="Rain effect">
-              <span>🌧️</span>
+            <button type="button" class="fx-inline-btn weather-mode-btn" data-weather-mode="rain" title="Rain atmosphere" aria-label="Rain atmosphere effect">
+              <span aria-hidden="true">🌧️</span>
             </button>
-            <button type="button" class="fx-inline-btn weather-mode-btn" data-weather-mode="snow" title="Snow atmosphere" aria-label="Snow effect">
-              <span>❄️</span>
+            <button type="button" class="fx-inline-btn weather-mode-btn" data-weather-mode="snow" title="Snow atmosphere" aria-label="Snow atmosphere effect">
+              <span aria-hidden="true">❄️</span>
             </button>
           </div>
         </div>
@@ -249,7 +249,7 @@
       </button>
 
       <!-- Hide Stage Cards & Playlist Button (Zen / Immersive Background View Toggle) -->
-      <button type="button" id="btn-toggle-stage-view" class="top-hide-stage-btn" title="Hide/Show Music Cards & Playlist (H)" aria-label="Hide or show music cards and playlist" aria-pressed="false">
+      <button type="button" id="btn-toggle-stage-view" class="top-hide-stage-btn" title="Hide/Show Music Cards & Playlist (H)" aria-label="Toggle stage view" aria-pressed="false">
         <svg class="eye-open-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
           <circle cx="12" cy="12" r="3"></circle>
@@ -263,7 +263,7 @@
   </header>
 
   <!-- Floating Fullscreen Trigger (Fixed Bottom-Right, Desktop only) -->
-  <button type="button" aria-label="Enter fullscreen" id="btn-fullscreen" class="fullscreen-float-btn" title="Fullscreen (F)">
+  <button type="button" aria-label="Toggle fullscreen mode" id="btn-fullscreen" class="fullscreen-float-btn" title="Fullscreen (F)">
     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white/80" aria-hidden="true">
       <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
       <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
@@ -304,7 +304,7 @@
           <div class="stage-control-capsules">
             <!-- Playlist Selector Capsule -->
             <div class="stage-capsule-item relative" id="playlist-selector-wrap">
-              <button type="button" id="btn-playlist-selector" class="stage-vibe-pill" aria-label="Select playlist" aria-expanded="false">
+              <button type="button" id="btn-playlist-selector" class="stage-vibe-pill" aria-expanded="false">
                 <div class="equalizer-bars flex items-end gap-[2px] h-[11px]" aria-hidden="true">
                   <span class="w-[2px] bg-green-400 rounded-full animate-eq-1"></span>
                   <span class="w-[2px] bg-green-400 rounded-full animate-eq-2"></span>
@@ -321,7 +321,7 @@
 
             <!-- Visuals Selector Capsule -->
             <div class="stage-capsule-item relative" id="visuals-selector-wrap">
-              <button type="button" id="btn-visuals-selector" class="stage-vibe-pill visuals-pill" aria-label="Select background visuals" aria-expanded="false">
+              <button type="button" id="btn-visuals-selector" class="stage-vibe-pill visuals-pill" aria-expanded="false">
                 <span class="visuals-pill-icon" aria-hidden="true">🎬</span>
                 <span id="active-visual-label" class="stage-playlist-name truncate">Visuals</span>
                 <span class="stage-playlist-badge visuals-badge" id="visuals-state-badge">Off</span>
@@ -389,11 +389,11 @@
               <div id="loading-error-box" class="loading-error-box hidden">
                 <p class="loading-error-title">Couldn't load playlist</p>
                 <p class="loading-error-sub">Please check connection & try again</p>
-                <button type="button" id="btn-loading-retry" class="loading-retry-btn">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                <button type="button" id="btn-loading-retry" class="loading-retry-btn" aria-label="Retry loading stream">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span>Try Again</span>
+                  <span>Retry Stream</span>
                 </button>
               </div>
             </div>
@@ -488,8 +488,8 @@
                   </div>
                 </div>
                 <div class="mobile-vol-area" id="mobile-vol-wrapper">
-                  <button type="button" id="btn-vol-mobile" class="player-sub-btn" aria-label="Volume">
-                    <svg id="vol-icon-mobile" class="vol-icon-mobile" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                  <button type="button" id="btn-vol-mobile" class="player-sub-btn" aria-label="Adjust or mute volume">
+                    <svg id="vol-icon-mobile" class="vol-icon-mobile" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
                       <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path>
                     </svg>
                   </button>
@@ -499,18 +499,18 @@
 
               <!-- Desktop Left Controls (Prev / Play / Next) -->
               <div class="player-left-controls desktop-only-flex">
-                <button type="button" id="btn-prev" class="player-ctrl-btn" aria-label="Previous Track">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <button type="button" id="btn-prev" class="player-ctrl-btn" aria-label="Previous track">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
                     <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
                   </svg>
                 </button>
-                <button type="button" id="btn-play" class="player-ctrl-btn player-play-btn" aria-label="Play / Pause">
-                  <svg id="play-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <button type="button" id="btn-play" class="player-ctrl-btn player-play-btn" aria-label="Play or pause track">
+                  <svg id="play-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
                     <path d="M8 5v14l11-7z"/>
                   </svg>
                 </button>
-                <button type="button" id="btn-next" class="player-ctrl-btn" aria-label="Next Track">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <button type="button" id="btn-next" class="player-ctrl-btn" aria-label="Next track">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
                     <path d="m6 18 8.5-6L6 6v12zM16 6v12h2V6z"/>
                   </svg>
                 </button>
@@ -542,20 +542,20 @@
               <!-- Desktop Right Controls (Repeat / Shuffle / Volume) -->
               <div class="player-right-controls desktop-only-flex" id="player-right-controls">
                 <div class="player-sub-actions" id="sub-actions-group">
-                  <button type="button" id="btn-shuffle" class="player-sub-btn" aria-label="Shuffle">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <button type="button" id="btn-shuffle" class="player-sub-btn" aria-label="Toggle shuffle mode">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="M16 3h5v5"></path><path d="M4 20 21 3"></path><path d="M21 16v5h-5"></path><path d="m15 15 6 6"></path><path d="M4 4l5 5"></path>
                     </svg>
                   </button>
-                  <button type="button" id="btn-repeat" class="player-sub-btn" aria-label="Repeat">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <button type="button" id="btn-repeat" class="player-sub-btn" aria-label="Toggle repeat mode">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="m17 1 4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="m7 23-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
                     </svg>
                   </button>
                 </div>
                 <div class="player-vol-wrapper flex items-center gap-2" id="vol-wrapper">
-                  <button type="button" id="btn-vol" class="player-sub-btn" aria-label="Volume">
-                    <svg id="vol-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <button type="button" id="btn-vol" class="player-sub-btn" aria-label="Adjust or mute volume">
+                    <svg id="vol-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
                       <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path>
                     </svg>
                   </button>
@@ -565,28 +565,28 @@
 
               <!-- Mobile Controls Bar (Shuffle | Prev | Play | Next | Repeat) -->
               <div class="mobile-controls-bar">
-                <button type="button" id="btn-shuffle-mobile" class="player-sub-btn" aria-label="Shuffle">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button type="button" id="btn-shuffle-mobile" class="player-sub-btn" aria-label="Toggle shuffle mode">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M16 3h5v5"></path><path d="M4 20 21 3"></path><path d="M21 16v5h-5"></path><path d="m15 15 6 6"></path><path d="M4 4l5 5"></path>
                   </svg>
                 </button>
-                <button type="button" id="btn-prev-mobile" class="player-ctrl-btn" aria-label="Previous Track">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <button type="button" id="btn-prev-mobile" class="player-ctrl-btn" aria-label="Previous track">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
                     <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
                   </svg>
                 </button>
-                <button type="button" id="btn-play-mobile" class="player-ctrl-btn mobile-play-btn" aria-label="Play / Pause">
-                  <svg id="play-icon-mobile" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <button type="button" id="btn-play-mobile" class="player-ctrl-btn mobile-play-btn" aria-label="Play or pause track">
+                  <svg id="play-icon-mobile" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
                     <path d="M8 5v14l11-7z"/>
                   </svg>
                 </button>
-                <button type="button" id="btn-next-mobile" class="player-ctrl-btn" aria-label="Next Track">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <button type="button" id="btn-next-mobile" class="player-ctrl-btn" aria-label="Next track">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
                     <path d="m6 18 8.5-6L6 6v12zM16 6v12h2V6z"/>
                   </svg>
                 </button>
-                <button type="button" id="btn-repeat-mobile" class="player-sub-btn" aria-label="Repeat">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button type="button" id="btn-repeat-mobile" class="player-sub-btn" aria-label="Toggle repeat mode">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="m17 1 4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="m7 23-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
                   </svg>
                 </button>
@@ -983,8 +983,8 @@
             <button type="button" class="editorial-nav-item" data-legal-page="contact">Contact</button>
           </nav>
 
-          <button type="button" id="btn-close-legal-cross" class="editorial-nav-close" aria-label="Close view">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <button type="button" id="btn-close-legal-cross" class="editorial-nav-close" aria-label="Close legal overview">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
@@ -1015,7 +1015,7 @@
     <div class="support-modal-backdrop" id="support-modal-backdrop"></div>
     <div class="editorial-support-card">
       <button type="button" class="editorial-support-close" id="btn-close-support" aria-label="Close support dialog">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
@@ -1053,8 +1053,8 @@
           <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span>PLAYLIST SYNC CENTER</span>
         </div>
-        <button type="button" class="support-close-btn" id="btn-close-sync" aria-label="Close Sync Modal">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button type="button" class="support-close-btn" id="btn-close-sync" aria-label="Close playlist sync modal">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -1070,8 +1070,8 @@
             </p>
           </div>
           <div class="sync-header-actions">
-            <button type="button" id="btn-sync-all-playlists" class="btn-sync-all">
-              <svg class="sync-spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <button type="button" id="btn-sync-all-playlists" class="btn-sync-all" aria-label="Synchronize all playlists">
+              <svg class="sync-spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
               <span id="btn-sync-all-label">Sync All Playlists</span>
