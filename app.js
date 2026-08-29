@@ -891,7 +891,7 @@
               // reconciles state.currentIndex with the ACTUAL YouTube video,
               // so the playing track is preserved and metadata always matches.
               if (!isBackgroundSync) {
-                loadPlaylistSongs(updatedCurrent, false, false);
+                loadPlaylistSongs(updatedCurrent, false, false, true);
               }
               return;
             }
@@ -991,7 +991,7 @@
     container.innerHTML = itemsHtml + syncFooterHtml;
   }
 
-  async function selectPlaylist(playlist) {
+  async function selectPlaylist(playlist, isInitialBootHydration = false) {
     state.currentPlaylist = playlist;
     updatePlaylistLabels(playlist.name, playlist.icon);
 
@@ -1002,7 +1002,7 @@
     });
 
     renderPlaylistMenus();
-    await loadPlaylistSongs(playlist);
+    await loadPlaylistSongs(playlist, false, false, isInitialBootHydration);
   }
 
   // ============================================================
@@ -1395,7 +1395,7 @@
   }
 
   // --- Dynamic Playlist Loading with SWR (Stale-While-Revalidate) & Zero Data Loss ---
-  async function loadPlaylistSongs(playlist, forceRefresh = false, isManualTrigger = false) {
+  async function loadPlaylistSongs(playlist, forceRefresh = false, isManualTrigger = false, skipAutoStart = false) {
     if (!playlist) return;
 
     const requestId = ++currentPlaylistRequestId;
@@ -1433,7 +1433,10 @@
       // Autostart only when the player holds no user-paused song (fresh boot).
       // The index now points at the reconciled track, so this loads the SAME
       // video the player was already cued with — playback and UI stay locked.
-      if (!state.isPlaying && !isPlayerLoadedButPaused()) {
+      // NEVER autostart from the initial boot hydration (skipAutoStart) — that
+      // would force the YouTube iframe to expand before any user gesture,
+      // causing layout shifts and blocked-playback churn.
+      if (!state.isPlaying && !isPlayerLoadedButPaused() && !skipAutoStart) {
         playCurrent();
       }
       if (!isManualTrigger) {
@@ -1537,9 +1540,11 @@
         state.currentIndex = activeIdx >= 0 ? activeIdx : 0;
         setupCardsInitial();
         updateDockUI();
-        if (!state.isPlaying && !isPlayerLoadedButPaused()) {
-          // Fresh boot / nothing meaningfully loaded -> load reconciled track
-          // (index already points at the video the player was cued with).
+        if (!state.isPlaying && !isPlayerLoadedButPaused() && !skipAutoStart) {
+          // Playlist switch / revalidation with nothing loaded -> load
+          // reconciled track (index already points at the cued video).
+          // Skipped during initial boot hydration to keep the player idle
+          // until the user interacts (no autoplay-attempt layout shifts).
           playCurrent();
         } else if (wasPlayingActualVideo && activeIdx < 0) {
           // The song that was ACTUALLY playing was deleted/reordered away by
