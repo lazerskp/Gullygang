@@ -254,19 +254,19 @@
     rainSplashes = [];
     rainRipples = [];
     snowflakes = [];
-    lightningTimer = 350 + Math.random() * 500;
+    lightningTimer = 400 + Math.random() * 600;
     lightningAlpha = 0;
     lightningStep = 0;
 
-    const isMobile = width < 768;
+    const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
 
     if (currentMode === 'rain') {
-      const dropCount = isMobile ? 85 : 190;
+      const dropCount = isMobile ? 38 : 140;
       for (let i = 0; i < dropCount; i++) {
         rainDrops.push(createRainDrop(true));
       }
     } else if (currentMode === 'snow') {
-      const flakeCount = isMobile ? 75 : 180;
+      const flakeCount = isMobile ? 30 : 130;
       for (let i = 0; i < flakeCount; i++) {
         snowflakes.push(createSnowflake(true));
       }
@@ -276,7 +276,9 @@
   // --- Resize canvas to viewport ---
   function resizeCanvas() {
     if (!canvas) return;
-    dpr = window.devicePixelRatio || 1;
+    const isMobile = window.innerWidth < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+    // Cap DPR to 1.0 on mobile to prevent excessive GPU fill-rate and battery drain
+    dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.0 : 1.5);
     width = window.innerWidth;
     height = window.innerHeight;
 
@@ -452,14 +454,22 @@
 
   // --- Main Animation Loop with Time Normalization ---
   function animationLoop(timestamp) {
-    if (!lastTimestamp) lastTimestamp = timestamp;
-    const dt = Math.min(timestamp - lastTimestamp, 33.3); // Cap max frame delta to ~30fps floor
-    lastTimestamp = timestamp;
+    if (!isTabActive || prefersReducedMotion || currentMode === 'off') {
+      stopLoop();
+      return;
+    }
 
-    if (!isTabActive || prefersReducedMotion) {
+    if (!lastTimestamp) lastTimestamp = timestamp;
+    const isMobile = width < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+    const minDelta = isMobile ? 32 : 16; // 30fps throttle on mobile
+
+    if (timestamp - lastTimestamp < minDelta) {
       animationFrameId = requestAnimationFrame(animationLoop);
       return;
     }
+
+    const dt = Math.min(timestamp - lastTimestamp, 40);
+    lastTimestamp = timestamp;
 
     const intensityFactor = isPlayingMusic ? 1.0 : 0.82;
 
@@ -479,8 +489,8 @@
   function startLoop() {
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     lastTimestamp = 0;
-    initParticles();
-    if (currentMode !== 'off' && !prefersReducedMotion) {
+    if (currentMode !== 'off' && !prefersReducedMotion && isTabActive) {
+      initParticles();
       animationFrameId = requestAnimationFrame(animationLoop);
     } else if (ctx) {
       ctx.clearRect(0, 0, width, height);
@@ -537,8 +547,10 @@
       // Handle tab visibility pause/resume
       document.addEventListener('visibilitychange', () => {
         isTabActive = !document.hidden;
-        if (isTabActive && currentMode !== 'off') {
-          lastTimestamp = performance.now();
+        if (isTabActive) {
+          if (currentMode !== 'off') startLoop();
+        } else {
+          stopLoop();
         }
       });
 

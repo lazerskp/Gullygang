@@ -3876,7 +3876,40 @@ body.is-stage-hidden .carousel-stage-container {
   opacity: 1;
   transform: translateY(0);
   transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1), transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
+}
+
+/* Mobile GPU & Thermal Optimization */
+@media (max-width: 768px) {
+  .ambient-canvas {
+    filter: blur(34px) saturate(1.35) contrast(1.05) !important;
+    -webkit-filter: blur(34px) saturate(1.35) contrast(1.05) !important;
+    transform: translateZ(0);
+  }
+
+  .player-bar-container,
+  .stage-playlist-dropdown,
+  .stage-visuals-dropdown,
+  .playlist-loading-card {
+    backdrop-filter: blur(18px) saturate(1.2) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.2) !important;
+  }
+
+  /* GPU Layer Containment for 60fps mobile scrolling */
+  .cinematic-editorial-strip,
+  .editorial-faq-section,
+  .experience-section,
+  .about-luxury-hero,
+  .catalog-showcase-section {
+    contain: content;
+  }
+
+  /* Smooth momentum scrolling */
+  .stage-playlist-dropdown,
+  .stage-visuals-dropdown,
+  .legal-modal-content,
+  .sync-admin-content {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* Reduced Motion Preference */
