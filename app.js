@@ -4714,43 +4714,44 @@
         fetchRealLocationAndWeather();
       }
     }
-    refreshWeatherIfStale();
-    setInterval(refreshWeatherIfStale, 600000);
-
+    // --- 1. CRITICAL INITIALIZATION (App Shell, Core Controls & Playlists) ---
     initDropdownHandlers();
     initVisualsSystem();
-    initEditorialExperienceAccordion();
-    initScrollReveal();
-    initVisualMomentParallax();
-    initGrandCta();
-    initFaqAccordion();
-    initStationCardClicks();
-    initPremium3DTilt();
     attachControlsListeners();
     setupCardsInitial();
     initYouTubeAPI();
     loadInsForgePlaylists();
     loadInsForgeVisuals();
-
-    // Initialize Legal & Informational Pages Engine
-    LegalPagesEngine.init();
-
-    // Initialize Support Engine (Buy Me A Chai)
-    SupportEngine.init();
-
-    // Initialize Playlist Synchronization Admin Center Engine
-    PlaylistSyncEngine.init();
-
-    // Initialize Google AdSense in About Section
-    AdSenseEngine.init();
-
-    // Initialize Living Fluid Ambient Canvas Atmosphere Engine
     AmbientAtmosphereEngine.init();
 
-    // Initialize Atmospheric Weather Effects
-    if (window.WeatherEffects && typeof window.WeatherEffects.init === 'function') {
-      window.WeatherEffects.init();
-      updateWeatherUI(window.WeatherEffects.getMode());
+    // --- 2. DEFERRED SECONDARY INITIALIZATION (Executed in Idle Slice) ---
+    function initSecondaryModules() {
+      refreshWeatherIfStale();
+      setInterval(refreshWeatherIfStale, 600000);
+
+      initEditorialExperienceAccordion();
+      initScrollReveal();
+      initVisualMomentParallax();
+      initGrandCta();
+      initFaqAccordion();
+      initStationCardClicks();
+      initPremium3DTilt();
+
+      LegalPagesEngine.init();
+      SupportEngine.init();
+      PlaylistSyncEngine.init();
+      AdSenseEngine.init();
+
+      if (window.WeatherEffects && typeof window.WeatherEffects.init === 'function') {
+        window.WeatherEffects.init();
+        updateWeatherUI(window.WeatherEffects.getMode());
+      }
+    }
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(initSecondaryModules, { timeout: 1200 });
+    } else {
+      setTimeout(initSecondaryModules, 100);
     }
 
     // Auto-sync with InsForge on focus (throttled to 5 minutes to eliminate mobile battery drain)
