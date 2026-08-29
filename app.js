@@ -11,6 +11,10 @@
     apiKey: (typeof window !== 'undefined' && (window.__ENV__?.INSFORGE_API_KEY || window.ENV?.INSFORGE_API_KEY)) || 'ik_3394ff1ae476e1e5bbabce8593040c1e'
   };
 
+  const API_BASE = (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'))
+    ? 'https://i7i9c74c.insforge.site'
+    : '';
+
   // --- Production Security Utilities ---
   function escapeHTML(str) {
     if (str === null || str === undefined) return '';
@@ -1377,10 +1381,16 @@
 
     // --- STEP 5: APPLY FRESH DATA TO STATE & UI ---
     if (runtimeTracks.length > 0) {
-      const isTracksDifferent = !state.tracks || state.tracks.length !== runtimeTracks.length || (state.tracks[0]?.id !== runtimeTracks[0]?.id);
+      const isTracksDifferent = !state.tracks || state.tracks.length !== runtimeTracks.length || (state.tracks[0]?.id !== runtimeTracks[0]?.id) || isManualTrigger;
       if (isTracksDifferent || !state.isPlaying) {
+        const currentPlayingSongId = state.tracks?.[state.currentIndex]?.id;
         state.tracks = runtimeTracks;
-        state.currentIndex = 0;
+        if (currentPlayingSongId) {
+          const newIdx = runtimeTracks.findIndex(t => t.id === currentPlayingSongId);
+          state.currentIndex = newIdx >= 0 ? newIdx : 0;
+        } else {
+          state.currentIndex = 0;
+        }
         setupCardsInitial();
         updateDockUI();
         if (!state.isPlaying) {
@@ -1419,6 +1429,7 @@
     if (refreshStatusEl) refreshStatusEl.textContent = 'Syncing YouTube...';
     refreshIconEl?.classList.add('animate-spin');
 
+    let syncStats = null;
     try {
       // 1. Authoritative Backend Synchronization from YouTube to InsForge
       if (state.currentPlaylist.id) {
@@ -1430,8 +1441,8 @@
           });
           const syncData = await syncRes.json();
           if (syncData && syncData.results && syncData.results[0]) {
-            const stats = syncData.results[0].stats;
-            console.log('[Sync] Backend sync result for playlist:', state.currentPlaylist.name, stats);
+            syncStats = syncData.results[0].stats;
+            console.log('[Sync] Backend sync result for playlist:', state.currentPlaylist.name, syncStats);
           }
         } catch (syncErr) {
           console.warn('[Sync] Backend sync notice, loading cached/database tracks:', syncErr);
@@ -1445,6 +1456,15 @@
 
       // 3. Load freshly reconciled songs into player & UI
       await loadPlaylistSongs(state.currentPlaylist, true, true);
+
+      // 4. Update status display with actual sync results
+      if (refreshStatusEl && syncStats) {
+        if (syncStats.added > 0 || syncStats.removed > 0) {
+          refreshStatusEl.textContent = `Synced: +${syncStats.added} -${syncStats.removed} (${syncStats.total} total)`;
+        } else {
+          refreshStatusEl.textContent = `Synced — ${syncStats.total} tracks (up to date)`;
+        }
+      }
     } finally {
       refreshIconEl?.classList.remove('animate-spin');
     }
@@ -4224,10 +4244,6 @@
   // YouTube to InsForge automated & manual differential synchronization
   // ============================================================
   const PlaylistSyncEngine = (() => {
-    const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-      ? 'https://i7i9c74c.insforge.site'
-      : '';
-
     let syncData = [];
     let isGlobalSyncing = false;
     let autoSyncTimer = null;
