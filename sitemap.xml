@@ -7,19 +7,14 @@
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <image:image>
-      <image:loc>https://gullygang.in/romantic.png</image:loc>
-      <image:title>GULLYGANG — Romantic Hits Radio</image:title>
+      <image:loc>https://gullygang.in/favicon.png</image:loc>
+      <image:title>GULLYGANG — Music That Feels Different</image:title>
       <image:caption>Aesthetic 24/7 Music Streaming Sanctuary with Live Weather and Visuals</image:caption>
     </image:image>
     <image:image>
-      <image:loc>https://gullygang.in/BHajan.png</image:loc>
-      <image:title>GULLYGANG — Bhajan &amp; Aarti Devotional Radio</image:title>
-      <image:caption>Devotional Jagannath Bhajans and Morning Prayers</image:caption>
-    </image:image>
-    <image:image>
-      <image:loc>https://gullygang.in/sukoon.jpg</image:loc>
-      <image:title>GULLYGANG — 5ukoon Highway Midnight Chill</image:title>
-      <image:caption>Calm late-night acoustic strings and soft ambient lofi melodies</image:caption>
+      <image:loc>https://gullygang.in/favicon.png</image:loc>
+      <image:title>GULLYGANG Official Emblem</image:title>
+      <image:caption>GULLYGANG High-Fidelity Radio Emblem</image:caption>
     </image:image>
   </url>
 </urlset>

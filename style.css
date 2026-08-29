@@ -2572,7 +2572,7 @@ body.is-stage-hidden .carousel-stage-container {
 }
 
 /* ============================================================
-   CHAPTER 5: MASSIVE CLOSING CTA ("KEEP LISTENING →")
+   CHAPTER 5: MASSIVE CLOSING CTA ("KEEP LISTENING")
    ============================================================ */
 .massive-cta-section {
   position: relative;
@@ -2640,6 +2640,28 @@ body.is-stage-hidden .carousel-stage-container {
   transform: translateX(18px);
   color: #6ee7b7;
 }
+.massive-cta-arrow svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+.visual-item-check svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+.sync-card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.sync-diff-item svg {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  vertical-align: -1px;
+  margin-right: 2px;
+}
+
 .massive-cta-sub {
   position: relative;
   z-index: 1;

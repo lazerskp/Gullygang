@@ -39,9 +39,9 @@
   <meta property="og:site_name" content="GULLYGANG" />
   <meta property="og:title" content="GULLYGANG — Music That Feels Different" />
   <meta property="og:description" content="GULLYGANG is a premium music experience built for people who love discovering and listening to music without distractions." />
-  <meta property="og:image" content="https://gullygang.in/romantic.png" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
+  <meta property="og:image" content="https://gullygang.in/favicon.png" />
+  <meta property="og:image:width" content="512" />
+  <meta property="og:image:height" content="512" />
   <meta property="og:image:alt" content="GULLYGANG — Music That Feels Different" />
   <meta property="og:locale" content="en_IN" />
   <meta property="og:locale:alternate" content="hi_IN" />
@@ -52,13 +52,15 @@
   <meta name="twitter:url" content="https://gullygang.in/" />
   <meta name="twitter:title" content="GULLYGANG — Music That Feels Different" />
   <meta name="twitter:description" content="GULLYGANG is a premium music experience built for people who love discovering and listening to music without distractions." />
-  <meta name="twitter:image" content="https://gullygang.in/romantic.png" />
+  <meta name="twitter:image" content="https://gullygang.in/favicon.png" />
   <meta name="twitter:site" content="@Gullygang" />
   <meta name="twitter:creator" content="@Gullygang" />
 
   <!-- Favicons & CDNs -->
-  <link rel="icon" href="romantic.png" type="image/png" />
-  <link rel="apple-touch-icon" href="romantic.png" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="preconnect" href="https://i.ytimg.com" crossorigin />
   <link rel="dns-prefetch" href="https://i.ytimg.com" />
 
@@ -72,7 +74,7 @@
         "@id": "https://gullygang.in/#radiostation",
         "name": "GULLYGANG",
         "url": "https://gullygang.in/",
-        "image": "https://gullygang.in/romantic.png",
+        "image": "https://gullygang.in/favicon.png",
         "description": "24/7 Non-Stop Aesthetic Music Streaming Sanctuary with Ambient Weather Visuals and High-Fidelity Audio.",
         "genre": ["Indian Music", "Romantic Hits", "Devotional", "Lofi Chill", "Acoustic"],
         "inLanguage": ["en", "hi", "or"],
@@ -96,7 +98,7 @@
           "url": "https://gullygang.in/",
           "logo": {
             "@type": "ImageObject",
-            "url": "https://gullygang.in/romantic.png"
+            "url": "https://gullygang.in/favicon.png"
           }
         }
       },
@@ -217,7 +219,11 @@
           <span class="weather-hub-divider" aria-hidden="true">•</span>
           <strong class="weather-hub-temp" id="weather-temp">--°C</strong>
           <span class="weather-hub-desc" id="weather-condition">Loading</span>
-          <span class="weather-hub-icon" id="weather-icon" aria-hidden="true">☁️</span>
+          <span class="weather-hub-icon" id="weather-icon" aria-hidden="true">
+            <svg class="weather-hub-svg inline-block" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+            </svg>
+          </span>
         </div>
         <div class="weather-hub-secondary">
           <span class="weather-hub-day" id="weather-day">Today</span>
@@ -228,13 +234,26 @@
           <!-- Inline Atmospheric Weather Switcher -->
           <div class="weather-fx-inline" role="group" aria-label="Atmosphere effects">
             <button type="button" class="fx-inline-btn weather-mode-btn is-active" data-weather-mode="off" title="Turn atmosphere off" aria-label="Disable atmosphere effects">
-              <span aria-hidden="true">✕</span>
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
             </button>
             <button type="button" class="fx-inline-btn weather-mode-btn" data-weather-mode="rain" title="Rain atmosphere" aria-label="Rain atmosphere effect">
-              <span aria-hidden="true">🌧️</span>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"></path>
+                <line x1="8" y1="19" x2="8" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+                <line x1="16" y1="19" x2="16" y2="21"></line>
+              </svg>
             </button>
             <button type="button" class="fx-inline-btn weather-mode-btn" data-weather-mode="snow" title="Snow atmosphere" aria-label="Snow atmosphere effect">
-              <span aria-hidden="true">❄️</span>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="2" x2="12" y2="22"></line>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                <line x1="19.07" y1="4.93" x2="4.93" y2="19.07"></line>
+              </svg>
             </button>
           </div>
         </div>
@@ -310,7 +329,7 @@
                   <span class="w-[2px] bg-green-400 rounded-full animate-eq-2"></span>
                   <span class="w-[2px] bg-green-400 rounded-full animate-eq-3"></span>
                 </div>
-                <span id="active-playlist-label" class="stage-playlist-name truncate">⚡️ GullyGang Special</span>
+                <span id="active-playlist-label" class="stage-playlist-name truncate">GullyGang Special</span>
                 <span class="stage-playlist-badge">Playlist</span>
                 <svg class="text-white/60 transition-transform duration-200" id="playlist-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="6 9 12 15 18 9"></polyline>
@@ -322,7 +341,16 @@
             <!-- Visuals Selector Capsule -->
             <div class="stage-capsule-item relative" id="visuals-selector-wrap">
               <button type="button" id="btn-visuals-selector" class="stage-vibe-pill visuals-pill" aria-expanded="false">
-                <span class="visuals-pill-icon" aria-hidden="true">🎬</span>
+                <svg class="visuals-pill-icon-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                  <line x1="7" y1="2" x2="7" y2="22"></line>
+                  <line x1="17" y1="2" x2="17" y2="22"></line>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <line x1="2" y1="7" x2="7" y2="7"></line>
+                  <line x1="2" y1="17" x2="7" y2="17"></line>
+                  <line x1="17" y1="17" x2="22" y2="17"></line>
+                  <line x1="17" y1="7" x2="22" y2="7"></line>
+                </svg>
                 <span id="active-visual-label" class="stage-playlist-name truncate">Visuals</span>
                 <span class="stage-playlist-badge visuals-badge" id="visuals-state-badge">Off</span>
                 <svg class="text-white/60 transition-transform duration-200" id="visuals-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -366,7 +394,7 @@
                     </svg>
                   </div>
                   <div class="loading-text-stack">
-                    <p class="loading-pl-name" id="loading-pl-name">Romantic 💝</p>
+                    <p class="loading-pl-name" id="loading-pl-name">GullyGang Special</p>
                     <div class="loading-status-line">
                       <span id="loading-status-text" class="loading-status-text">Loading playlist</span>
                       <span class="loading-dots" aria-hidden="true">
@@ -940,7 +968,7 @@
               <span class="massive-cta-title">
                 KEEP<br />LISTENING
               </span>
-              <span class="massive-cta-arrow" aria-hidden="true">→</span>
+              <span class="massive-cta-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></span>
             </a>
             
             <p class="massive-cta-sub">

@@ -28,7 +28,7 @@ function getNormalizedThumbnail(thumbUrl, videoId) {
   if (videoId) {
     return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   }
-  return 'romantic.png';
+  return 'favicon.png';
 }
 
 /**

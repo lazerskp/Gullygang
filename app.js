@@ -49,9 +49,9 @@
   const DEFAULT_SEED_PLAYLIST = {
     id: '25217e19-6e46-4e64-8d34-14a697b56f63',
     name: 'GullyGang Special',
-    icon: '⚡️',
+    icon: 'bolt',
     youtube_playlist_url: 'https://youtube.com/playlist?list=PLIQS0Hg0bqrV8JDs67xuNRI0C5UTfGAyt',
-    bg_image: 'romantic.png'
+    bg_image: 'favicon.png'
   };
 
   const DEFAULT_SEED_TRACKS = [
@@ -529,8 +529,8 @@
         layerState.imgLoaded = true;
       };
       img.onerror = () => {
-        if (imgUrl !== 'romantic.png') {
-          img.src = 'romantic.png';
+        if (imgUrl !== 'favicon.png') {
+          img.src = 'favicon.png';
         }
       };
       img.src = imgUrl;
@@ -904,16 +904,16 @@
         {
           id: '25217e19-6e46-4e64-8d34-14a697b56f63',
           name: 'GullyGang Special',
-          icon: '⚡️',
+          icon: 'bolt',
           youtube_playlist_url: 'https://youtube.com/playlist?list=PLIQS0Hg0bqrV8JDs67xuNRI0C5UTfGAyt',
-          bg_image: 'romantic.png'
+          bg_image: 'favicon.png'
         },
         {
           id: '79baaf20-b9b9-44c6-b38c-193f2aa8efbf',
           name: 'Odia Romantic',
-          icon: '💝',
+          icon: 'heart',
           youtube_playlist_url: 'https://youtube.com/playlist?list=PLIQS0Hg0bqrUpax63Fk7i7XjGa5a-9Av1',
-          bg_image: 'romantic.png'
+          bg_image: 'favicon.png'
         }
       ];
       renderPlaylistMenus();
@@ -921,10 +921,30 @@
     }
   }
 
+  // --- Inline SVG Icon System (replaces emoji) ---
+  function svgIcon(paths, size = 12, cls = '') {
+    const classAttr = cls ? ` class="${cls}"` : '';
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}"${classAttr} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+  }
+
+  const PLAYLIST_ICON_SVGS = {
+    bolt: { paths: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />', size: 12 },
+    heart: { paths: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />', size: 12 },
+    music: { paths: '<path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />', size: 12 }
+  };
+  // Legacy aliases so icons stored in the database (e.g. emoji values) still resolve
+  const PLAYLIST_ICON_ALIASES = { '⚡️': 'bolt', '⚡': 'bolt', 'bolt': 'bolt', '💝': 'heart', '❤️': 'heart', 'heart': 'heart', '🎵': 'music', '🎶': 'music', 'music': 'music' };
+
+  function playlistIconSvg(icon) {
+    const key = PLAYLIST_ICON_ALIASES[icon] || 'music';
+    const def = PLAYLIST_ICON_SVGS[key];
+    return svgIcon(def.paths, def.size);
+  }
+
   function updatePlaylistLabels(name, icon) {
-    const displayIcon = icon ? `${icon} ` : '';
-    const displayName = `${displayIcon}${name}`.trim();
-    if (DOM.activePlaylistLabel) DOM.activePlaylistLabel.textContent = displayName;
+    if (!DOM.activePlaylistLabel) return;
+    const iconHtml = icon ? playlistIconSvg(icon) + ' ' : '';
+    DOM.activePlaylistLabel.innerHTML = `${iconHtml}${escapeHTML(name)}`;
   }
 
   function renderPlaylistMenus() {
@@ -933,7 +953,7 @@
 
     const itemsHtml = state.playlists.map(pl => {
       const isActive = state.currentPlaylist?.id === pl.id;
-      const icon = pl.icon ? escapeHTML(pl.icon) + ' ' : '';
+      const icon = pl.icon ? playlistIconSvg(pl.icon) + ' ' : '';
       const safeName = escapeHTML(pl.name);
       const safeId = escapeHTML(String(pl.id));
       return `
@@ -1019,18 +1039,18 @@
       }
     }
 
-    return 'romantic.png';
+    return 'favicon.png';
   }
 
   function getTrackArtworkUrl(track) {
-    if (!track) return 'romantic.png';
+    if (!track) return 'favicon.png';
     return normalizeThumbnailUrl(track.thumbnail, track.id);
   }
 
   function getArtworkWaterfallCandidates(track) {
     const candidates = [];
     if (!track) {
-      candidates.push('romantic.png');
+      candidates.push('favicon.png');
       return candidates;
     }
 
@@ -1052,9 +1072,9 @@
       candidates.push(track.thumbnail);
     }
 
-    const playlistCover = state.currentPlaylist?.bg_image || 'romantic.png';
+    const playlistCover = state.currentPlaylist?.bg_image || 'favicon.png';
     if (!candidates.includes(playlistCover)) candidates.push(playlistCover);
-    if (!candidates.includes('romantic.png')) candidates.push('romantic.png');
+    if (!candidates.includes('favicon.png')) candidates.push('favicon.png');
 
     return candidates;
   }
@@ -1416,8 +1436,8 @@
       } else {
         // Safe offline seed tracks only if completely empty cold-start with no cache and offline
         const fallbackTracks = [
-          { id: '3:59 AM', title: '3:59 AM', artist: 'DIVINE', thumbnail: 'romantic.png' },
-          { id: 'Winning Speech', title: 'Winning Speech', artist: 'Karan Aujla', thumbnail: 'romantic.png' }
+          { id: '3:59 AM', title: '3:59 AM', artist: 'DIVINE', thumbnail: 'favicon.png' },
+          { id: 'Winning Speech', title: 'Winning Speech', artist: 'Karan Aujla', thumbnail: 'favicon.png' }
         ];
         runtimeTracks = fallbackTracks.map((t, idx) => ({
           ...t,
@@ -1830,7 +1850,7 @@
         artworkList.push({ src: `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`, sizes: '480x360', type: 'image/jpeg' });
         artworkList.push({ src: `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`, sizes: '320x180', type: 'image/jpeg' });
       }
-      artworkList.push({ src: 'romantic.png', sizes: '512x512', type: 'image/png' });
+      artworkList.push({ src: 'favicon.png', sizes: '512x512', type: 'image/png' });
 
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title || 'Untitled Track',
@@ -2673,7 +2693,7 @@
       return `
         <button type="button" class="visual-item-btn ${isActive ? 'is-active' : ''}" data-visual-id="${safeId}">
           <span class="visual-item-title">${safeName}</span>
-          <span class="visual-item-check">✓</span>
+          <span class="visual-item-check">${svgIcon('<path d="M20 6 9 17l-5-5" />', 11)}</span>
         </button>
       `;
     }).join('');
@@ -2945,37 +2965,54 @@
     });
   }
 
+  // --- Inline SVG Weather Icon Library (replaces emoji) ---
+  const WEATHER_ICON_SVGS = {
+    sun: '<circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />',
+    sunCloud: '<path d="M12 2v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="M20 12h2" /><path d="m19.07 4.93-1.41 1.41" /><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128" /><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z" />',
+    cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />',
+    fog: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /><path d="M16 17H7" /><path d="M17 21H9" />',
+    drizzle: '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" /><path d="M8 19v1" /><path d="M8 14v1" /><path d="M16 19v1" /><path d="M16 14v1" /><path d="M12 21v1" /><path d="M12 16v1" />',
+    rain: '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" /><path d="M16 14v6" /><path d="M8 14v6" /><path d="M12 16v6" />',
+    snow: '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" /><path d="M8 15h.01" /><path d="M8 19h.01" /><path d="M12 17h.01" /><path d="M12 21h.01" /><path d="M16 15h.01" /><path d="M16 19h.01" />',
+    thunder: '<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973" /><path d="m13 12-3 5h4l-3 5" />'
+  };
+
   // --- Real Live WMO Weather Mapping ---
   const WMO_WEATHER_MAP = {
-    0: { desc: 'Clear Sky', icon: '☀️' },
-    1: { desc: 'Mainly Clear', icon: '🌤️' },
-    2: { desc: 'Partly Cloudy', icon: '⛅' },
-    3: { desc: 'Overcast', icon: '☁️' },
-    45: { desc: 'Foggy', icon: '🌫️' },
-    48: { desc: 'Rime Fog', icon: '🌫️' },
-    51: { desc: 'Light Drizzle', icon: '🌦️' },
-    53: { desc: 'Moderate Drizzle', icon: '🌦️' },
-    55: { desc: 'Dense Drizzle', icon: '🌧️' },
-    56: { desc: 'Freezing Drizzle', icon: '🌨️' },
-    57: { desc: 'Dense Freezing Drizzle', icon: '🌨️' },
-    61: { desc: 'Slight Rain', icon: '🌦️' },
-    63: { desc: 'Moderate Rain', icon: '🌧️' },
-    65: { desc: 'Heavy Rain', icon: '🌧️' },
-    66: { desc: 'Freezing Rain', icon: '🌧️' },
-    67: { desc: 'Heavy Freezing Rain', icon: '🌨️' },
-    71: { desc: 'Slight Snow', icon: '🌨️' },
-    73: { desc: 'Moderate Snow', icon: '❄️' },
-    75: { desc: 'Heavy Snow', icon: '❄️' },
-    77: { desc: 'Snow Grains', icon: '❄️' },
-    80: { desc: 'Slight Showers', icon: '🌦️' },
-    81: { desc: 'Moderate Showers', icon: '🌧️' },
-    82: { desc: 'Violent Showers', icon: '⛈️' },
-    85: { desc: 'Snow Showers', icon: '🌨️' },
-    86: { desc: 'Heavy Snow Showers', icon: '❄️' },
-    95: { desc: 'Thunderstorm', icon: '⛈️' },
-    96: { desc: 'Thunderstorm with Hail', icon: '⛈️' },
-    99: { desc: 'Heavy Thunderstorm with Hail', icon: '⛈️' }
+    0: { desc: 'Clear Sky', icon: 'sun' },
+    1: { desc: 'Mainly Clear', icon: 'sunCloud' },
+    2: { desc: 'Partly Cloudy', icon: 'sunCloud' },
+    3: { desc: 'Overcast', icon: 'cloud' },
+    45: { desc: 'Foggy', icon: 'fog' },
+    48: { desc: 'Rime Fog', icon: 'fog' },
+    51: { desc: 'Light Drizzle', icon: 'drizzle' },
+    53: { desc: 'Moderate Drizzle', icon: 'drizzle' },
+    55: { desc: 'Dense Drizzle', icon: 'rain' },
+    56: { desc: 'Freezing Drizzle', icon: 'snow' },
+    57: { desc: 'Dense Freezing Drizzle', icon: 'snow' },
+    61: { desc: 'Slight Rain', icon: 'drizzle' },
+    63: { desc: 'Moderate Rain', icon: 'rain' },
+    65: { desc: 'Heavy Rain', icon: 'rain' },
+    66: { desc: 'Freezing Rain', icon: 'rain' },
+    67: { desc: 'Heavy Freezing Rain', icon: 'snow' },
+    71: { desc: 'Slight Snow', icon: 'snow' },
+    73: { desc: 'Moderate Snow', icon: 'snow' },
+    75: { desc: 'Heavy Snow', icon: 'snow' },
+    77: { desc: 'Snow Grains', icon: 'snow' },
+    80: { desc: 'Slight Showers', icon: 'drizzle' },
+    81: { desc: 'Moderate Showers', icon: 'rain' },
+    82: { desc: 'Violent Showers', icon: 'thunder' },
+    85: { desc: 'Snow Showers', icon: 'snow' },
+    86: { desc: 'Heavy Snow Showers', icon: 'snow' },
+    95: { desc: 'Thunderstorm', icon: 'thunder' },
+    96: { desc: 'Thunderstorm with Hail', icon: 'thunder' },
+    99: { desc: 'Heavy Thunderstorm with Hail', icon: 'thunder' }
   };
+
+  function weatherIconSvg(key) {
+    const paths = WEATHER_ICON_SVGS[key] || WEATHER_ICON_SVGS.sun;
+    return svgIcon(paths, 13, 'weather-hub-svg inline-block');
+  }
 
   // --- Real Geolocation & Weather Fetcher (Non-Blocking / User Permission Model) ---
   async function fetchRealLocationAndWeather(userInitiated = false) {
@@ -3029,7 +3066,7 @@
           if (locEl && parsed.city) locEl.textContent = parsed.city;
           if (tempEl && parsed.temp) tempEl.textContent = parsed.temp;
           if (descEl && parsed.desc) descEl.textContent = parsed.desc;
-          if (iconEl && parsed.icon) iconEl.textContent = parsed.icon;
+          if (iconEl && parsed.icon) iconEl.innerHTML = weatherIconSvg(parsed.icon);
           return;
         }
       }
@@ -3061,11 +3098,11 @@
         if (current) {
           const temp = `${Math.round(current.temperature_2m)}°C`;
           const code = current.weather_code;
-          const info = WMO_WEATHER_MAP[code] || { desc: 'Clear', icon: '☀️' };
+          const info = WMO_WEATHER_MAP[code] || { desc: 'Clear', icon: 'sun' };
 
           if (tempEl) tempEl.textContent = temp;
           if (descEl) descEl.textContent = info.desc;
-          if (iconEl) iconEl.textContent = info.icon;
+          if (iconEl) iconEl.innerHTML = weatherIconSvg(info.icon);
 
           try {
             sessionStorage.setItem('gullygang_cached_weather', JSON.stringify({
@@ -3718,7 +3755,7 @@
                 <span class="editorial-support-badge">COMMUNITY SUPPORT</span>
                 <h3 class="text-xl font-bold text-white mb-2">Support the project</h3>
                 <p class="text-sm text-white/80 mb-6 font-medium">
-                  Every contribution helps keep the music alive. ❤️🌌
+                  Every contribution helps keep the music alive. <span style="color:#f472b6; display:inline-block; vertical-align:-2px;">${svgIcon('<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />', 14)}</span><span style="color:#a78bfa; display:inline-block; vertical-align:-2px;">${svgIcon('<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />', 14)}</span>
                 </p>
                 <div style="margin-top: 8px;">
                   <a href="https://buymeachai.ezee.li/Lazer" target="_blank" rel="noopener noreferrer" class="buyme-chai-link" aria-label="Buy Me A Chai for GullyGang">
@@ -4531,7 +4568,7 @@
         }
 
         const stats = pl.sync_stats || { total: pl.song_count || 0, added: 0, removed: 0, updated: 0, reordered: 0 };
-        const icon = pl.icon ? escapeHTML(pl.icon) : '🎵';
+        const icon = playlistIconSvg(pl.icon);
         const name = escapeHTML(pl.name);
         const ytId = escapeHTML(pl.youtube_playlist_id || '');
         const timeFormatted = formatRelativeTime(pl.last_synced_at);
@@ -4575,7 +4612,7 @@
                 <span class="sync-diff-item stat-added">+${stats.added || 0} added</span>
                 <span class="sync-diff-item stat-removed">-${stats.removed || 0} removed</span>
                 <span class="sync-diff-item stat-updated">~${stats.updated || 0} updated</span>
-                <span class="sync-diff-item stat-reordered">↕${stats.reordered || 0} reordered</span>
+                <span class="sync-diff-item stat-reordered">${svgIcon('<path d="m21 16-4 4-4-4" /><path d="M17 20V4" /><path d="m3 8 4-4 4 4" /><path d="M7 4v16" />', 11)}${stats.reordered || 0} reordered</span>
               </div>
               <span class="sync-time-stamp">${timeFormatted}</span>
             </div>
