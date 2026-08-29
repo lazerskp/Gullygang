@@ -105,6 +105,7 @@
     dockTimeCombined: document.getElementById('dock-time-combined'),
     dockRail: document.getElementById('dock-rail'),
     dockFill: document.getElementById('dock-fill'),
+    dockThumbHandle: document.getElementById('dock-thumb-handle'),
     btnVol: document.getElementById('btn-vol'),
     volIcon: document.getElementById('vol-icon'),
     volSlider: document.getElementById('vol-slider'),
@@ -1856,9 +1857,14 @@
 
     // Reset progress track to loading state
     if (DOM.dockFill) DOM.dockFill.style.width = '0%';
+    if (DOM.dockThumbHandle) DOM.dockThumbHandle.style.left = '0%';
     if (DOM.dockCurrentTime) DOM.dockCurrentTime.textContent = '0:00';
-    if (DOM.dockDuration) DOM.dockDuration.textContent = '--:--';
-    if (DOM.dockTimeCombined) DOM.dockTimeCombined.textContent = '0:00 / --:--';
+    if (DOM.dockDuration) DOM.dockDuration.textContent = '0:00';
+    if (DOM.dockTimeCombined) DOM.dockTimeCombined.textContent = '0:00 / 0:00';
+    if (DOM.dockRail) {
+      DOM.dockRail.setAttribute('aria-valuenow', '0');
+      DOM.dockRail.setAttribute('aria-valuetext', '0:00');
+    }
 
     trackEvent('song_played', {
       title: track.title,
@@ -1993,17 +1999,25 @@
       const dur = typeof state.ytPlayer.getDuration === 'function' ? state.ytPlayer.getDuration() : 0;
 
       if (dur > 0) {
-        if (DOM.dockFill) DOM.dockFill.style.width = `${(cur / dur) * 100}%`;
+        const pct = Math.max(0, Math.min(100, (cur / dur) * 100));
+        const pctStr = `${pct.toFixed(2)}%`;
+        if (DOM.dockFill) DOM.dockFill.style.width = pctStr;
+        if (DOM.dockThumbHandle) DOM.dockThumbHandle.style.left = pctStr;
         if (DOM.dockCurrentTime) DOM.dockCurrentTime.textContent = formatTime(cur);
-        if (DOM.dockDuration) DOM.dockDuration.textContent = `- ${formatTime(Math.max(0, dur - cur))}`;
+        if (DOM.dockDuration) DOM.dockDuration.textContent = formatTime(dur);
         if (DOM.dockTimeCombined) DOM.dockTimeCombined.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+        if (DOM.dockRail) {
+          DOM.dockRail.setAttribute('aria-valuenow', Math.round(pct));
+          DOM.dockRail.setAttribute('aria-valuetext', `${formatTime(cur)} of ${formatTime(dur)}`);
+        }
         updateMediaSessionPosition(cur, dur);
       } else {
-        // Duration pending / initializing — don't freeze at 0:00 / 0:00
+        // Duration pending / initializing
         if (DOM.dockFill) DOM.dockFill.style.width = '0%';
+        if (DOM.dockThumbHandle) DOM.dockThumbHandle.style.left = '0%';
         if (DOM.dockCurrentTime) DOM.dockCurrentTime.textContent = formatTime(cur);
-        if (DOM.dockDuration) DOM.dockDuration.textContent = '--:--';
-        if (DOM.dockTimeCombined) DOM.dockTimeCombined.textContent = `${formatTime(cur)} / --:--`;
+        if (DOM.dockDuration) DOM.dockDuration.textContent = '0:00';
+        if (DOM.dockTimeCombined) DOM.dockTimeCombined.textContent = `${formatTime(cur)} / 0:00`;
       }
     } catch (e) {}
   }
@@ -2012,11 +2026,19 @@
     if (!state.isPlayerReady || !state.ytPlayer) return;
     try {
       const dur = typeof state.ytPlayer.getDuration === 'function' ? state.ytPlayer.getDuration() : 0;
-      const safeTarget = Math.max(0, Math.min(dur || targetSeconds, targetSeconds));
+      const safeTarget = Math.max(0, Math.min(dur > 0 ? dur : targetSeconds, targetSeconds));
       if (typeof state.ytPlayer.seekTo === 'function') {
         state.ytPlayer.seekTo(safeTarget, true);
-        if (dur > 0 && DOM.dockFill) {
-          DOM.dockFill.style.width = `${(safeTarget / dur) * 100}%`;
+        if (dur > 0) {
+          const pct = Math.max(0, Math.min(100, (safeTarget / dur) * 100));
+          const pctStr = `${pct.toFixed(2)}%`;
+          if (DOM.dockFill) DOM.dockFill.style.width = pctStr;
+          if (DOM.dockThumbHandle) DOM.dockThumbHandle.style.left = pctStr;
+          if (DOM.dockCurrentTime) DOM.dockCurrentTime.textContent = formatTime(safeTarget);
+          if (DOM.dockRail) {
+            DOM.dockRail.setAttribute('aria-valuenow', Math.round(pct));
+            DOM.dockRail.setAttribute('aria-valuetext', `${formatTime(safeTarget)} of ${formatTime(dur)}`);
+          }
         }
         updateMediaSessionPosition(safeTarget, dur);
       }
@@ -2036,7 +2058,7 @@
     if (document.hidden) return; // Suspend DOM updates when tab is hidden
     updateProgressUI();
     const isMobile = window.innerWidth < 768 || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
-    const intervalMs = isMobile ? 450 : 250;
+    const intervalMs = isMobile ? 350 : 250;
     state.progressTimer = setInterval(() => {
       if (document.hidden) return;
       updateProgressUI();
@@ -2058,14 +2080,109 @@
   function handleSeek(e) {
     if (!state.isPlayerReady || !state.ytPlayer || !DOM.dockRail) return;
     const rect = DOM.dockRail.getBoundingClientRect();
+    if (rect.width <= 0) return;
     const clickX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     const pct = clickX / rect.width;
     const dur = typeof state.ytPlayer.getDuration === 'function' ? state.ytPlayer.getDuration() : 0;
 
     if (dur > 0) {
-      const targetSec = dur * pct;
-      seekToTime(targetSec);
+      seekToTime(dur * pct);
     }
+  }
+
+  function attachSeekSliderListeners() {
+    const rail = DOM.dockRail;
+    if (!rail) return;
+
+    function getSeekPercentage(e) {
+      const rect = rail.getBoundingClientRect();
+      if (rect.width <= 0) return 0;
+      const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      const offsetX = Math.max(0, Math.min(clientX - rect.left, rect.width));
+      return offsetX / rect.width;
+    }
+
+    function updateVisualSeek(pct) {
+      const clampedPct = Math.max(0, Math.min(1, pct));
+      const dur = (state.isPlayerReady && state.ytPlayer && typeof state.ytPlayer.getDuration === 'function')
+        ? state.ytPlayer.getDuration()
+        : 0;
+
+      const pctStr = `${(clampedPct * 100).toFixed(2)}%`;
+      if (DOM.dockFill) DOM.dockFill.style.width = pctStr;
+      if (DOM.dockThumbHandle) DOM.dockThumbHandle.style.left = pctStr;
+
+      if (dur > 0) {
+        const previewSec = dur * clampedPct;
+        if (DOM.dockCurrentTime) DOM.dockCurrentTime.textContent = formatTime(previewSec);
+        rail.setAttribute('aria-valuenow', Math.round(clampedPct * 100));
+        rail.setAttribute('aria-valuetext', `${formatTime(previewSec)} of ${formatTime(dur)}`);
+      }
+    }
+
+    rail.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      state.isSeeking = true;
+      rail.classList.add('is-dragging');
+      try {
+        rail.setPointerCapture(e.pointerId);
+      } catch (err) {}
+
+      const pct = getSeekPercentage(e);
+      updateVisualSeek(pct);
+    });
+
+    rail.addEventListener('pointermove', (e) => {
+      if (!state.isSeeking) return;
+      e.preventDefault();
+      const pct = getSeekPercentage(e);
+      updateVisualSeek(pct);
+    });
+
+    const handlePointerEnd = (e) => {
+      if (!state.isSeeking) return;
+      state.isSeeking = false;
+      rail.classList.remove('is-dragging');
+      try {
+        rail.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+
+      const pct = getSeekPercentage(e);
+      const dur = (state.isPlayerReady && state.ytPlayer && typeof state.ytPlayer.getDuration === 'function')
+        ? state.ytPlayer.getDuration()
+        : 0;
+
+      if (dur > 0) {
+        seekToTime(dur * pct);
+      }
+    };
+
+    rail.addEventListener('pointerup', handlePointerEnd);
+    rail.addEventListener('pointercancel', handlePointerEnd);
+
+    // Keyboard accessibility for desktop
+    rail.addEventListener('keydown', (e) => {
+      const dur = (state.isPlayerReady && state.ytPlayer && typeof state.ytPlayer.getDuration === 'function')
+        ? state.ytPlayer.getDuration()
+        : 0;
+
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        seekBy(-5);
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        seekBy(5);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        seekToTime(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        if (dur > 0) seekToTime(Math.max(0, dur - 0.5));
+      } else if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        togglePlay();
+      }
+    });
   }
 
   // --- Volume & Controls ---
@@ -2950,10 +3067,8 @@
     document.getElementById('btn-repeat-mobile')?.addEventListener('click', toggleRepeat);
     document.getElementById('btn-vol-mobile')?.addEventListener('click', toggleVolSlider);
 
-    DOM.dockRail?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      handleSeek(e);
-    });
+    // Attach draggable music progress & seek slider listeners
+    attachSeekSliderListeners();
 
     // Volume Slider Desktop
     DOM.btnVol?.addEventListener('click', toggleVolSlider);

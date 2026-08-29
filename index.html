@@ -493,24 +493,26 @@
               </div>
 
               <!-- Center Zone: Inset Track Well (Desktop) / Full Width Rail (Mobile) -->
-              <div class="player-center-track" id="dock-rail" role="slider" aria-label="Now playing and progress">
+              <div class="player-center-track">
                 <div class="player-track-art-wrapper player-thumb-wrap desktop-only-inline">
                   <img id="dock-thumb" src="romantic.png" alt="Cover" class="player-track-art track-thumb-img" />
                 </div>
-                <div class="track-info-texts player-track-info desktop-only-inline">
-                  <p class="track-title-text player-track-title" id="dock-title">Ore Mora Saiyana</p>
-                  <p class="track-artist-text player-track-artist" id="dock-artist">Aseema Panda</p>
+                <div class="track-center-column">
+                  <div class="track-info-texts player-track-info desktop-only-inline">
+                    <p class="track-title-text player-track-title" id="dock-title">Ore Mora Saiyana</p>
+                    <p class="track-artist-text player-track-artist" id="dock-artist">Aseema Panda</p>
+                  </div>
+                  <!-- Draggable Music Progress & Seek Slider -->
+                  <div class="player-seek-row">
+                    <span class="seek-time-label seek-time-current" id="dock-current-time">0:00</span>
+                    <div class="player-seek-slider" id="dock-rail" role="slider" tabindex="0" aria-label="Seek music position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0:00">
+                      <div class="seek-track-bg"></div>
+                      <div class="dock-fill-overlay" id="dock-fill" style="width: 0%;"></div>
+                      <div class="seek-thumb-handle" id="dock-thumb-handle" style="left: 0%;"></div>
+                    </div>
+                    <span class="seek-time-label seek-time-duration" id="dock-duration">0:00</span>
+                  </div>
                 </div>
-                <div class="track-time-combined desktop-only-inline" id="dock-time-combined">0:00 / 0:00</div>
-                <div class="dock-rail-overlay">
-                  <div class="dock-fill-overlay" id="dock-fill"></div>
-                </div>
-              </div>
-
-              <!-- Mobile Time Row (0:00 on Left, -6:51 on Right) -->
-              <div class="mobile-time-row">
-                <span id="dock-current-time">0:00</span>
-                <span id="dock-duration">-0:00</span>
               </div>
 
               <!-- Desktop Right Controls (Repeat / Shuffle / Volume) -->

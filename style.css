@@ -1465,13 +1465,19 @@ body.is-stage-hidden .carousel-stage-container {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    border-radius: 10px;
+    gap: 12px;
+    padding: 4px 8px;
     background: transparent;
     border: none;
-    cursor: pointer;
-    overflow: hidden;
+    overflow: visible;
+  }
+  .track-center-column {
+    flex: 1 1 0%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
   }
   /* Desktop Player Artwork Container & Image */
   .player-thumb-wrap,
@@ -1491,49 +1497,116 @@ body.is-stage-hidden .carousel-stage-container {
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
   .track-info-texts {
-    flex: 1 1 0%;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
     min-width: 0;
   }
   .track-title-text {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
     color: #ffffff;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    line-height: 1.25;
+    line-height: 1.2;
   }
   .track-artist-text {
     font-size: 10.5px;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.45);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    margin-top: 1px;
   }
-  .track-time-combined {
+  .player-seek-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .seek-time-label {
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.35);
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.4);
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    letter-spacing: 0.02em;
+    min-width: 26px;
     flex-shrink: 0;
-    margin-left: 6px;
   }
-  .dock-rail-overlay {
+  .seek-time-current {
+    text-align: right;
+  }
+  .seek-time-duration {
+    text-align: left;
+  }
+  .player-seek-slider {
+    flex: 1 1 0%;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+    touch-action: none;
+    outline: none;
+  }
+  .player-seek-slider:focus-visible .seek-track-bg {
+    outline: 2px solid rgba(255, 255, 255, 0.4);
+    outline-offset: 2px;
+  }
+  .seek-track-bg {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 0;
-    height: 1.5px;
-    background: rgba(255, 255, 255, 0.06);
-    cursor: pointer;
+    height: 2.5px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    pointer-events: none;
+    transition: height 0.15s ease, background 0.15s ease;
   }
   .dock-fill-overlay {
-    height: 100%;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 2.5px;
     width: 0%;
-    background: rgba(255, 255, 255, 0.65);
-    transition: width 0.1s linear;
+    background: rgba(255, 255, 255, 0.85);
     border-radius: 999px;
+    pointer-events: none;
+    transition: height 0.15s ease, background 0.15s ease;
+  }
+  .seek-thumb-handle {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .player-seek-slider:hover .seek-track-bg,
+  .player-seek-slider.is-dragging .seek-track-bg {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.18);
+  }
+  .player-seek-slider:hover .dock-fill-overlay,
+  .player-seek-slider.is-dragging .dock-fill-overlay {
+    height: 4px;
+    background: #ffffff;
+  }
+  .player-seek-slider:hover .seek-thumb-handle,
+  .player-seek-slider.is-dragging .seek-thumb-handle {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 1;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.8), 0 0 6px rgba(255, 255, 255, 0.35);
   }
 
   .player-right-controls {
@@ -1771,39 +1844,66 @@ body.is-stage-hidden .carousel-stage-container {
 
   .player-center-track {
     width: 100%;
-    height: 2.5px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 999px;
-    position: relative;
-    cursor: pointer;
-    overflow: hidden;
-    margin-top: 2px;
+    background: transparent;
     border: none;
     padding: 0;
+    margin: 0;
+    overflow: visible;
   }
-  .dock-rail-overlay {
-    position: absolute;
-    inset: 0;
+  .track-center-column {
     width: 100%;
-    height: 100%;
+  }
+  .player-seek-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin: 4px 0 2px;
+    padding: 0 2px;
+  }
+  .seek-time-label {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+    min-width: 26px;
+  }
+  .player-seek-slider {
+    flex: 1 1 0%;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .seek-track-bg {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
   }
   .dock-fill-overlay {
-    height: 100%;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 3px;
     width: 0%;
     background: rgba(255, 255, 255, 0.85);
     border-radius: 999px;
-    transition: width 0.1s linear;
   }
-
-  .mobile-time-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.35);
-    font-variant-numeric: tabular-nums;
-    margin-top: -2px;
+  .seek-thumb-handle {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
   }
 
   .mobile-controls-bar {
