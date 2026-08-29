@@ -643,7 +643,7 @@ body.is-stage-hidden .top-weather-hub {
     left: max(14px, env(safe-area-inset-left, 14px));
     right: max(14px, env(safe-area-inset-right, 14px));
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     pointer-events: none;
     z-index: 50;
@@ -652,29 +652,19 @@ body.is-stage-hidden .top-weather-hub {
   .brand-logo-text {
     font-size: 13.5px;
     letter-spacing: 0.14em;
-    padding-top: 3px;
+    padding-top: 0;
     line-height: 1;
   }
 
-  /* Right controls area on Mobile:
-     Row 1: [♥] Support + [☁ Effects ▾]
-     Row 2: [Hide] */
+  /* Right controls area on Mobile: [♥] [👁 Hide] [☁ Effects ▾] in one compact horizontal line */
   .top-header-right {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
+    align-items: center;
+    gap: 6px;
     pointer-events: auto;
   }
 
   .top-header-controls-row {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-  }
-
-  .top-header-controls-upper {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -705,25 +695,10 @@ body.is-stage-hidden .top-weather-hub {
     height: 14px;
   }
 
-  /* Effects dropdown button on mobile */
-  .top-effects-dropdown-btn {
-    height: 30px;
-    padding: 0 10px 0 8px;
-    font-size: 11.5px;
-    font-weight: 500;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.9);
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
   /* Independent compact Hide button */
   .top-hide-stage-btn {
-    height: 24px;
-    padding: 0 9px;
+    height: 28px;
+    padding: 0 8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -743,10 +718,25 @@ body.is-stage-hidden .top-weather-hub {
     background: rgba(255, 255, 255, 0.1);
   }
 
-  /* Weather information: EXACTLY CENTERED horizontally in mobile viewport */
+  /* Effects dropdown button on mobile */
+  .top-effects-dropdown-btn {
+    height: 28px;
+    padding: 0 9px 0 7px;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    display: inline-flex;
+    align-items: center;
+    gap: 3.5px;
+  }
+
+  /* Weather information: EXACTLY CENTERED horizontally in mobile viewport, moved down */
   .top-weather-hub {
     position: absolute;
-    top: max(80px, calc(env(safe-area-inset-top, 10px) + 70px));
+    top: max(68px, calc(env(safe-area-inset-top, 10px) + 58px));
     left: 0;
     right: 0;
     width: 100%;
