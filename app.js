@@ -884,6 +884,15 @@
             if (updatedCurrent) {
               state.currentPlaylist = updatedCurrent;
               updatePlaylistLabels(updatedCurrent.name, updatedCurrent.icon);
+              // CANONICAL BOOT SYNC: previously this branch returned early and
+              // NEVER loaded real playlist songs — seed tracks (and hardcoded
+              // dock metadata) stayed visible until the user changed playlist.
+              // Now hydrate the real songs via SWR; loadPlaylistSongs
+              // reconciles state.currentIndex with the ACTUAL YouTube video,
+              // so the playing track is preserved and metadata always matches.
+              if (!isBackgroundSync) {
+                loadPlaylistSongs(updatedCurrent, false, false);
+              }
               return;
             }
           }
@@ -1016,6 +1025,61 @@
     const directMatch = trimmed.match(/^[A-Za-z0-9_-]{11}$/);
     if (directMatch) return directMatch[0];
     return trimmed;
+  }
+
+  // ============================================================
+  // CANONICAL CURRENT-TRACK RECONCILIATION ENGINE
+  // Single source of truth: the ACTUAL video loaded in the YouTube player.
+  // YouTube video ID -> track object -> state.currentIndex -> cards/dock/
+  // thumbnail/artwork/MediaSession must NEVER initialize or drift apart.
+  // ============================================================
+  function getActualPlayingVideoId() {
+    try {
+      if (state.ytPlayer && typeof state.ytPlayer.getVideoData === 'function') {
+        const videoData = state.ytPlayer.getVideoData();
+        if (videoData && videoData.video_id) return videoData.video_id;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function findTrackIndexByVideoId(tracks, videoId) {
+    if (!videoId || !Array.isArray(tracks) || tracks.length === 0) return -1;
+    const cleanId = extractCleanYouTubeId(videoId);
+    if (!cleanId) return -1;
+    return tracks.findIndex(t => {
+      const trackId = extractCleanYouTubeId((t && (t.id || t.youtubeId || t.youtube_id)) || '');
+      return trackId && trackId === cleanId;
+    });
+  }
+
+  // True when the player holds a user-paused song (must never be restarted by
+  // background revalidation). CUED/unstarted videos MAY be auto-started.
+  function isPlayerLoadedButPaused() {
+    try {
+      if (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function') {
+        return state.ytPlayer.getPlayerState() === 2; // PAUSED
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  // Resolve the canonical current track from the REAL YouTube video and
+  // re-render every metadata surface (cards, dock, artwork, MediaSession)
+  // when the index had drifted. Never touches playback itself.
+  function reconcileCurrentTrack(renderIfChanged = true) {
+    const actualVideoId = getActualPlayingVideoId();
+    if (!actualVideoId) return null;
+    const matchIdx = findTrackIndexByVideoId(state.tracks, actualVideoId);
+    if (matchIdx < 0) return null;
+    if (matchIdx !== state.currentIndex) {
+      state.currentIndex = matchIdx;
+      if (renderIfChanged) {
+        setupCardsInitial();
+        updateDockUI();
+      }
+    }
+    return state.tracks[matchIdx];
   }
 
   function normalizeThumbnailUrl(thumb, videoId) {
@@ -1356,11 +1420,20 @@
     const hasCachedTracks = Array.isArray(cachedTracks) && cachedTracks.length > 0;
 
     if (hasCachedTracks) {
+      // Canonical reconciliation: preserve the ACTUAL video loaded in the
+      // player. Never blindly reset to index 0 on boot or background sync.
+      const actualVideoId = getActualPlayingVideoId();
+      const activeVideoId = actualVideoId
+        || extractCleanYouTubeId((state.tracks && state.tracks[state.currentIndex] && state.tracks[state.currentIndex].id) || '');
       state.tracks = cachedTracks;
-      state.currentIndex = 0;
+      const activeIdx = findTrackIndexByVideoId(cachedTracks, activeVideoId);
+      state.currentIndex = activeIdx >= 0 ? activeIdx : 0;
       setupCardsInitial();
       updateDockUI();
-      if (!state.isPlaying) {
+      // Autostart only when the player holds no user-paused song (fresh boot).
+      // The index now points at the reconciled track, so this loads the SAME
+      // video the player was already cued with — playback and UI stay locked.
+      if (!state.isPlaying && !isPlayerLoadedButPaused()) {
         playCurrent();
       }
       if (!isManualTrigger) {
@@ -1453,17 +1526,24 @@
     if (runtimeTracks.length > 0) {
       const isTracksDifferent = !state.tracks || state.tracks.length !== runtimeTracks.length || (state.tracks[0]?.id !== runtimeTracks[0]?.id) || isManualTrigger;
       if (isTracksDifferent || !state.isPlaying) {
-        const currentPlayingSongId = state.tracks?.[state.currentIndex]?.id;
+        // Canonical reconciliation: the ACTUAL YouTube video wins over any
+        // stale/default state index (seed or cache).
+        const actualVideoId = getActualPlayingVideoId();
+        const activeVideoId = actualVideoId
+          || extractCleanYouTubeId((state.tracks && state.tracks[state.currentIndex] && state.tracks[state.currentIndex].id) || '');
+        const wasPlayingActualVideo = Boolean(actualVideoId) && state.isPlaying;
         state.tracks = runtimeTracks;
-        if (currentPlayingSongId) {
-          const newIdx = runtimeTracks.findIndex(t => t.id === currentPlayingSongId);
-          state.currentIndex = newIdx >= 0 ? newIdx : 0;
-        } else {
-          state.currentIndex = 0;
-        }
+        const activeIdx = findTrackIndexByVideoId(runtimeTracks, activeVideoId);
+        state.currentIndex = activeIdx >= 0 ? activeIdx : 0;
         setupCardsInitial();
         updateDockUI();
-        if (!state.isPlaying) {
+        if (!state.isPlaying && !isPlayerLoadedButPaused()) {
+          // Fresh boot / nothing meaningfully loaded -> load reconciled track
+          // (index already points at the video the player was cued with).
+          playCurrent();
+        } else if (wasPlayingActualVideo && activeIdx < 0) {
+          // The song that was ACTUALLY playing was deleted/reordered away by
+          // the remote playlist -> fall back to track 0 on player AND UI.
           playCurrent();
         }
       }
@@ -1567,7 +1647,7 @@
     state.ytPlayer = new YT.Player('yt-player', {
       height: '180',
       width: '320',
-      videoId: curTrack.id,
+      videoId: extractCleanYouTubeId(curTrack.id) || curTrack.id,
       host: 'https://www.youtube-nocookie.com',
       playerVars: {
         autoplay: 0,
@@ -1593,6 +1673,12 @@
     try {
       event.target.setVolume(state.volume * 100);
     } catch (e) {}
+
+    // CANONICAL SYNC: the player may have been created with a seed video that
+    // no longer matches a re-rendered state (cache/remote hydration can land
+    // before onReady). Lock state.currentIndex to the REAL loaded video and
+    // render its metadata before any playback starts.
+    reconcileCurrentTrack(true);
 
     if (state.pendingAction === 'play') {
       state.pendingAction = null;
@@ -1624,6 +1710,11 @@
       state.isPlaying = true;
       setPlayState(true);
       startProgressTracker();
+      // CANONICAL SYNC: reconcile UI to the video YouTube reports as ACTUALLY
+      // playing. This is the final authority — it guarantees no persistent
+      // YouTube=SongA / UI=SongB drift regardless of which async hydration
+      // (cache, InsForge, realtime sync) landed out of order during boot.
+      reconcileCurrentTrack(true);
     } else if (pState === 2) { // PAUSED
       state.isPlaying = false;
       setPlayState(false);
@@ -1632,7 +1723,8 @@
       state.isPlaying = true;
       setPlayState(true);
     } else if (pState === 5) { // CUED
-      // Video is cued and ready
+      // Video is cued and ready — lock UI metadata to the cued video
+      reconcileCurrentTrack(true);
     } else if (pState === 0) { // ENDED
       // 1. Stale Transition Guard: Ignore ENDED events emitted during manual navigation (cooldown 1200ms)
       const timeSinceManualNav = Date.now() - manualNavTimestamp;
@@ -1801,9 +1893,17 @@
     }
   }
 
+  // Redundant-render guard: the exact same track object already painted on
+  // the dock. Prevents 0:00 resets / thumbnail waterfall re-trigger flashes
+  // when multiple boot paths (seed, cache, remote) render the same track.
+  let lastDockTrackRef = null;
+
   function updateDockUI() {
     const curTrack = state.tracks[state.currentIndex];
     if (!curTrack) return;
+
+    if (lastDockTrackRef === curTrack) return;
+    lastDockTrackRef = curTrack;
 
     if (DOM.dockTitle) DOM.dockTitle.textContent = curTrack.title;
     if (DOM.dockArtist) DOM.dockArtist.textContent = curTrack.artist;
@@ -1921,6 +2021,25 @@
 
     const track = state.tracks[state.currentIndex];
     if (!track) return;
+
+    // IDEMPOTENCY GUARD: if the player is ALREADY actively playing/buffering
+    // this exact video (e.g. playCurrent() re-fired by hydration paths while
+    // the same track is live), do not restart it. Cued/paused states still
+    // fall through so pendingAction autoplay and resume behavior is preserved.
+    if (targetIndex === state.currentIndex && direction === 'direct') {
+      if (state.isPlayerReady && state.ytPlayer) {
+        try {
+          const liveState = typeof state.ytPlayer.getPlayerState === 'function' ? state.ytPlayer.getPlayerState() : -1;
+          if (liveState === 1 || liveState === 3) { // PLAYING or BUFFERING
+            const videoData = typeof state.ytPlayer.getVideoData === 'function' ? state.ytPlayer.getVideoData() : null;
+            const trackId = extractCleanYouTubeId(track.id || track.youtubeId || track.youtube_id) || track.id;
+            if (videoData && videoData.video_id === trackId) {
+              return; // Player already owns this video — UI already in sync
+            }
+          }
+        } catch (e) {}
+      }
+    }
 
     // 1. Sanitize canonical YouTube video ID
     const cleanId = extractCleanYouTubeId(track.id || track.youtubeId || track.youtube_id);
