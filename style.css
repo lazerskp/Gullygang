@@ -3069,12 +3069,12 @@ body.is-stage-hidden .top-weather-hub {
 
 /* ============================================================
    DEDICATED ADVERTISEMENT PLACEMENT (ABOUT SECTION ONLY)
-   Subtle, responsive, non-intrusive container adhering to AdSense policies
+   Subtle, responsive, non-intrusive container for Adsterra units
    ============================================================ */
 .editorial-ad-section {
   width: 100%;
   max-width: 900px;
-  margin: 3.5rem auto 4.5rem;
+  margin: 3.5rem auto 4rem;
   padding: 0 1rem;
 }
 
@@ -3108,7 +3108,7 @@ body.is-stage-hidden .top-weather-hub {
 }
 
 .editorial-ad-slot-box {
-  min-height: 100px;
+  min-height: 90px;
   width: 100%;
   display: flex;
   align-items: center;
@@ -3116,62 +3116,27 @@ body.is-stage-hidden .top-weather-hub {
   overflow: hidden;
 }
 
-.editorial-ad-slot-box .adsbygoogle {
-  width: 100%;
+.editorial-ad-slot-box.editorial-ad-native-box {
   min-height: 90px;
-}
-
-/* Development placeholder when AdSense client/slot ID is not configured */
-.ad-dev-placeholder {
   width: 100%;
-  padding: 2.25rem 1.5rem;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.015);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
 }
 
-.ad-dev-placeholder.hidden {
-  display: none !important;
-}
-
-.ad-dev-badge {
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.2rem 0.65rem;
-  border-radius: 999px;
-  background: rgba(96, 165, 250, 0.12);
-  color: #60a5fa;
-  border: 1px solid rgba(96, 165, 250, 0.25);
-}
-
-.ad-dev-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.ad-dev-sub {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.4);
-  max-width: 380px;
-  line-height: 1.4;
+.editorial-ad-slot-box.editorial-ad-banner-box {
+  min-height: 250px;
+  width: 100%;
 }
 
 @media (max-width: 640px) {
   .editorial-ad-section {
-    margin: 2.5rem auto 3.5rem;
+    margin: 2.25rem auto 3rem;
     padding: 0 0.5rem;
   }
   .editorial-ad-container {
-    padding: 1.25rem 0.85rem;
+    padding: 1.15rem 0.75rem;
     border-radius: 14px;
+  }
+  .editorial-ad-slot-box.editorial-ad-banner-box {
+    min-height: 50px;
   }
 }
 
@@ -3983,11 +3948,11 @@ body.is-stage-hidden .top-weather-hub {
   margin-bottom: 14px;
 }
 
-/* Editorial AdSense Placements (About Section Only) */
+/* Editorial Adsterra Placements (About Section Only) */
 .editorial-ad-placement-wrap {
   width: 100%;
   max-width: 860px;
-  margin: 36px 0 44px;
+  margin: 36px auto 44px;
   padding: 22px 20px;
   background: rgba(12, 12, 16, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -4009,44 +3974,26 @@ body.is-stage-hidden .top-weather-hub {
 
 .editorial-ad-slot-inner {
   width: 100%;
-  min-height: 100px;
+  min-height: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
-.adsense-about-ins {
-  display: block;
-  width: 100%;
+.editorial-ad-slot-inner.editorial-ad-banner-box {
+  min-height: 250px;
 }
 
-.adsense-dev-box {
-  width: 100%;
-  min-height: 110px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 20px;
-  box-sizing: border-box;
-  text-align: center;
-}
-
-.adsense-dev-badge {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #34d399;
-  margin-bottom: 4px;
-}
-
-.adsense-dev-sub {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+@media (max-width: 640px) {
+  .editorial-ad-placement-wrap {
+    margin: 24px auto 32px;
+    padding: 16px 12px;
+    border-radius: 14px;
+  }
+  .editorial-ad-slot-inner.editorial-ad-banner-box {
+    min-height: 50px;
+  }
 }
 
 /* Contact Form Fullscreen Editorial Design */

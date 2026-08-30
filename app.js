@@ -4139,129 +4139,135 @@
   }
 
   // ============================================================
-  // GOOGLE ADSENSE INTEGRATION (ABOUT SECTION ONLY)
-  // Non-intrusive, responsive, policy-compliant lazy-loading ad engine
-  // Supports 2 separate placements in the About editorial section
+  // ADSTERRA ADVERTISING ENGINE (ABOUT PAGE ONLY)
+  // Dedicated, lightweight, mobile-friendly ad delivery
+  // Placement 1: Native Banner (76c9a991d0bae2e02df34a62c0087610)
+  // Placement 2: Desktop 300x250 (d4127e461dd80ed29176989541fb7384) / Mobile 320x50 (d92daf229dcf68e460cafced4cc7b352)
   // ============================================================
-  const AdSenseEngine = (function () {
-    let isScriptLoaded = false;
-    let isScriptLoading = false;
-
-    function getAdSenseConfig() {
-      const client = (typeof window !== 'undefined' && (
-        window.__ENV__?.ADSENSE_CLIENT_ID ||
-        window.ENV?.ADSENSE_CLIENT_ID ||
-        localStorage.getItem('odiverse_adsense_client') ||
-        ''
-      )) || '';
-
-      const slot1 = (typeof window !== 'undefined' && (
-        window.__ENV__?.ADSENSE_ABOUT_SLOT ||
-        window.ENV?.ADSENSE_ABOUT_SLOT ||
-        localStorage.getItem('odiverse_adsense_slot') ||
-        ''
-      )) || '';
-
-      const slot2 = (typeof window !== 'undefined' && (
-        window.__ENV__?.ADSENSE_ABOUT_SLOT_2 ||
-        window.ENV?.ADSENSE_ABOUT_SLOT_2 ||
-        localStorage.getItem('odiverse_adsense_slot_2') ||
-        slot1
-      )) || '';
-
-      return { client, slot1, slot2 };
-    }
+  const AdsterraEngine = (function () {
+    const activeObservers = [];
 
     function init() {
-      const config = getAdSenseConfig();
-      const isConfigured = Boolean(
-        config.client &&
-        config.client.startsWith('ca-pub-') &&
-        !config.client.includes('XXXX') &&
-        config.slot1 &&
-        !config.slot1.includes('XXXX')
-      );
-
+      // Find all About ad containers across the DOM
       const placements = document.querySelectorAll('.editorial-ad-placement-wrap');
       if (placements.length === 0) return;
 
       placements.forEach((wrap) => {
-        const placementId = wrap.getAttribute('data-ad-placement') || wrap.id;
-        const insEl = wrap.querySelector('.adsense-about-ins');
-        const slotId = placementId === '2' ? config.slot2 : config.slot1;
+        const placementId = wrap.getAttribute('data-ad-placement') || '1';
+        const isInsideModal = wrap.closest('#legal-view-modal') !== null;
 
-        if (isConfigured && slotId) {
-          wrap.classList.remove('hidden');
-          wrap.style.display = 'block';
-          if (insEl) {
-            insEl.setAttribute('data-ad-client', config.client);
-            insEl.setAttribute('data-ad-slot', slotId);
-            insEl.style.display = 'block';
+        // If inside modal, ensure it only activates for the about page
+        if (isInsideModal) {
+          const currentActive = LegalPagesEngine?.getActivePage ? LegalPagesEngine.getActivePage() : 'about';
+          if (currentActive !== 'about') {
+            wrap.style.display = 'none';
+            return;
           }
-
-          // Individual IntersectionObserver per ad placement with appropriate scroll container
-          const isInsideModal = wrap.closest('#legal-view-modal') !== null;
-          const observerRoot = isInsideModal ? (document.getElementById('legal-view-modal') || null) : null;
-
-          const observer = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) {
-                observer.disconnect();
-                loadAndPushAd(config.client);
-              }
-            });
-          }, {
-            root: observerRoot,
-            rootMargin: '300px'
-          });
-
-          observer.observe(wrap);
-        } else {
-          // When not configured with approved AdSense credentials, keep ad containers cleanly hidden
-          wrap.classList.add('hidden');
-          wrap.style.display = 'none';
-          if (insEl) insEl.style.display = 'none';
         }
+
+        wrap.style.display = 'block';
+        wrap.classList.remove('hidden');
+
+        // Lazy-load using IntersectionObserver when scrolled near
+        const observerRoot = isInsideModal ? (document.getElementById('legal-view-modal') || null) : null;
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              observer.disconnect();
+              loadPlacement(wrap, placementId);
+            }
+          });
+        }, {
+          root: observerRoot,
+          rootMargin: '250px'
+        });
+
+        observer.observe(wrap);
+        activeObservers.push(observer);
       });
     }
 
-    function loadAndPushAd(clientId) {
-      if (isScriptLoaded || document.getElementById('adsbygoogle-js')) {
-        isScriptLoaded = true;
-        try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-        } catch (e) {
-          console.warn('[AdSense] Push warning:', e);
-        }
-        return;
+    function loadPlacement(wrap, placementId) {
+      if (placementId === '1') {
+        loadNativeBanner(wrap);
+      } else if (placementId === '2') {
+        loadResponsiveBanner(wrap);
+      }
+    }
+
+    function loadNativeBanner(wrap) {
+      const slotBox = wrap.querySelector('.editorial-ad-slot-box, .editorial-ad-slot-inner') || wrap;
+      if (!slotBox) return;
+      if (slotBox.getAttribute('data-ad-loaded') === 'true') return;
+
+      // Clean any existing container id elsewhere to avoid duplicates in DOM
+      const existingContainer = document.getElementById('container-76c9a991d0bae2e02df34a62c0087610');
+      if (existingContainer && !slotBox.contains(existingContainer)) {
+        existingContainer.removeAttribute('id');
       }
 
-      if (isScriptLoading) return;
-      isScriptLoading = true;
+      let containerDiv = slotBox.querySelector('#container-76c9a991d0bae2e02df34a62c0087610');
+      if (!containerDiv) {
+        containerDiv = document.createElement('div');
+        containerDiv.id = 'container-76c9a991d0bae2e02df34a62c0087610';
+        slotBox.appendChild(containerDiv);
+      }
 
+      slotBox.setAttribute('data-ad-loaded', 'true');
+
+      // Exact Adsterra Native script injection
       const script = document.createElement('script');
-      script.id = 'adsbygoogle-js';
-      script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(clientId)}`;
       script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.onload = function () {
-        isScriptLoaded = true;
-        isScriptLoading = false;
-        try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-        } catch (e) {
-          console.warn('[AdSense] Initial push warning:', e);
-        }
+      script.setAttribute('data-cfasync', 'false');
+      script.src = 'https://pl31088916.profitableratecpmnetwork.com/76c9a991d0bae2e02df34a62c0087610/invoke.js';
+      slotBox.appendChild(script);
+    }
+
+    function loadResponsiveBanner(wrap) {
+      const slotBox = wrap.querySelector('.editorial-ad-slot-box, .editorial-ad-slot-inner') || wrap;
+      if (!slotBox) return;
+      if (slotBox.getAttribute('data-ad-loaded') === 'true') return;
+      slotBox.setAttribute('data-ad-loaded', 'true');
+
+      const isMobile = window.innerWidth < 640;
+      const key = isMobile ? 'd92daf229dcf68e460cafced4cc7b352' : 'd4127e461dd80ed29176989541fb7384';
+      const width = isMobile ? 320 : 300;
+      const height = isMobile ? 50 : 250;
+
+      // Exact Adsterra atOptions configuration in normal window context
+      window.atOptions = {
+        'key': key,
+        'format': 'iframe',
+        'height': height,
+        'width': width,
+        'params': {}
       };
-      script.onerror = function (err) {
-        isScriptLoading = false;
-        console.warn('[AdSense] Script loading error:', err);
-      };
-      document.head.appendChild(script);
+
+      // Exact Adsterra invoke.js script injection directly into page DOM
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.src = `https://www.highrevenueformat.com/${key}/invoke.js`;
+      slotBox.appendChild(script);
+    }
+
+    function cleanupModal() {
+      while (activeObservers.length > 0) {
+        const obs = activeObservers.pop();
+        try { obs.disconnect(); } catch (e) {}
+      }
+      const modal = document.getElementById('legal-view-modal');
+      if (modal) {
+        const modalSlots = modal.querySelectorAll('.editorial-ad-slot-box, .editorial-ad-slot-inner');
+        modalSlots.forEach((slot) => {
+          slot.removeAttribute('data-ad-loaded');
+          slot.innerHTML = '';
+        });
+      }
     }
 
     return {
-      init
+      init,
+      cleanupModal
     };
   })();
 
@@ -4320,17 +4326,11 @@
             </div>
           </section>
 
-          <!-- Placement 1: Google AdSense Placement 1 -->
-          <div class="editorial-ad-placement-wrap hidden" id="about-ad-section-1" data-ad-placement="1">
+          <!-- Placement 1: Adsterra Native Banner -->
+          <div class="editorial-ad-placement-wrap" id="modal-about-ad-section-1" data-ad-placement="1">
             <div class="editorial-ad-label">ADVERTISEMENT</div>
-            <div class="editorial-ad-slot-inner">
-              <ins class="adsbygoogle adsense-about-ins"
-                   id="adsense-about-ins-1"
-                   style="display:none;"
-                   data-ad-client=""
-                   data-ad-slot=""
-                   data-ad-format="auto"
-                   data-full-width-responsive="true"></ins>
+            <div class="editorial-ad-slot-inner editorial-ad-native-box" id="modal-adsterra-about-container-1">
+              <!-- Dynamically populated Adsterra Native Banner (76c9a991d0bae2e02df34a62c0087610) -->
             </div>
           </div>
 
@@ -4377,17 +4377,11 @@
             </div>
           </section>
 
-          <!-- Placement 2: Google AdSense Placement 2 -->
-          <div class="editorial-ad-placement-wrap hidden" id="about-ad-section-2" data-ad-placement="2">
+          <!-- Placement 2: Adsterra Responsive Banner (300x250 Desktop / 320x50 Mobile) -->
+          <div class="editorial-ad-placement-wrap" id="modal-about-ad-section-2" data-ad-placement="2">
             <div class="editorial-ad-label">ADVERTISEMENT</div>
-            <div class="editorial-ad-slot-inner">
-              <ins class="adsbygoogle adsense-about-ins"
-                   id="adsense-about-ins-2"
-                   style="display:none;"
-                   data-ad-client=""
-                   data-ad-slot=""
-                   data-ad-format="auto"
-                   data-full-width-responsive="true"></ins>
+            <div class="editorial-ad-slot-inner editorial-ad-banner-box" id="modal-adsterra-about-container-2">
+              <!-- Dynamically populated responsive Adsterra unit: 300x250 (Desktop) / 320x50 (Mobile) -->
             </div>
           </div>
 
@@ -4474,26 +4468,12 @@
             </div>
           </section>
 
-          <!-- Google AdSense Placement for Privacy -->
-          <div class="editorial-ad-placement-wrap hidden" id="privacy-ad-section" data-ad-placement="privacy">
-            <div class="editorial-ad-label">ADVERTISEMENT</div>
-            <div class="editorial-ad-slot-inner">
-              <ins class="adsbygoogle adsense-about-ins"
-                   id="adsense-privacy-ins"
-                   style="display:none;"
-                   data-ad-client=""
-                   data-ad-slot=""
-                   data-ad-format="auto"
-                   data-full-width-responsive="true"></ins>
-            </div>
-          </div>
-
           <section class="editorial-magazine-chapter">
             <div class="editorial-chapter-num">03</div>
-            <h2 class="editorial-chapter-title">ADVERTISING &amp; GOOGLE ADSENSE</h2>
+            <h2 class="editorial-chapter-title">THIRD-PARTY ADVERTISING</h2>
             <div class="editorial-chapter-body">
               <p>
-                GULLYGANG integrates Google AdSense exclusively in the dedicated About section to support server maintenance, while keeping the primary music player screen completely free of advertisements.
+                GULLYGANG integrates advertisements exclusively in the dedicated About section to support server maintenance, while keeping the primary music player screen completely free of advertisements.
               </p>
               <p>
                 Third-party vendors, including Google, use cookies and related tracking mechanisms to serve advertisements based on your prior visits to this website or other sites across the Internet.
@@ -4591,20 +4571,6 @@
             </div>
           </section>
 
-          <!-- Google AdSense Placement for Terms -->
-          <div class="editorial-ad-placement-wrap hidden" id="terms-ad-section" data-ad-placement="terms">
-            <div class="editorial-ad-label">ADVERTISEMENT</div>
-            <div class="editorial-ad-slot-inner">
-              <ins class="adsbygoogle adsense-about-ins"
-                   id="adsense-terms-ins"
-                   style="display:none;"
-                   data-ad-client=""
-                   data-ad-slot=""
-                   data-ad-format="auto"
-                   data-full-width-responsive="true"></ins>
-            </div>
-          </div>
-
           <section class="editorial-magazine-chapter">
             <div class="editorial-chapter-num">04</div>
             <h2 class="editorial-chapter-title">INTELLECTUAL PROPERTY</h2>
@@ -4689,27 +4655,9 @@
                   <div class="editorial-feature-item-title">Session Cache (sessionStorage)</div>
                   <div class="editorial-feature-item-desc">Temporarily holds playlist song listings for up to 10 minutes to prevent unnecessary and redundant YouTube API calls.</div>
                 </li>
-                <li class="editorial-feature-item">
-                  <div class="editorial-feature-item-title">Third-Party Advertising (Google AdSense)</div>
-                  <div class="editorial-feature-item-desc">Google AdSense utilizes cookies in the About section to serve relevant, non-intrusive advertisements and measure ad performance.</div>
-                </li>
               </ul>
             </div>
           </section>
-
-          <!-- Google AdSense Placement for Cookies -->
-          <div class="editorial-ad-placement-wrap hidden" id="cookies-ad-section" data-ad-placement="cookies">
-            <div class="editorial-ad-label">ADVERTISEMENT</div>
-            <div class="editorial-ad-slot-inner">
-              <ins class="adsbygoogle adsense-about-ins"
-                   id="adsense-cookies-ins"
-                   style="display:none;"
-                   data-ad-client=""
-                   data-ad-slot=""
-                   data-ad-format="auto"
-                   data-full-width-responsive="true"></ins>
-            </div>
-          </div>
 
           <section class="editorial-magazine-chapter">
             <div class="editorial-chapter-num">03</div>
@@ -4928,9 +4876,9 @@
         attachContactFormHandler();
       }
 
-      // Initialize Google AdSense placements for all editorial/legal pages
-      if (['about', 'privacy', 'terms', 'cookies', 'disclaimer'].includes(normalizedKey)) {
-        AdSenseEngine.init();
+      // Initialize Adsterra placements ONLY on the about page
+      if (normalizedKey === 'about') {
+        AdsterraEngine.init();
       }
 
       // Attach internal links inside legal content
@@ -4951,6 +4899,8 @@
       modal.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
       document.title = 'GULLYGANG — Music That Feels Different';
+
+      AdsterraEngine.cleanupModal();
 
       if (window.location.hash.startsWith('#/')) {
         history.replaceState(null, null, window.location.pathname + window.location.search);
@@ -5184,7 +5134,8 @@
     return {
       init,
       openPage,
-      close
+      close,
+      getActivePage: () => activePage
     };
   })();
 
@@ -5984,7 +5935,7 @@
       () => UserPlaylistEngine.init(),
       () => SupportEngine.init(),
       () => PlaylistSyncEngine.init(),
-      () => AdSenseEngine.init(),
+      () => AdsterraEngine.init(),
       () => {
         if (window.WeatherEffects && typeof window.WeatherEffects.init === 'function') {
           window.WeatherEffects.init();
