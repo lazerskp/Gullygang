@@ -1291,6 +1291,15 @@ body.is-stage-hidden .top-weather-hub {
   flex-direction: column;
   gap: 4px;
 }
+.visuals-status-state {
+  padding: 12px 10px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  user-select: none;
+}
 .visual-item-btn {
   display: flex;
   align-items: center;

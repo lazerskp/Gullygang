@@ -2953,17 +2953,7 @@
     DropdownPositioner.detachListeners();
   }
 
-  // --- Master Curated Visual Presets (Source of Truth) ---
-  const DEFAULT_VISUAL_PRESETS = [
-    { id: 'off', name: 'Default Artwork (Image)', url: '', type: 'dynamic' },
-    { id: 'midnight-drive', name: 'Midnight Drive (4K)', url: 'https://youtu.be/5WwP_7UoXgA', type: 'youtube' },
-    { id: 'neon-rain', name: 'Neon Rain Tokyo (4K)', url: 'https://youtu.be/qMkuQvM_fN8', type: 'youtube' },
-    { id: 'snowfall-sanctuary', name: 'Snowfall Sanctuary (4K)', url: 'https://youtu.be/HFMQdOJu1dA', type: 'youtube' },
-    { id: 'aurora-borealis', name: 'Northern Lights Aurora (4K)', url: 'https://youtu.be/7UvKq5w1xW0', type: 'youtube' },
-    { id: 'deep-space', name: 'Deep Space Nebula (4K)', url: 'https://youtu.be/1La4QzGeaaQ', type: 'youtube' },
-    { id: 'ocean-waves', name: 'Ocean Waves & Horizon (1080p)', url: 'https://vjs.zencdn.net/v/oceans.mp4', type: 'mp4' }
-  ];
-
+  // --- InsForge Visuals Engine (100% Database-Controlled) ---
   const VISUAL_SOUND_STORAGE_KEY = 'gullygang_visual_sound_enabled';
   const VISUAL_VOLUME_STORAGE_KEY = 'gullygang_visual_volume';
   const CACHED_VISUALS_KEY = 'gullygang_cached_visuals';
@@ -2982,7 +2972,7 @@
 
   function resolveVisualPreset(visualId, customUrl = null) {
     if (!visualId || visualId === 'off') {
-      return { id: 'off', name: 'Default Artwork (Image)', url: '', type: 'dynamic', audioCapable: false };
+      return { id: 'off', name: 'Default', url: '', type: 'dynamic', audioCapable: false };
     }
     if (visualId === 'custom') {
       const url = (customUrl || (document.getElementById('custom-visual-url')?.value || '')).trim();
@@ -2996,8 +2986,8 @@
       };
     }
 
-    const currentPresets = Array.isArray(state.visuals) && state.visuals.length > 0 ? state.visuals : DEFAULT_VISUAL_PRESETS;
-    const found = currentPresets.find(p => p.id === visualId) || DEFAULT_VISUAL_PRESETS.find(p => p.id === visualId);
+    const currentPresets = Array.isArray(state.visuals) ? state.visuals : [];
+    const found = currentPresets.find(p => p.id === visualId);
     if (found) {
       const ytId = extractYouTubeVideoId(found.url);
       return {
@@ -3005,12 +2995,11 @@
         name: found.name,
         url: found.url || '',
         type: found.type || (ytId ? 'youtube' : found.url ? 'mp4' : 'dynamic'),
-        audioCapable: found.id !== 'off' && !!found.url
+        audioCapable: !!found.url
       };
     }
 
-    console.warn('[Visuals] Preset not found by ID:', visualId, 'falling back safely.');
-    return { id: 'off', name: 'Default Artwork (Image)', url: '', type: 'dynamic', audioCapable: false };
+    return { id: 'off', name: 'Default', url: '', type: 'dynamic', audioCapable: false };
   }
 
   function initBgYouTubePlayerIfPending() {
@@ -3193,7 +3182,7 @@
           soundIcon.innerHTML = '<path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"></path>';
         } else {
           // High (2 waves)
-          soundIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path>';
+          soundIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77z"></path>';
         }
       } else {
         // Muted
@@ -3239,11 +3228,12 @@
     });
   }
 
-  // --- InsForge Cloud Visuals Sync with SWR ---
+  // --- InsForge Cloud Visuals Sync (100% Database-Controlled) ---
   async function loadInsForgeVisuals(isBackgroundSync = false) {
     let cloudVisuals = null;
+    let fetchFailed = false;
 
-    // 1. Synchronous Cache Check
+    // 1. Instant Cache Hydration: Render cached InsForge visuals in 0ms
     if (!state.visuals || state.visuals.length === 0) {
       try {
         const cached = localStorage.getItem(CACHED_VISUALS_KEY);
@@ -3251,68 +3241,75 @@
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
             state.visuals = parsed;
+            state.visualsLoading = false;
             renderVisualsOptions();
           }
         }
       } catch (e) {}
     }
 
-    // 2. Fetch from dedicated 'visuals' database table
+    // 2. Fetch active records from InsForge database 'visuals' table (display_order asc)
     try {
       const res = await insforgeFetch('/api/database/records/visuals?is_active=eq.true&order=display_order.asc');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           cloudVisuals = data;
         }
+      } else {
+        fetchFailed = true;
       }
-    } catch (e) {}
-
-    // 3. Fetch from 'site_settings' (background_visuals key) if needed
-    if (!cloudVisuals) {
-      try {
-        const res = await insforgeFetch('/api/database/records/site_settings?key=eq.background_visuals');
-        if (res.ok) {
-          const rows = await res.json();
-          if (Array.isArray(rows) && rows.length > 0 && rows[0].value) {
-            const parsed = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              cloudVisuals = parsed;
-            }
-          }
-        }
-      } catch (e) {}
+    } catch (e) {
+      console.warn('[Visuals] InsForge visuals sync notice:', e.message);
+      fetchFailed = true;
     }
 
-    // Normalized Master Merge: Preserves ALL default presets and adds cloud presets
-    let mergedList = [...DEFAULT_VISUAL_PRESETS];
-
-    if (cloudVisuals && cloudVisuals.length > 0) {
-      cloudVisuals.forEach((cv, idx) => {
-        const url = (cv.url || '').trim();
-        if (url && !mergedList.some(p => p.id === cv.id || (p.url && p.url === url))) {
+    // 3. Normalize active records
+    if (cloudVisuals) {
+      const normalized = [];
+      cloudVisuals.forEach(item => {
+        const url = (item.url || '').trim();
+        // Strict security: ensure URL is safe and non-empty
+        if (item.is_active !== false && url && isSafeUrl(url)) {
           const ytId = extractYouTubeVideoId(url);
-          mergedList.push({
-            id: cv.id || `cloud-${idx}`,
-            name: cv.name || 'Visual Scene',
+          normalized.push({
+            id: item.id,
+            name: item.name || 'Visual Scene',
             url: url,
             type: ytId ? 'youtube' : 'mp4',
-            audioCapable: true
+            audioCapable: true,
+            displayOrder: item.display_order !== undefined ? item.display_order : 0
           });
         }
       });
-    }
 
-    try {
-      localStorage.setItem(CACHED_VISUALS_KEY, JSON.stringify(mergedList));
-    } catch (e) {}
+      state.visuals = normalized;
+      state.visualsLoading = false;
+      state.visualsError = false;
 
-    state.visuals = mergedList;
-    renderVisualsOptions();
+      try {
+        localStorage.setItem(CACHED_VISUALS_KEY, JSON.stringify(normalized));
+      } catch (e) {}
 
-    // Re-sync UI state without resetting to 'off'
-    if (state.currentVisual) {
-      setVisual(state.currentVisual, null, false);
+      renderVisualsOptions();
+
+      // Validate currently active visual against updated active InsForge records
+      if (state.currentVisual && state.currentVisual !== 'off' && state.currentVisual !== 'custom') {
+        const stillActive = normalized.find(p => p.id === state.currentVisual);
+        if (stillActive) {
+          setVisual(state.currentVisual, null, false);
+        } else {
+          // Preset was deleted or deactivated in InsForge: safely clear and fallback to artwork
+          try { localStorage.removeItem('odiverse_bg_visual'); } catch (e) {}
+          setVisual('off', null, false);
+        }
+      }
+    } else if (fetchFailed) {
+      state.visualsLoading = false;
+      if (!state.visuals || state.visuals.length === 0) {
+        state.visualsError = true;
+        renderVisualsOptions();
+      }
     }
   }
 
@@ -3320,8 +3317,22 @@
     const optionsList = document.getElementById('visuals-options-list');
     if (!optionsList) return;
 
-    const list = Array.isArray(state.visuals) && state.visuals.length > 0 ? state.visuals : DEFAULT_VISUAL_PRESETS;
-    optionsList.innerHTML = list.map(vp => {
+    if (state.visualsLoading && (!state.visuals || state.visuals.length === 0)) {
+      optionsList.innerHTML = '<div class="visuals-status-state">Loading visuals...</div>';
+      return;
+    }
+
+    if (state.visualsError && (!state.visuals || state.visuals.length === 0)) {
+      optionsList.innerHTML = '<div class="visuals-status-state">Visuals temporarily unavailable</div>';
+      return;
+    }
+
+    if (!state.visuals || state.visuals.length === 0) {
+      optionsList.innerHTML = '<div class="visuals-status-state">No visuals available</div>';
+      return;
+    }
+
+    optionsList.innerHTML = state.visuals.map(vp => {
       const safeId = escapeHTML(String(vp.id));
       const safeName = escapeHTML(String(vp.name));
       const isActive = state.currentVisual === vp.id;
@@ -3347,6 +3358,22 @@
 
     if (!bgVideo) return;
 
+    state.visuals = [];
+    state.visualsLoading = true;
+    state.visualsError = false;
+
+    // Instant Synchronous Cache Hydration
+    try {
+      const cached = localStorage.getItem(CACHED_VISUALS_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          state.visuals = parsed;
+          state.visualsLoading = false;
+        }
+      }
+    } catch (e) {}
+
     // Restore saved visual sound preference (Default: false / Muted) & Volume (Default: 0.7)
     try {
       state.visualSoundEnabled = localStorage.getItem(VISUAL_SOUND_STORAGE_KEY) === 'true';
@@ -3368,7 +3395,11 @@
       const itemBtn = e.target.closest('.visual-item-btn');
       if (itemBtn) {
         const visualId = itemBtn.getAttribute('data-visual-id');
-        setVisual(visualId);
+        if (state.currentVisual === visualId) {
+          setVisual('off');
+        } else {
+          setVisual(visualId);
+        }
         closeAllDropdowns();
       }
     });
@@ -3454,6 +3485,14 @@
       if (customInput && savedCustomUrl) customInput.value = savedCustomUrl;
     } catch (e) {}
 
+    // Check if saved visual exists in active visuals
+    if (savedVisual !== 'off' && savedVisual !== 'custom') {
+      const exists = state.visuals.find(p => p.id === savedVisual);
+      if (!exists && !state.visualsLoading) {
+        savedVisual = 'off';
+      }
+    }
+
     setVisual(savedVisual, savedCustomUrl, false);
     updateVisualSoundUI();
   }
@@ -3464,7 +3503,11 @@
 
     state.currentVisual = preset.id;
     if (persist) {
-      try { localStorage.setItem('odiverse_bg_visual', preset.id); } catch (e) {}
+      if (preset.id === 'off') {
+        try { localStorage.removeItem('odiverse_bg_visual'); } catch (e) {}
+      } else {
+        try { localStorage.setItem('odiverse_bg_visual', preset.id); } catch (e) {}
+      }
       if (preset.id === 'custom' && preset.url) {
         try { localStorage.setItem('odiverse_custom_visual_url', preset.url); } catch (e) {}
       }
