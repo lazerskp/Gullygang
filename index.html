@@ -477,42 +477,38 @@
                   </div>
                   <span class="visuals-active-tag" id="visuals-active-counter">Default</span>
                 </div>
+
+                <!-- TOP Visual Audio Control (Matches Main Music Player Volume Language) -->
+                <div class="visuals-sound-top-bar" id="visuals-sound-utility-row">
+                  <button type="button" id="btn-toggle-visual-sound" class="visuals-vol-btn" aria-label="Toggle visual sound" aria-pressed="false" title="Turn visual sound on">
+                    <svg id="visuals-sound-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                      <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"></path>
+                    </svg>
+                  </button>
+                  <input
+                    type="range"
+                    id="visuals-vol-slider"
+                    class="visuals-vol-slider"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value="0.7"
+                    aria-label="Visual background volume"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="70"
+                  />
+                  <span class="visuals-vol-percent" id="visuals-sound-percent">70%</span>
+                </div>
+
                 <div class="visuals-options-list" id="visuals-options-list"></div>
+
                 <!-- Custom URL input -->
                 <div class="visuals-custom-input-box">
                   <span class="custom-input-label">Custom Video URL (YouTube or MP4)</span>
                   <div class="custom-input-row">
                     <input type="url" id="custom-visual-url" class="custom-visual-input" placeholder="Paste YouTube link or MP4 URL..." />
                     <button type="button" id="btn-apply-custom-visual" class="custom-visual-apply-btn">Set</button>
-                  </div>
-                </div>
-                <!-- Dedicated Visual Audio Utility Row (Compact Speaker + Volume Slider) -->
-                <div class="visuals-sound-utility-row" id="visuals-sound-utility-row">
-                  <div class="visuals-sound-main-row">
-                    <button type="button" id="btn-toggle-visual-sound" class="visuals-sound-icon-btn" aria-label="Toggle visual sound" aria-pressed="false" title="Turn visual sound on">
-                      <svg class="visuals-sound-icon" id="visuals-sound-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                        <line x1="23" y1="9" x2="17" y2="15"></line>
-                        <line x1="17" y1="9" x2="23" y2="15"></line>
-                      </svg>
-                    </button>
-                    <span class="visuals-sound-label">VISUAL SOUND</span>
-                    <span class="visuals-sound-percent" id="visuals-sound-percent">OFF</span>
-                  </div>
-                  <div class="visuals-volume-slider-wrap" id="visuals-volume-slider-wrap">
-                    <input
-                      type="range"
-                      id="visuals-vol-slider"
-                      class="visuals-vol-slider"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value="0.7"
-                      aria-label="Visual background volume"
-                      aria-valuemin="0"
-                      aria-valuemax="100"
-                      aria-valuenow="70"
-                    />
                   </div>
                 </div>
               </div>

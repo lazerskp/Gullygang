@@ -1388,148 +1388,160 @@ body.is-stage-hidden .top-weather-hub {
   border-color: rgba(255, 255, 255, 0.32);
 }
 
-/* Visual Audio Utility Row (Compact Speaker + Volume Slider) */
-.visuals-sound-utility-row {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  transition: opacity 0.2s ease;
-}
-
-.visuals-sound-main-row {
+/* ============================================================
+   TOP VISUAL AUDIO CONTROL (Matches Main Music Player Language)
+   ============================================================ */
+.visuals-sound-top-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-}
-
-.visuals-sound-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.65);
-  cursor: pointer;
-  outline: none;
+  padding: 6px 10px;
+  margin: 6px 0 10px 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.visuals-sound-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
+.visuals-sound-top-bar:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
-.visuals-sound-icon-btn:focus-visible {
+.visuals-sound-top-bar.is-active {
+  background: rgba(74, 222, 128, 0.06);
+  border-color: rgba(74, 222, 128, 0.22);
+}
+
+.visuals-vol-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  outline: none;
+  flex-shrink: 0;
+  padding: 0;
+  transition: color 0.25s ease, transform 0.2s ease, filter 0.25s ease;
+}
+
+.visuals-vol-btn:hover {
+  color: rgba(255, 255, 255, 0.95);
+  transform: scale(1.08);
+}
+
+.visuals-vol-btn:focus-visible {
   outline: 2px solid rgba(74, 222, 128, 0.6);
   outline-offset: 1px;
 }
 
-.visuals-sound-icon-btn[aria-pressed="true"] {
-  background: rgba(74, 222, 128, 0.14);
-  border-color: rgba(74, 222, 128, 0.35);
-  color: #4ade80;
-}
-
-.visuals-sound-icon {
-  flex-shrink: 0;
-  transition: color 0.2s ease;
-}
-
-.visuals-sound-label {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
-  flex: 1;
-  user-select: none;
-  transition: color 0.2s ease;
-}
-
-.visuals-sound-utility-row.is-active .visuals-sound-label {
-  color: rgba(255, 255, 255, 0.95);
-}
-
-.visuals-sound-percent {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.5);
-  min-width: 32px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  transition: color 0.2s ease;
-}
-
-.visuals-sound-utility-row.is-active .visuals-sound-percent {
-  color: #4ade80;
-}
-
-.visuals-volume-slider-wrap {
-  width: 100%;
-  display: flex;
-  align-items: center;
+.visuals-sound-top-bar.is-active .visuals-vol-btn,
+.visuals-vol-btn[aria-pressed="true"] {
+  color: #4ade80 !important;
+  filter: drop-shadow(0 0 6px rgba(74, 222, 128, 0.5));
 }
 
 .visuals-vol-slider {
   -webkit-appearance: none;
   appearance: none;
-  width: 100%;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.15);
+  background: transparent;
   outline: none;
   cursor: pointer;
+  height: 16px;
+  flex: 1;
+  min-width: 60px;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+}
+
+.visuals-vol-slider::-webkit-slider-runnable-track {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  height: 2.5px;
+  border: none;
+  transition: background 0.2s ease;
+}
+
+.visuals-sound-top-bar.is-active .visuals-vol-slider::-webkit-slider-runnable-track {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.visuals-vol-slider::-moz-range-track {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  height: 2.5px;
+  border: none;
   transition: background 0.2s ease;
 }
 
 .visuals-vol-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 12px;
-  height: 12px;
+  background: #ffffff;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.75);
-  cursor: pointer;
+  width: 10px;
+  height: 10px;
+  margin-top: -3.75px;
+  border: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .visuals-vol-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
+  transform: scale(1.25);
   background: #ffffff;
 }
 
-.visuals-sound-utility-row.is-active .visuals-vol-slider::-webkit-slider-thumb {
+.visuals-sound-top-bar.is-active .visuals-vol-slider::-webkit-slider-thumb {
   background: #4ade80;
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);
 }
 
 .visuals-vol-slider::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
+  background: #ffffff;
   border-radius: 50%;
+  width: 10px;
+  height: 10px;
   border: none;
-  background: rgba(255, 255, 255, 0.75);
-  cursor: pointer;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
 }
 
-.visuals-sound-utility-row.is-disabled {
+.visuals-sound-top-bar.is-active .visuals-vol-slider::-moz-range-thumb {
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);
+}
+
+.visuals-vol-percent {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.65);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.visuals-sound-top-bar.is-active .visuals-vol-percent {
+  color: #4ade80;
+}
+
+.visuals-sound-top-bar.is-disabled {
   opacity: 0.38;
   pointer-events: none;
 }
 
-.visuals-sound-utility-row.is-disabled .visuals-sound-icon-btn,
-.visuals-sound-utility-row.is-disabled .visuals-vol-slider {
+.visuals-sound-top-bar.is-disabled .visuals-vol-btn,
+.visuals-sound-top-bar.is-disabled .visuals-vol-slider {
   cursor: not-allowed;
 }
 
