@@ -1388,6 +1388,128 @@ body.is-stage-hidden .top-weather-hub {
   border-color: rgba(255, 255, 255, 0.32);
 }
 
+/* Visual Audio Utility Row */
+.visuals-sound-utility-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: opacity 0.2s ease;
+}
+
+.visuals-sound-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  user-select: none;
+}
+
+.visuals-sound-icon {
+  color: rgba(255, 255, 255, 0.55);
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+.visuals-sound-utility-row.is-active .visuals-sound-icon {
+  color: #4ade80;
+}
+
+.visuals-sound-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  transition: color 0.2s ease;
+}
+
+.visuals-sound-utility-row.is-active .visuals-sound-label {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.visuals-sound-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3.5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.visuals-sound-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.visuals-sound-toggle-btn:focus-visible {
+  outline: 2px solid rgba(74, 222, 128, 0.6);
+  outline-offset: 1px;
+}
+
+.visuals-sound-status-text {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  min-width: 22px;
+  text-align: right;
+}
+
+.visuals-sound-switch-pill {
+  width: 24px;
+  height: 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  display: flex;
+  align-items: center;
+  padding: 1.5px;
+  transition: background 0.2s ease;
+  position: relative;
+}
+
+.visuals-sound-switch-thumb {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease;
+  transform: translateX(0);
+}
+
+.visuals-sound-toggle-btn[aria-pressed="true"] {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #4ade80;
+}
+
+.visuals-sound-toggle-btn[aria-pressed="true"] .visuals-sound-switch-pill {
+  background: #4ade80;
+}
+
+.visuals-sound-toggle-btn[aria-pressed="true"] .visuals-sound-switch-thumb {
+  transform: translateX(11px);
+  background: #000000;
+}
+
+.visuals-sound-utility-row.is-disabled {
+  opacity: 0.38;
+  pointer-events: none;
+}
+
+.visuals-sound-utility-row.is-disabled .visuals-sound-toggle-btn {
+  cursor: not-allowed;
+}
+
 /* Playlist Dropdown Sync Action Button */
 .playlist-sync-btn {
   display: flex;
