@@ -1022,13 +1022,22 @@ body.is-stage-hidden .top-weather-hub {
   opacity: 0;
   transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), background 0.6s ease;
 }
-.weather-ambient-overlay.ambient-rain.is-active {
+.weather-ambient-overlay.ambient-rain.is-active,
+.weather-ambient-overlay.ambient-heavy-rain.is-active {
   opacity: 1;
   background: radial-gradient(circle at 50% 30%, rgba(8, 14, 24, 0.32) 0%, rgba(2, 4, 10, 0.52) 100%);
+}
+.weather-ambient-overlay.ambient-storm.is-active {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 30%, rgba(5, 8, 18, 0.45) 0%, rgba(1, 2, 8, 0.70) 100%);
 }
 .weather-ambient-overlay.ambient-snow.is-active {
   opacity: 1;
   background: radial-gradient(circle at 50% 30%, rgba(220, 235, 255, 0.05) 0%, rgba(10, 18, 30, 0.25) 100%);
+}
+.weather-ambient-overlay.ambient-blizzard.is-active {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 30%, rgba(200, 225, 255, 0.08) 0%, rgba(8, 16, 28, 0.38) 100%);
 }
 
 /* ============================================================
@@ -1494,7 +1503,7 @@ body.is-stage-hidden .top-weather-hub {
   overflow: hidden;
   opacity: 0;
   transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 0;
+  z-index: 1;
   pointer-events: none;
 }
 .bg-yt-layer.is-active {
