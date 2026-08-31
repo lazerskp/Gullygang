@@ -5078,6 +5078,14 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
 
+      document.getElementById('footer-link-features')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        const featuresEl = document.getElementById('features');
+        if (featuresEl) {
+          featuresEl.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+
       document.getElementById('footer-link-playlists')?.addEventListener('click', (e) => {
         e.preventDefault();
         window.scrollTo({ top: 0, behavior: 'smooth' });
