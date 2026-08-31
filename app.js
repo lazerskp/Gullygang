@@ -4318,7 +4318,7 @@
             <h2 class="editorial-chapter-title">THE IDEA</h2>
             <div class="editorial-chapter-body">
               <p>
-                GULLYGANG is a digital listening sanctuary designed around music, atmosphere, and cultural discovery. Born from a reverence for melody, it unites generations of timeless cinema duets, soulful devotional hymns, modern romantic hits, and midnight highway acoustics inside a fluid, living canvas.
+                GULLYGANG is a global music discovery and immersive listening platform designed around music, atmosphere, and artists. Bringing together hip-hop, rap, love, chill, pop, lo-fi and curated playlists from India and around the world inside a fluid, living canvas.
               </p>
               <p>
                 Rather than treating music as a sterile list of files, GULLYGANG transforms every listening session into an ambient sanctuary that breathes in sync with your local weather and visual mood.
@@ -4345,7 +4345,7 @@
               <ul class="editorial-feature-list">
                 <li class="editorial-feature-item">
                   <div class="editorial-feature-item-title">Curated Playlist Discovery</div>
-                  <div class="editorial-feature-item-desc">Handcrafted broadcast stations spanning golden 90s cinema duets, sacred morning bhajans, and soothing acoustic highway lofi.</div>
+                  <div class="editorial-feature-item-desc">Curated playlists and radio channels spanning rap, hip-hop, love, chill, lo-fi, pop, and underground artist discoveries.</div>
                 </li>
                 <li class="editorial-feature-item">
                   <div class="editorial-feature-item-title">Fluid Continuous Audio Player</div>
@@ -4391,7 +4391,7 @@
             <h2 class="editorial-chapter-title">SUPPORT GULLYGANG</h2>
             <div class="editorial-chapter-body">
               <p>
-                GULLYGANG is independently maintained to keep cultural and independent music freely accessible to listeners worldwide.
+                GULLYGANG is independently maintained to keep music discovery freely accessible to listeners worldwide.
               </p>
               <div class="editorial-support-showcase">
                 <span class="editorial-support-badge">COMMUNITY SUPPORT</span>
