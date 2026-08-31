@@ -2956,14 +2956,16 @@
   // --- Dynamic InsForge Cloud Visuals Engine ---
   const DEFAULT_VISUAL_PRESETS = [
     { id: 'off', name: 'Default Artwork (Image)', url: '' },
-    { id: 'snow-4k', name: '4K Snowflakes Loop', url: 'https://youtu.be/HFMQdOJu1dA' },
-    { id: 'lofi-drive', name: 'Lofi Night Drive', url: 'https://youtu.be/5WwP_7UoXgA' },
-    { id: 'ocean', name: 'Ocean Waves & Horizon', url: 'https://vjs.zencdn.net/v/oceans.mp4' },
-    { id: 'ambient', name: 'Ambient Motion Flow', url: 'https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/face-demographics-walking-and-pause.mp4' },
-    { id: 'nature', name: 'Nature & Sunset Bloom', url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4' }
+    { id: 'midnight-drive', name: 'Midnight Drive (4K)', url: 'https://youtu.be/5WwP_7UoXgA' },
+    { id: 'neon-rain', name: 'Neon Rain Tokyo (4K)', url: 'https://youtu.be/qMkuQvM_fN8' },
+    { id: 'snowfall-sanctuary', name: 'Snowfall Sanctuary (4K)', url: 'https://youtu.be/HFMQdOJu1dA' },
+    { id: 'ocean-waves', name: 'Ocean Waves & Horizon (1080p)', url: 'https://vjs.zencdn.net/v/oceans.mp4' },
+    { id: 'aurora-borealis', name: 'Northern Lights Aurora (4K)', url: 'https://youtu.be/7UvKq5w1xW0' },
+    { id: 'deep-space', name: 'Deep Space Nebula (4K)', url: 'https://youtu.be/1La4QzGeaaQ' }
   ];
 
   const VISUAL_SOUND_STORAGE_KEY = 'gullygang_visual_sound_enabled';
+  const VISUAL_VOLUME_STORAGE_KEY = 'gullygang_visual_volume';
 
   let bgYtPlayer = null;
   let bgYtReady = false;
@@ -2983,10 +2985,10 @@
         const bgYtContainer = document.getElementById('bg-yt-container');
         if (bgYtContainer && state.currentVisual && state.currentVisual !== 'off') {
           bgYtContainer.classList.add('is-active');
-          if (state.visualSoundEnabled && bgYtPlayer && typeof bgYtPlayer.unMute === 'function') {
+          if (state.visualSoundEnabled && state.visualVolume > 0 && bgYtPlayer && typeof bgYtPlayer.unMute === 'function') {
             try {
               bgYtPlayer.unMute();
-              bgYtPlayer.setVolume(100);
+              bgYtPlayer.setVolume(Math.round(state.visualVolume * 100));
             } catch (e) {}
           }
         }
@@ -3004,10 +3006,10 @@
           videoId: ytId,
           startSeconds: 0
         });
-        if (state.visualSoundEnabled) {
+        if (state.visualSoundEnabled && state.visualVolume > 0) {
           try {
             bgYtPlayer.unMute();
-            bgYtPlayer.setVolume(100);
+            bgYtPlayer.setVolume(Math.round(state.visualVolume * 100));
           } catch (e) {}
         } else {
           bgYtPlayer.mute();
@@ -3032,7 +3034,7 @@
             host: 'https://www.youtube-nocookie.com',
             playerVars: {
               autoplay: 1,
-              mute: state.visualSoundEnabled ? 0 : 1,
+              mute: state.visualSoundEnabled && state.visualVolume > 0 ? 0 : 1,
               loop: 1,
               playlist: ytId,
               controls: 0,
@@ -3049,10 +3051,10 @@
             events: {
               onReady: (event) => {
                 bgYtReady = true;
-                if (state.visualSoundEnabled) {
+                if (state.visualSoundEnabled && state.visualVolume > 0) {
                   try {
                     event.target.unMute();
-                    event.target.setVolume(100);
+                    event.target.setVolume(Math.round(state.visualVolume * 100));
                   } catch (e) {}
                 } else {
                   event.target.mute();
@@ -3079,25 +3081,40 @@
     }
   }
 
+  function updateSliderTrack(sliderEl, value, isActive) {
+    if (!sliderEl) return;
+    const pct = Math.round(value * 100);
+    const activeColor = isActive ? '#4ade80' : 'rgba(255, 255, 255, 0.45)';
+    sliderEl.style.background = `linear-gradient(to right, ${activeColor} 0%, ${activeColor} ${pct}%, rgba(255, 255, 255, 0.12) ${pct}%, rgba(255, 255, 255, 0.12) 100%)`;
+  }
+
   function updateVisualSoundUI() {
     const soundRow = document.getElementById('visuals-sound-utility-row');
     const soundBtn = document.getElementById('btn-toggle-visual-sound');
-    const soundText = document.getElementById('visuals-sound-status-text');
+    const soundPercent = document.getElementById('visuals-sound-percent');
     const soundIcon = document.getElementById('visuals-sound-icon');
-    if (!soundBtn || !soundText) return;
+    const volSlider = document.getElementById('visuals-vol-slider');
+    if (!soundBtn || !soundPercent) return;
 
     const isAudioCapable = state.currentVisual && state.currentVisual !== 'off';
 
     if (soundRow) {
       soundRow.classList.toggle('is-disabled', !isAudioCapable);
-      soundRow.classList.toggle('is-active', isAudioCapable && state.visualSoundEnabled);
+      soundRow.classList.toggle('is-active', isAudioCapable && state.visualSoundEnabled && state.visualVolume > 0);
+    }
+
+    if (volSlider) {
+      volSlider.disabled = !isAudioCapable;
+      volSlider.value = String(state.visualVolume !== undefined ? state.visualVolume : 0.7);
+      volSlider.setAttribute('aria-valuenow', String(Math.round((state.visualVolume || 0) * 100)));
+      updateSliderTrack(volSlider, state.visualVolume || 0, isAudioCapable && state.visualSoundEnabled && state.visualVolume > 0);
     }
 
     if (!isAudioCapable) {
       soundBtn.setAttribute('aria-pressed', 'false');
       soundBtn.setAttribute('aria-disabled', 'true');
       soundBtn.setAttribute('title', 'Sound unavailable for static artwork');
-      soundText.textContent = 'N/A';
+      soundPercent.textContent = 'N/A';
       if (soundIcon) {
         soundIcon.innerHTML = `
           <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
@@ -3109,18 +3126,29 @@
     }
 
     soundBtn.removeAttribute('aria-disabled');
-    soundBtn.setAttribute('aria-pressed', state.visualSoundEnabled ? 'true' : 'false');
-    soundBtn.setAttribute('title', state.visualSoundEnabled ? 'Turn visual sound off' : 'Turn visual sound on');
-    soundText.textContent = state.visualSoundEnabled ? 'ON' : 'OFF';
+    const isAudible = state.visualSoundEnabled && state.visualVolume > 0;
+    soundBtn.setAttribute('aria-pressed', isAudible ? 'true' : 'false');
+    soundBtn.setAttribute('title', isAudible ? 'Turn visual sound off' : 'Turn visual sound on');
+    soundPercent.textContent = isAudible ? `${Math.round(state.visualVolume * 100)}%` : 'OFF';
 
     if (soundIcon) {
-      if (state.visualSoundEnabled) {
-        soundIcon.innerHTML = `
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-        `;
+      if (isAudible) {
+        if (state.visualVolume <= 0.5) {
+          // Low/medium (1 wave)
+          soundIcon.innerHTML = `
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          `;
+        } else {
+          // High (2 waves)
+          soundIcon.innerHTML = `
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          `;
+        }
       } else {
+        // Muted
         soundIcon.innerHTML = `
           <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
           <line x1="23" y1="9" x2="17" y2="15"></line>
@@ -3130,11 +3158,48 @@
     }
   }
 
+  function setVisualVolume(vol, persist = true) {
+    const clamped = Math.max(0, Math.min(1, parseFloat(vol) || 0));
+    state.visualVolume = clamped;
+    if (persist) {
+      try {
+        localStorage.setItem(VISUAL_VOLUME_STORAGE_KEY, String(clamped));
+      } catch (e) {}
+    }
+
+    const bgVideo = document.getElementById('bg-video');
+    const bgYtContainer = document.getElementById('bg-yt-container');
+
+    if (clamped === 0) {
+      if (bgVideo) bgVideo.muted = true;
+      if (bgYtPlayer && typeof bgYtPlayer.mute === 'function') bgYtPlayer.mute();
+    } else if (state.visualSoundEnabled) {
+      if (bgVideo && bgVideo.classList.contains('is-active')) {
+        bgVideo.muted = false;
+        bgVideo.volume = clamped;
+      }
+      if (bgYtPlayer && bgYtContainer && bgYtContainer.classList.contains('is-active')) {
+        try {
+          if (typeof bgYtPlayer.unMute === 'function') bgYtPlayer.unMute();
+          if (typeof bgYtPlayer.setVolume === 'function') bgYtPlayer.setVolume(Math.round(clamped * 100));
+        } catch (e) {}
+      }
+    }
+
+    updateVisualSoundUI();
+  }
+
   function applyVisualSound(enable, persist = true) {
     state.visualSoundEnabled = !!enable;
+    if (state.visualSoundEnabled && (state.visualVolume === 0 || isNaN(state.visualVolume))) {
+      state.visualVolume = 0.7;
+    }
     if (persist) {
       try {
         localStorage.setItem(VISUAL_SOUND_STORAGE_KEY, state.visualSoundEnabled ? 'true' : 'false');
+        if (state.visualSoundEnabled) {
+          localStorage.setItem(VISUAL_VOLUME_STORAGE_KEY, String(state.visualVolume));
+        }
       } catch (e) {}
     }
 
@@ -3143,8 +3208,9 @@
 
     // HTML5 Video
     if (bgVideo && bgVideo.classList.contains('is-active')) {
-      if (state.visualSoundEnabled) {
+      if (state.visualSoundEnabled && state.visualVolume > 0) {
         bgVideo.muted = false;
+        bgVideo.volume = state.visualVolume;
         const playPromise = bgVideo.play();
         if (playPromise && typeof playPromise.catch === 'function') {
           playPromise.catch(err => {
@@ -3161,10 +3227,10 @@
     // YouTube Video
     if (bgYtPlayer && bgYtContainer && bgYtContainer.classList.contains('is-active')) {
       try {
-        if (state.visualSoundEnabled) {
+        if (state.visualSoundEnabled && state.visualVolume > 0) {
           if (typeof bgYtPlayer.unMute === 'function') {
             bgYtPlayer.unMute();
-            bgYtPlayer.setVolume(100);
+            bgYtPlayer.setVolume(Math.round(state.visualVolume * 100));
           }
         } else {
           if (typeof bgYtPlayer.mute === 'function') {
@@ -3180,6 +3246,7 @@
 
     trackEvent('visual_sound_toggled', {
       sound_enabled: state.visualSoundEnabled,
+      visual_volume: state.visualVolume,
       active_visual: state.currentVisual
     });
   }
@@ -3289,6 +3356,7 @@
     const btnApplyCustom = document.getElementById('btn-apply-custom-visual');
     const optionsList = document.getElementById('visuals-options-list');
     const btnToggleSound = document.getElementById('btn-toggle-visual-sound');
+    const volSlider = document.getElementById('visuals-vol-slider');
 
     if (!bgVideo) return;
 
@@ -3305,11 +3373,18 @@
       } catch (e) {}
     }
 
-    // Restore saved visual sound preference (Default: false / Muted)
+    // Restore saved visual sound preference (Default: false / Muted) & Volume (Default: 0.7)
     try {
       state.visualSoundEnabled = localStorage.getItem(VISUAL_SOUND_STORAGE_KEY) === 'true';
+      const storedVol = parseFloat(localStorage.getItem(VISUAL_VOLUME_STORAGE_KEY));
+      if (!isNaN(storedVol) && storedVol >= 0 && storedVol <= 1) {
+        state.visualVolume = storedVol;
+      } else {
+        state.visualVolume = 0.7;
+      }
     } catch (e) {
       state.visualSoundEnabled = false;
+      state.visualVolume = 0.7;
     }
 
     renderVisualsOptions();
@@ -3349,7 +3424,25 @@
     btnToggleSound?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!state.currentVisual || state.currentVisual === 'off') return;
+      if (!state.visualSoundEnabled && (state.visualVolume === 0 || isNaN(state.visualVolume))) {
+        state.visualVolume = 0.7;
+      }
       applyVisualSound(!state.visualSoundEnabled, true);
+    });
+
+    // Visual Volume Slider Handlers
+    volSlider?.addEventListener('input', (e) => {
+      e.stopPropagation();
+      const val = parseFloat(e.target.value);
+      setVisualVolume(val, true);
+      // Auto-enable if dragging above 0 while previously muted
+      if (val > 0 && !state.visualSoundEnabled) {
+        applyVisualSound(true, true);
+      }
+    });
+
+    volSlider?.addEventListener('click', (e) => {
+      e.stopPropagation();
     });
 
     // Visuals Dropdown Toggle
@@ -3493,10 +3586,10 @@
       }
       ensureBgYouTubePlayer(ytId, () => {
         if (bgYtContainer) bgYtContainer.classList.add('is-active');
-        if (state.visualSoundEnabled && bgYtPlayer && typeof bgYtPlayer.unMute === 'function') {
+        if (state.visualSoundEnabled && state.visualVolume > 0 && bgYtPlayer && typeof bgYtPlayer.unMute === 'function') {
           try {
             bgYtPlayer.unMute();
-            bgYtPlayer.setVolume(100);
+            bgYtPlayer.setVolume(Math.round(state.visualVolume * 100));
           } catch (e) {}
         }
       });
@@ -3518,7 +3611,8 @@
           bgVideo.src = targetRawUrl;
           bgVideo.load();
         }
-        bgVideo.muted = !state.visualSoundEnabled;
+        bgVideo.muted = !state.visualSoundEnabled || state.visualVolume === 0;
+        bgVideo.volume = state.visualVolume !== undefined ? state.visualVolume : 0.7;
         bgVideo.play().catch(e => {
           if (state.visualSoundEnabled) {
             bgVideo.muted = true;
