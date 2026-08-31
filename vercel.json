@@ -1,6 +1,13 @@
 {
   "outputDirectory": ".",
+  "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/top-10-rappers-in-india",
+      "destination": "/top-10-rappers-in-india.html"
+    }
+  ],
   "redirects": [
     {
       "source": "/:path*",
