@@ -4954,6 +4954,91 @@
   })();
 
   // ============================================================
+  // AUTHORITATIVE DAY / NIGHT THEME ENGINE
+  // ============================================================
+  const ThemeEngine = (function () {
+    const STORAGE_KEY = 'gullygang_theme';
+
+    function getPreferredTheme() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored === 'light' || stored === 'dark') return stored;
+      } catch (e) {}
+      return 'dark';
+    }
+
+    function applyTheme(theme, persist = true) {
+      const normalized = theme === 'light' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', normalized);
+      document.documentElement.classList.toggle('light-theme', normalized === 'light');
+      document.documentElement.classList.toggle('dark-theme', normalized === 'dark');
+
+      if (persist) {
+        try {
+          localStorage.setItem(STORAGE_KEY, normalized);
+        } catch (e) {}
+      }
+
+      updateToggleButtons(normalized);
+    }
+
+    function updateToggleButtons(theme) {
+      const toggleBtns = document.querySelectorAll('#btn-theme-toggle, .btn-theme-toggle');
+      toggleBtns.forEach((btn) => {
+        const sunIcon = btn.querySelector('.theme-icon-sun');
+        const moonIcon = btn.querySelector('.theme-icon-moon');
+        if (theme === 'light') {
+          sunIcon?.classList.add('hidden');
+          moonIcon?.classList.remove('hidden');
+          btn.setAttribute('aria-label', 'Switch to Dark theme');
+          btn.setAttribute('title', 'Switch to Dark theme');
+        } else {
+          sunIcon?.classList.remove('hidden');
+          moonIcon?.classList.add('hidden');
+          btn.setAttribute('aria-label', 'Switch to Light theme');
+          btn.setAttribute('title', 'Switch to Light theme');
+        }
+      });
+    }
+
+    function toggle() {
+      const current = document.documentElement.getAttribute('data-theme') || getPreferredTheme();
+      const newTheme = current === 'light' ? 'dark' : 'light';
+      applyTheme(newTheme, true);
+    }
+
+    function init() {
+      const activeTheme = document.documentElement.getAttribute('data-theme') || getPreferredTheme();
+      applyTheme(activeTheme, false);
+
+      if (!window.__gullygang_theme_delegation_attached) {
+        window.__gullygang_theme_delegation_attached = true;
+        document.addEventListener('click', (e) => {
+          const btn = e.target.closest('#btn-theme-toggle, .btn-theme-toggle');
+          if (btn) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggle();
+          }
+        });
+      }
+    }
+
+    const engine = {
+      init,
+      toggle,
+      applyTheme,
+      getTheme: () => document.documentElement.getAttribute('data-theme') || getPreferredTheme()
+    };
+
+    if (typeof window !== 'undefined') {
+      window.ThemeEngine = engine;
+    }
+
+    return engine;
+  })();
+
+  // ============================================================
   // CENTRALIZED CINEMATIC EDITORIAL SPA ROUTING ENGINE
   // Apple Music / Spotify Editorial Magazine Fullscreen Experience
   // ============================================================
@@ -6754,11 +6839,13 @@
         initPremium3DTilt();
       }
 
+      ThemeEngine.init();
       LegalPagesEngine.init();
       UserPlaylistEngine.init();
       SupportEngine.init();
       PlaylistSyncEngine.init();
       PlaylistPreviewEngine.init();
+      AdsterraEngine.init();
       initScrollReveal();
     }
 
@@ -6925,6 +7012,7 @@
       () => SupportEngine.init(),
       () => PlaylistSyncEngine.init(),
       () => PlaylistPreviewEngine.init(),
+      () => ThemeEngine.init(),
       () => AdsterraEngine.init(),
       () => {
         if (window.WeatherEffects && typeof window.WeatherEffects.init === 'function') {

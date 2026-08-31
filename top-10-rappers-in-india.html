@@ -4,7 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#050507" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="color-scheme" content="dark light" />
+
+  <!-- Immediate Theme Hydration (Prevents Flash of Unstyled Theme) -->
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('gullygang_theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        } else {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   <!-- Primary SEO Meta Tags -->
   <title>Top 10 Rappers in India (2026) | GULLYGANG</title>
@@ -237,14 +251,46 @@
           <span>GULLYGANG</span>
         </a>
 
-      <nav class="article-nav-links" aria-label="Quick site navigation">
-        <a href="/" class="article-nav-link">Home</a>
-        <a href="/#features" class="article-nav-link">Features</a>
-        <a href="/#stations" class="article-nav-link">Stations</a>
-        <a href="/#visuals" class="article-nav-link">Visuals</a>
-      </nav>
-    </div>
-  </header>
+        <nav class="article-nav-links" aria-label="Quick site navigation">
+          <a href="/" class="article-nav-link">Home</a>
+          <a href="/blog" class="article-nav-link">Blog</a>
+          <a href="/top-10-rappers-in-india" class="article-nav-link text-[#34d399]">Top 10 Rappers in India</a>
+          <a href="/#about" class="article-nav-link">About</a>
+        </nav>
+
+        <div class="article-nav-actions flex items-center gap-2">
+          <!-- Current Playlist Queue Preview Button -->
+          <button type="button" id="btn-playlist-preview" class="theme-toggle-btn" aria-label="Current Playlist Queue" title="Playlist Queue" aria-expanded="false" aria-controls="playlist-preview-panel">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="8" y1="6" x2="21" y2="6"></line>
+              <line x1="8" y1="12" x2="21" y2="12"></line>
+              <line x1="8" y1="18" x2="21" y2="18"></line>
+              <line x1="3" y1="6" x2="3.01" y2="6"></line>
+              <line x1="3" y1="12" x2="3.01" y2="12"></line>
+              <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+          </button>
+
+          <!-- Day / Night Theme Toggle -->
+          <button type="button" id="btn-theme-toggle" class="theme-toggle-btn" aria-label="Toggle Light/Dark Theme" title="Toggle Theme">
+            <svg class="theme-icon-sun" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2"></path>
+              <path d="M12 20v2"></path>
+              <path d="m4.93 4.93 1.41 1.41"></path>
+              <path d="m17.66 17.66 1.41 1.41"></path>
+              <path d="M2 12h2"></path>
+              <path d="M20 12h2"></path>
+              <path d="m6.34 17.66-1.41 1.41"></path>
+              <path d="m19.07 4.93-1.41 1.41"></path>
+            </svg>
+            <svg class="theme-icon-moon hidden" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
 
   <!-- Main Article Content Container -->
   <main class="article-container">
@@ -916,8 +962,9 @@
             <span class="footer-nav-heading">DISCOVER</span>
             <ul class="footer-nav-list">
               <li><a href="/" class="footer-nav-link">Home Player</a></li>
-              <li><a href="/#features" class="footer-nav-link">Features</a></li>
+              <li><a href="/blog" class="footer-nav-link">Blog</a></li>
               <li><a href="/top-10-rappers-in-india" class="footer-nav-link text-[#34d399]">Top 10 Rappers in India</a></li>
+              <li><a href="/#features" class="footer-nav-link">Features</a></li>
               <li><a href="/#stations" class="footer-nav-link">Stations</a></li>
               <li><a href="/#visuals" class="footer-nav-link">Visuals</a></li>
             </ul>

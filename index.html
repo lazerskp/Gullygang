@@ -4,7 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0a0a0a" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="color-scheme" content="dark light" />
+
+  <!-- Immediate Theme Hydration (Prevents Flash of Unstyled Theme) -->
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('gullygang_theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        } else {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   <!-- Production Security Headers with PostHog Whitelist -->
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
@@ -267,6 +281,33 @@
           </div>
 
           <div class="top-header-controls-row flex items-center gap-2">
+            <!-- Blog Editorial Link -->
+            <a href="/blog" class="header-support-pill" title="GULLYGANG Blog" aria-label="GULLYGANG Blog">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
+              <span class="support-pill-text">Blog</span>
+            </a>
+
+            <!-- Day / Night Theme Toggle -->
+            <button type="button" id="btn-theme-toggle" class="theme-toggle-btn" aria-label="Toggle Light/Dark Theme" title="Toggle Theme">
+              <svg class="theme-icon-sun" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="4"></circle>
+                <path d="M12 2v2"></path>
+                <path d="M12 20v2"></path>
+                <path d="m4.93 4.93 1.41 1.41"></path>
+                <path d="m17.66 17.66 1.41 1.41"></path>
+                <path d="M2 12h2"></path>
+                <path d="M20 12h2"></path>
+                <path d="m6.34 17.66-1.41 1.41"></path>
+                <path d="m19.07 4.93-1.41 1.41"></path>
+              </svg>
+              <svg class="theme-icon-moon hidden" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+              </svg>
+            </button>
+
             <!-- Support GULLYGANG Topbar Button (Icon-only on mobile, Pill on desktop) -->
             <button type="button" id="btn-support-header" class="header-support-pill" title="Support GULLYGANG" aria-label="Support GULLYGANG">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="support-heart-icon" aria-hidden="true">
@@ -1579,8 +1620,9 @@
             <span class="footer-nav-heading">DISCOVER</span>
             <ul class="footer-nav-list">
               <li><a href="#" class="footer-nav-link" id="footer-link-home">Home</a></li>
-              <li><a href="#features" class="footer-nav-link" id="footer-link-features">Features</a></li>
+              <li><a href="/blog" class="footer-nav-link" id="footer-link-blog">Blog</a></li>
               <li><a href="/top-10-rappers-in-india" class="footer-nav-link" id="footer-link-top-rappers">Top 10 Rappers in India</a></li>
+              <li><a href="#features" class="footer-nav-link" id="footer-link-features">Features</a></li>
               <li><a href="#stations" class="footer-nav-link" id="footer-link-playlists">Playlists</a></li>
               <li><a href="#stations" class="footer-nav-link" id="footer-link-stations">Stations</a></li>
               <li><a href="#visuals" class="footer-nav-link" id="footer-link-visuals">Visuals</a></li>

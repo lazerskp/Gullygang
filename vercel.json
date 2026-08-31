@@ -4,6 +4,10 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/blog",
+      "destination": "/blog.html"
+    },
+    {
       "source": "/top-10-rappers-in-india",
       "destination": "/top-10-rappers-in-india.html"
     }
