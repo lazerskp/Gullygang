@@ -1289,6 +1289,25 @@ body.is-stage-hidden .top-weather-hub {
 .visuals-options-list {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+.visuals-group-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.visuals-group-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 3px 4px 1px 4px;
+  user-select: none;
+}
+.visuals-subgroup-list {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 .visuals-status-state {

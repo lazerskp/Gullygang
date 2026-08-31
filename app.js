@@ -2953,7 +2953,7 @@
     DropdownPositioner.detachListeners();
   }
 
-  // --- InsForge Visuals Engine (100% Database-Controlled) ---
+  // --- InsForge Visuals Engine (Database-Controlled + Dedicated Default Artwork) ---
   const VISUAL_SOUND_STORAGE_KEY = 'gullygang_visual_sound_enabled';
   const VISUAL_VOLUME_STORAGE_KEY = 'gullygang_visual_volume';
   const CACHED_VISUALS_KEY = 'gullygang_cached_visuals';
@@ -2972,7 +2972,7 @@
 
   function resolveVisualPreset(visualId, customUrl = null) {
     if (!visualId || visualId === 'off') {
-      return { id: 'off', name: 'Default', url: '', type: 'dynamic', audioCapable: false };
+      return { id: 'off', name: 'Default Artwork', url: '', type: 'dynamic', audioCapable: false };
     }
     if (visualId === 'custom') {
       const url = (customUrl || (document.getElementById('custom-visual-url')?.value || '')).trim();
@@ -2999,34 +2999,31 @@
       };
     }
 
-    return { id: 'off', name: 'Default', url: '', type: 'dynamic', audioCapable: false };
+    return { id: 'off', name: 'Default Artwork', url: '', type: 'dynamic', audioCapable: false };
   }
 
   function initBgYouTubePlayerIfPending() {
     if (pendingBgYtId) {
-      ensureBgYouTubePlayer(pendingBgYtId, () => {
-        const bgYtContainer = document.getElementById('bg-yt-container');
-        if (bgYtContainer && state.currentVisual && state.currentVisual !== 'off') {
-          bgYtContainer.classList.add('is-active');
-          applyVisualSoundToActiveMedia();
-        }
-      });
+      ensureBgYouTubePlayer(pendingBgYtId, state.visualGeneration);
     }
   }
 
-  function ensureBgYouTubePlayer(ytId, onReadyCallback) {
+  function ensureBgYouTubePlayer(ytId, generation) {
     if (!ytId) return;
     pendingBgYtId = ytId;
 
     if (bgYtPlayer && typeof bgYtPlayer.loadVideoById === 'function') {
       try {
+        // Enforce immediate mute prior to loading new video
+        if (typeof bgYtPlayer.mute === 'function') bgYtPlayer.mute();
         bgYtPlayer.loadVideoById({
           videoId: ytId,
           startSeconds: 0
         });
-        applyVisualSoundToActiveMedia();
         bgYtPlayer.playVideo();
-        if (onReadyCallback) onReadyCallback();
+        if (generation === state.visualGeneration) {
+          applyVisualAudioState();
+        }
         return;
       } catch (e) {
         console.warn('[Visuals] Failed to reuse YouTube player, re-initializing...', e);
@@ -3046,7 +3043,7 @@
             videoId: ytId,
             playerVars: {
               autoplay: 1,
-              mute: state.visualSoundEnabled && state.visualVolume > 0 ? 0 : 1,
+              mute: 1, // HARD INVARIANT: Always initialize player in muted mode!
               loop: 1,
               playlist: ytId,
               controls: 0,
@@ -3063,13 +3060,21 @@
             events: {
               onReady: (event) => {
                 bgYtReady = true;
-                applyVisualSoundToActiveMedia();
                 event.target.playVideo();
-                if (onReadyCallback) onReadyCallback();
+                if (generation === state.visualGeneration && state.currentVisual && state.currentVisual !== 'off') {
+                  applyVisualAudioState();
+                } else {
+                  try { event.target.mute(); } catch (e) {}
+                }
               },
               onStateChange: (event) => {
                 if (event.data === 0) {
                   event.target.playVideo();
+                }
+                if (generation === state.visualGeneration && state.currentVisual && state.currentVisual !== 'off') {
+                  applyVisualAudioState();
+                } else {
+                  try { event.target.mute(); } catch (e) {}
                 }
               },
               onError: (err) => {
@@ -3093,46 +3098,59 @@
     sliderEl.style.background = `linear-gradient(to right, ${activeColor} 0%, ${activeColor} ${pct}%, rgba(255, 255, 255, 0.15) ${pct}%, rgba(255, 255, 255, 0.15) 100%)`;
   }
 
-  function applyVisualSoundToActiveMedia() {
+  // --- Authoritative Centralized Audio Controller ---
+  function applyVisualAudioState() {
     const isAudioCapable = state.currentVisual && state.currentVisual !== 'off';
     const bgVideo = document.getElementById('bg-video');
     const bgYtContainer = document.getElementById('bg-yt-container');
 
-    if (!isAudioCapable) {
-      if (bgVideo) bgVideo.muted = true;
-      if (bgYtPlayer && typeof bgYtPlayer.mute === 'function') {
-        try { bgYtPlayer.mute(); } catch (e) {}
+    // HARD INVARIANT: When visualSoundEnabled === false OR Default Artwork OR volume === 0:
+    // ALL background visual audio sources MUST BE completely silent and muted!
+    if (!isAudioCapable || !state.visualSoundEnabled || state.visualVolume <= 0) {
+      if (bgVideo) {
+        bgVideo.muted = true;
+        bgVideo.volume = 0;
+      }
+      if (bgYtPlayer) {
+        try {
+          if (typeof bgYtPlayer.mute === 'function') bgYtPlayer.mute();
+          if (typeof bgYtPlayer.setVolume === 'function') bgYtPlayer.setVolume(0);
+        } catch (e) {}
       }
       return;
     }
 
-    if (state.visualSoundEnabled && state.visualVolume > 0) {
-      // Unmute & Volume
-      if (bgVideo && bgVideo.classList.contains('is-active')) {
-        bgVideo.muted = false;
-        bgVideo.volume = state.visualVolume;
-        const playPromise = bgVideo.play();
-        if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch(() => {
-            bgVideo.muted = true;
-            bgVideo.play().catch(() => {});
-          });
-        }
+    // When visualSoundEnabled === true and volume > 0 on audio-capable active visual:
+    const targetVol = Math.max(0, Math.min(1, state.visualVolume));
+    const ytVol = Math.round(targetVol * 100);
+
+    // Apply to HTML5 Video if active
+    if (bgVideo && bgVideo.classList.contains('is-active')) {
+      bgVideo.volume = targetVol;
+      bgVideo.muted = false;
+      const playPromise = bgVideo.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          bgVideo.muted = true;
+          bgVideo.play().catch(() => {});
+        });
       }
-      if (bgYtPlayer && bgYtContainer && bgYtContainer.classList.contains('is-active')) {
-        try {
-          if (typeof bgYtPlayer.unMute === 'function') bgYtPlayer.unMute();
-          if (typeof bgYtPlayer.setVolume === 'function') bgYtPlayer.setVolume(Math.round(state.visualVolume * 100));
-        } catch (e) {}
-      }
-    } else {
-      // Mute
-      if (bgVideo) bgVideo.muted = true;
-      if (bgYtPlayer) {
-        try {
-          if (typeof bgYtPlayer.mute === 'function') bgYtPlayer.mute();
-        } catch (e) {}
-      }
+    } else if (bgVideo) {
+      bgVideo.muted = true;
+      bgVideo.volume = 0;
+    }
+
+    // Apply to YouTube if active
+    if (bgYtPlayer && bgYtContainer && bgYtContainer.classList.contains('is-active')) {
+      try {
+        if (typeof bgYtPlayer.unMute === 'function') bgYtPlayer.unMute();
+        if (typeof bgYtPlayer.setVolume === 'function') bgYtPlayer.setVolume(ytVol);
+      } catch (e) {}
+    } else if (bgYtPlayer) {
+      try {
+        if (typeof bgYtPlayer.mute === 'function') bgYtPlayer.mute();
+        if (typeof bgYtPlayer.setVolume === 'function') bgYtPlayer.setVolume(0);
+      } catch (e) {}
     }
   }
 
@@ -3200,7 +3218,7 @@
       } catch (e) {}
     }
 
-    applyVisualSoundToActiveMedia();
+    applyVisualAudioState();
     updateVisualSoundUI();
   }
 
@@ -3218,7 +3236,7 @@
       } catch (e) {}
     }
 
-    applyVisualSoundToActiveMedia();
+    applyVisualAudioState();
     updateVisualSoundUI();
 
     trackEvent('visual_sound_toggled', {
@@ -3269,7 +3287,6 @@
       const normalized = [];
       cloudVisuals.forEach(item => {
         const url = (item.url || '').trim();
-        // Strict security: ensure URL is safe and non-empty
         if (item.is_active !== false && url && isSafeUrl(url)) {
           const ytId = extractYouTubeVideoId(url);
           normalized.push({
@@ -3299,7 +3316,6 @@
         if (stillActive) {
           setVisual(state.currentVisual, null, false);
         } else {
-          // Preset was deleted or deactivated in InsForge: safely clear and fallback to artwork
           try { localStorage.removeItem('odiverse_bg_visual'); } catch (e) {}
           setVisual('off', null, false);
         }
@@ -3317,32 +3333,44 @@
     const optionsList = document.getElementById('visuals-options-list');
     if (!optionsList) return;
 
+    const isDefaultActive = !state.currentVisual || state.currentVisual === 'off';
+
+    let insforgeSectionHtml = '';
     if (state.visualsLoading && (!state.visuals || state.visuals.length === 0)) {
-      optionsList.innerHTML = '<div class="visuals-status-state">Loading visuals...</div>';
-      return;
+      insforgeSectionHtml = '<div class="visuals-status-state">Loading visuals...</div>';
+    } else if (state.visualsError && (!state.visuals || state.visuals.length === 0)) {
+      insforgeSectionHtml = '<div class="visuals-status-state">Visuals temporarily unavailable</div>';
+    } else if (!state.visuals || state.visuals.length === 0) {
+      insforgeSectionHtml = '<div class="visuals-status-state">No visuals available</div>';
+    } else {
+      insforgeSectionHtml = state.visuals.map(vp => {
+        const safeId = escapeHTML(String(vp.id));
+        const safeName = escapeHTML(String(vp.name));
+        const isActive = state.currentVisual === vp.id;
+        return `
+          <button type="button" class="visual-item-btn ${isActive ? 'is-active' : ''}" data-visual-id="${safeId}">
+            <span class="visual-item-title">${safeName}</span>
+            <span class="visual-item-check">${svgIcon('<path d="M20 6 9 17l-5-5" />', 11)}</span>
+          </button>
+        `;
+      }).join('');
     }
 
-    if (state.visualsError && (!state.visuals || state.visuals.length === 0)) {
-      optionsList.innerHTML = '<div class="visuals-status-state">Visuals temporarily unavailable</div>';
-      return;
-    }
-
-    if (!state.visuals || state.visuals.length === 0) {
-      optionsList.innerHTML = '<div class="visuals-status-state">No visuals available</div>';
-      return;
-    }
-
-    optionsList.innerHTML = state.visuals.map(vp => {
-      const safeId = escapeHTML(String(vp.id));
-      const safeName = escapeHTML(String(vp.name));
-      const isActive = state.currentVisual === vp.id;
-      return `
-        <button type="button" class="visual-item-btn ${isActive ? 'is-active' : ''}" data-visual-id="${safeId}">
-          <span class="visual-item-title">${safeName}</span>
+    optionsList.innerHTML = `
+      <div class="visuals-group-section">
+        <span class="visuals-group-label">Default</span>
+        <button type="button" class="visual-item-btn ${isDefaultActive ? 'is-active' : ''}" data-visual-id="off">
+          <span class="visual-item-title">Default Artwork</span>
           <span class="visual-item-check">${svgIcon('<path d="M20 6 9 17l-5-5" />', 11)}</span>
         </button>
-      `;
-    }).join('');
+      </div>
+      <div class="visuals-group-section">
+        <span class="visuals-group-label">InsForge Visuals</span>
+        <div class="visuals-subgroup-list">
+          ${insforgeSectionHtml}
+        </div>
+      </div>
+    `;
   }
 
   function initVisualsSystem() {
@@ -3361,6 +3389,7 @@
     state.visuals = [];
     state.visualsLoading = true;
     state.visualsError = false;
+    state.visualGeneration = 0;
 
     // Instant Synchronous Cache Hydration
     try {
@@ -3395,11 +3424,7 @@
       const itemBtn = e.target.closest('.visual-item-btn');
       if (itemBtn) {
         const visualId = itemBtn.getAttribute('data-visual-id');
-        if (state.currentVisual === visualId) {
-          setVisual('off');
-        } else {
-          setVisual(visualId);
-        }
+        setVisual(visualId);
         closeAllDropdowns();
       }
     });
@@ -3498,6 +3523,7 @@
   }
 
   function setVisual(visualId, customUrl = null, persist = true) {
+    const currentGen = ++state.visualGeneration;
     const preset = resolveVisualPreset(visualId, customUrl);
     if (!preset) return;
 
@@ -3541,72 +3567,62 @@
       visual_type: preset.type
     });
 
-    // Layer Execution State Machine
+    // --- STEP 1 & 2: Immediate Silence and Inactive Media Pause ---
+    if (bgVideo) {
+      bgVideo.muted = true;
+      bgVideo.volume = 0;
+      bgVideo.classList.remove('is-active');
+      if (preset.type !== 'mp4') {
+        bgVideo.pause();
+        bgVideo.removeAttribute('src');
+      }
+    }
+    if (bgYtPlayer) {
+      try {
+        if (typeof bgYtPlayer.mute === 'function') bgYtPlayer.mute();
+        if (typeof bgYtPlayer.setVolume === 'function') bgYtPlayer.setVolume(0);
+        if (preset.type !== 'youtube' && typeof bgYtPlayer.pauseVideo === 'function') {
+          bgYtPlayer.pauseVideo();
+        }
+      } catch (e) {}
+    }
+    if (bgYtContainer && preset.type !== 'youtube') {
+      bgYtContainer.classList.remove('is-active');
+    }
+
+    // --- STEP 3 & 4: Load and Activate Selected Media Layer ---
     if (isOff) {
       pendingBgYtId = null;
-      if (bgVideo) {
-        bgVideo.classList.remove('is-active');
-        bgVideo.pause();
-        bgVideo.muted = true;
-        bgVideo.removeAttribute('src');
-      }
-      if (bgYtContainer) {
-        bgYtContainer.classList.remove('is-active');
-        if (bgYtPlayer && typeof bgYtPlayer.pauseVideo === 'function') {
-          bgYtPlayer.pauseVideo();
-        }
-        if (bgYtPlayer && typeof bgYtPlayer.mute === 'function') {
-          bgYtPlayer.mute();
-        }
-      }
       if (dynamicArtworkBg) dynamicArtworkBg.style.opacity = '1';
+      applyVisualAudioState();
     } else if (preset.type === 'youtube') {
       const ytId = extractYouTubeVideoId(preset.url);
-      if (bgVideo) {
-        bgVideo.classList.remove('is-active');
-        bgVideo.pause();
-        bgVideo.muted = true;
-        bgVideo.removeAttribute('src');
-      }
-      if (ytId) {
-        ensureBgYouTubePlayer(ytId, () => {
-          if (bgYtContainer) bgYtContainer.classList.add('is-active');
-          applyVisualSoundToActiveMedia();
-        });
-      }
       if (bgYtContainer) bgYtContainer.classList.add('is-active');
       if (dynamicArtworkBg) dynamicArtworkBg.style.opacity = '0.35';
+      if (ytId) {
+        ensureBgYouTubePlayer(ytId, currentGen);
+      }
     } else if (preset.type === 'mp4') {
       pendingBgYtId = null;
-      if (bgYtContainer) {
-        bgYtContainer.classList.remove('is-active');
-        if (bgYtPlayer && typeof bgYtPlayer.pauseVideo === 'function') {
-          bgYtPlayer.pauseVideo();
-        }
-        if (bgYtPlayer && typeof bgYtPlayer.mute === 'function') {
-          bgYtPlayer.mute();
-        }
-      }
       if (bgVideo) {
+        bgVideo.classList.add('is-active');
         if (bgVideo.src !== preset.url) {
           bgVideo.src = preset.url;
           bgVideo.load();
         }
-        bgVideo.muted = !state.visualSoundEnabled || state.visualVolume === 0;
-        bgVideo.volume = state.visualVolume !== undefined ? state.visualVolume : 0.7;
+        applyVisualAudioState();
         bgVideo.play().catch(() => {
-          if (state.visualSoundEnabled) {
-            bgVideo.muted = true;
-            bgVideo.play().catch(() => {});
-          }
+          // Autoplay fallback: retry muted
+          bgVideo.muted = true;
+          bgVideo.play().catch(() => {});
         });
-        bgVideo.classList.add('is-active');
       }
       if (dynamicArtworkBg) dynamicArtworkBg.style.opacity = '0.35';
     }
 
     updateVisualSoundUI();
   }
+
 
   function initDropdownHandlers() {
     // Weather Effects Dropdown Toggle
