@@ -959,6 +959,39 @@
   </div> <!-- /#app-router-view -->
 
   <!-- ============================================================
+       CURRENT PLAYLIST PREVIEW PANEL (Desktop Floating / Mobile Bottom Sheet)
+       ============================================================ -->
+  <div id="playlist-preview-backdrop" class="playlist-preview-backdrop hidden" aria-hidden="true"></div>
+  <div id="playlist-preview-panel" class="playlist-preview-panel hidden" role="dialog" aria-modal="true" aria-label="Current Playlist Preview" aria-hidden="true">
+    <!-- Mobile Drag Handle -->
+    <div class="playlist-preview-drag-bar" aria-hidden="true"></div>
+
+    <!-- Header -->
+    <div class="playlist-preview-header">
+      <div class="playlist-preview-title-group">
+        <span class="playlist-preview-eyebrow">CURRENT PLAYLIST</span>
+        <div class="playlist-preview-heading-row">
+          <h3 id="playlist-preview-title" class="playlist-preview-title">GullyGang Special</h3>
+          <span id="playlist-preview-badge" class="playlist-preview-badge">-- SONGS</span>
+        </div>
+      </div>
+      <button type="button" id="btn-close-playlist-preview" class="playlist-preview-close-btn" aria-label="Close playlist preview">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Scrollable Songs List -->
+    <div class="playlist-preview-list-wrap" id="playlist-preview-list-wrap">
+      <ul class="playlist-preview-list" id="playlist-preview-list" role="listbox" aria-label="Songs in active playlist">
+        <!-- Dynamically rendered song rows -->
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============================================================
        CINEMATIC EDITORIAL LEGAL & INFORMATIONAL EXPERIENCE
        Apple Music / Spotify Editorial Magazine Fullscreen Overlay
        ============================================================ -->

@@ -707,12 +707,22 @@
               <!-- Desktop Right Controls (Repeat / Shuffle / Volume) -->
               <div class="player-right-controls desktop-only-flex" id="player-right-controls">
                 <div class="player-sub-actions" id="sub-actions-group">
-                  <button type="button" id="btn-shuffle" class="player-sub-btn" aria-label="Toggle shuffle mode">
+                  <button type="button" id="btn-playlist-preview" class="player-sub-btn" aria-label="Current Playlist Queue" title="Playlist Queue" aria-expanded="false" aria-controls="playlist-preview-panel">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                  </button>
+                  <button type="button" id="btn-shuffle" class="player-sub-btn" aria-label="Toggle shuffle mode" title="Shuffle">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="M16 3h5v5"></path><path d="M4 20 21 3"></path><path d="M21 16v5h-5"></path><path d="m15 15 6 6"></path><path d="M4 4l5 5"></path>
                     </svg>
                   </button>
-                  <button type="button" id="btn-repeat" class="player-sub-btn" aria-label="Toggle repeat mode">
+                  <button type="button" id="btn-repeat" class="player-sub-btn" aria-label="Toggle repeat mode" title="Repeat">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="m17 1 4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="m7 23-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
                     </svg>
@@ -728,8 +738,18 @@
                 </div>
               </div>
 
-              <!-- Mobile Controls Bar (Shuffle | Prev | Play | Next | Repeat) -->
+              <!-- Mobile Controls Bar (Queue | Shuffle | Prev | Play | Next | Repeat) -->
               <div class="mobile-controls-bar">
+                <button type="button" id="btn-playlist-preview-mobile" class="player-sub-btn" aria-label="Current Playlist Queue" aria-expanded="false" aria-controls="playlist-preview-panel">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                  </svg>
+                </button>
                 <button type="button" id="btn-shuffle-mobile" class="player-sub-btn" aria-label="Toggle shuffle mode">
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M16 3h5v5"></path><path d="M4 20 21 3"></path><path d="M21 16v5h-5"></path><path d="m15 15 6 6"></path><path d="M4 4l5 5"></path>
@@ -1263,6 +1283,39 @@
     </div>
 
   </main>
+
+  <!-- ============================================================
+       CURRENT PLAYLIST PREVIEW PANEL (Desktop Floating / Mobile Bottom Sheet)
+       ============================================================ -->
+  <div id="playlist-preview-backdrop" class="playlist-preview-backdrop hidden" aria-hidden="true"></div>
+  <div id="playlist-preview-panel" class="playlist-preview-panel hidden" role="dialog" aria-modal="true" aria-label="Current Playlist Preview" aria-hidden="true">
+    <!-- Mobile Drag Handle -->
+    <div class="playlist-preview-drag-bar" aria-hidden="true"></div>
+
+    <!-- Header -->
+    <div class="playlist-preview-header">
+      <div class="playlist-preview-title-group">
+        <span class="playlist-preview-eyebrow">CURRENT PLAYLIST</span>
+        <div class="playlist-preview-heading-row">
+          <h3 id="playlist-preview-title" class="playlist-preview-title">GullyGang Special</h3>
+          <span id="playlist-preview-badge" class="playlist-preview-badge">-- SONGS</span>
+        </div>
+      </div>
+      <button type="button" id="btn-close-playlist-preview" class="playlist-preview-close-btn" aria-label="Close playlist preview">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Scrollable Songs List -->
+    <div class="playlist-preview-list-wrap" id="playlist-preview-list-wrap">
+      <ul class="playlist-preview-list" id="playlist-preview-list" role="listbox" aria-label="Songs in active playlist">
+        <!-- Dynamically rendered song rows -->
+      </ul>
+    </div>
+  </div>
 
   <!-- ============================================================
        DEDICATED LEGAL & INFORMATIONAL SPA PAGES CONTAINER
