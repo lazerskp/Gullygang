@@ -81,6 +81,25 @@
     }
   ];
 
+  // Authoritative Music State Storage Keys
+  const MUSIC_PLAYLIST_STORAGE_KEY = 'gullygang_current_playlist_id';
+  const MUSIC_TRACK_STORAGE_KEY = 'gullygang_current_track_index';
+  const MUSIC_VOLUME_STORAGE_KEY = 'gullygang_player_volume';
+  const MUSIC_SHUFFLE_STORAGE_KEY = 'gullygang_shuffle_enabled';
+  const MUSIC_REPEAT_STORAGE_KEY = 'gullygang_repeat_mode';
+
+  let initialVol = 1;
+  let initialShuffle = false;
+  let initialRepeat = 'all';
+  try {
+    const sVol = parseFloat(localStorage.getItem(MUSIC_VOLUME_STORAGE_KEY));
+    if (!isNaN(sVol) && sVol >= 0 && sVol <= 1) initialVol = sVol;
+    const sShuff = localStorage.getItem(MUSIC_SHUFFLE_STORAGE_KEY);
+    if (sShuff !== null) initialShuffle = sShuff === 'true';
+    const sRep = localStorage.getItem(MUSIC_REPEAT_STORAGE_KEY);
+    if (sRep) initialRepeat = sRep;
+  } catch (e) {}
+
   // Global State
   const state = {
     playlists: [DEFAULT_SEED_PLAYLIST],
@@ -88,9 +107,9 @@
     tracks: DEFAULT_SEED_TRACKS,
     currentIndex: 0,
     isPlaying: false,
-    isShuffle: false,
-    repeatMode: 'all',
-    volume: 1,
+    isShuffle: initialShuffle,
+    repeatMode: initialRepeat,
+    volume: initialVol,
     isMuted: false,
     ytPlayer: null,
     isPlayerReady: false,
@@ -99,6 +118,18 @@
     isSeeking: false,
     isVolSliderOpen: false
   };
+
+  function persistMusicState() {
+    try {
+      if (state.currentPlaylist && state.currentPlaylist.id) {
+        localStorage.setItem(MUSIC_PLAYLIST_STORAGE_KEY, String(state.currentPlaylist.id));
+      }
+      localStorage.setItem(MUSIC_TRACK_STORAGE_KEY, String(state.currentIndex || 0));
+      localStorage.setItem(MUSIC_VOLUME_STORAGE_KEY, String(state.volume !== undefined ? state.volume : 1));
+      localStorage.setItem(MUSIC_SHUFFLE_STORAGE_KEY, state.isShuffle ? 'true' : 'false');
+      localStorage.setItem(MUSIC_REPEAT_STORAGE_KEY, state.repeatMode || 'all');
+    } catch (e) {}
+  }
 
   // DOM Elements
   const DOM = {
@@ -1079,7 +1110,9 @@
             state.playlists = parsed;
             renderPlaylistMenus();
             if (!state.currentPlaylist) {
-              selectPlaylist(parsed[0]);
+              const savedPlaylistId = localStorage.getItem(MUSIC_PLAYLIST_STORAGE_KEY);
+              const matched = savedPlaylistId ? parsed.find(p => String(p.id) === String(savedPlaylistId)) : null;
+              selectPlaylist(matched || parsed[0]);
             }
           }
         }
@@ -1220,6 +1253,7 @@
 
   async function selectPlaylist(playlist, isInitialBootHydration = false) {
     state.currentPlaylist = playlist;
+    persistMusicState();
     updatePlaylistLabels(playlist.name, playlist.icon);
 
     trackEvent('playlist_selected', {
@@ -2262,6 +2296,7 @@
 
     const prevIndex = state.currentIndex;
     state.currentIndex = targetIndex;
+    persistMusicState();
 
     // Maintain shuffle history stack
     if (state.isShuffle && isManualUserAction) {
@@ -2771,6 +2806,7 @@
       shuffleHistory.push(state.currentIndex);
       shuffleHistoryIndex = 0;
     }
+    persistMusicState();
   }
 
   function toggleRepeat() {
@@ -2789,6 +2825,7 @@
       mobBtn.classList.toggle('is-active', isActive);
       mobBtn.setAttribute('title', `Repeat: ${state.repeatMode}`);
     }
+    persistMusicState();
   }
 
   function toggleFullscreen() {
@@ -4157,6 +4194,7 @@
       if (DOM.volIcon) DOM.volIcon.style.color = volColor;
       const mobVolIcon = document.getElementById('vol-icon-mobile');
       if (mobVolIcon) mobVolIcon.style.color = volColor;
+      persistMusicState();
     });
 
     // Volume Slider Mobile
@@ -4175,6 +4213,7 @@
       if (DOM.volIcon) DOM.volIcon.style.color = volColor;
       const mobVolIcon = document.getElementById('vol-icon-mobile');
       if (mobVolIcon) mobVolIcon.style.color = volColor;
+      persistMusicState();
     });
 
     // Hide / Show Stage (Cards & Playlist) Toggle
@@ -4183,40 +4222,43 @@
     // Fullscreen
     DOM.btnFullscreen?.addEventListener('click', toggleFullscreen);
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-      switch (e.code) {
-        case 'Space':
-          e.preventDefault();
-          togglePlay();
-          break;
-        case 'ArrowRight':
-          if (e.shiftKey) playNext(1);
-          else if (state.isPlayerReady && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
-            state.ytPlayer.seekTo((state.ytPlayer.getCurrentTime() || 0) + 5, true);
-          }
-          break;
-        case 'ArrowLeft':
-          if (e.shiftKey) playPrev(1);
-          else if (state.isPlayerReady && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
-            state.ytPlayer.seekTo(Math.max(0, (state.ytPlayer.getCurrentTime() || 0) - 5), true);
-          }
-          break;
-        case 'KeyM':
-          toggleMute();
-          break;
-        case 'KeyF':
-          toggleFullscreen();
-          break;
-        case 'KeyH':
-          toggleStageView();
-          break;
-        case 'Escape':
-          closeAllDropdowns();
-          break;
-      }
-    });
+    // Keyboard shortcuts (attach only once globally)
+    if (!window.__gullygang_keyboard_attached) {
+      window.__gullygang_keyboard_attached = true;
+      document.addEventListener('keydown', (e) => {
+        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+        switch (e.code) {
+          case 'Space':
+            e.preventDefault();
+            togglePlay();
+            break;
+          case 'ArrowRight':
+            if (e.shiftKey) playNext(1);
+            else if (state.isPlayerReady && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+              state.ytPlayer.seekTo((state.ytPlayer.getCurrentTime() || 0) + 5, true);
+            }
+            break;
+          case 'ArrowLeft':
+            if (e.shiftKey) playPrev(1);
+            else if (state.isPlayerReady && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+              state.ytPlayer.seekTo(Math.max(0, (state.ytPlayer.getCurrentTime() || 0) - 5), true);
+            }
+            break;
+          case 'KeyM':
+            toggleMute();
+            break;
+          case 'KeyF':
+            toggleFullscreen();
+            break;
+          case 'KeyH':
+            toggleStageView();
+            break;
+          case 'Escape':
+            closeAllDropdowns();
+            break;
+        }
+      });
+    }
 
     if ('mediaSession' in navigator) {
       const mediaActions = [
@@ -6201,6 +6243,294 @@
     };
   })();
 
+  // ============================================================
+  // GULLYGANG CLIENT-SIDE APP ROUTER (PERSISTENT MUSIC SHELL)
+  // Enables uninterrupted music streaming across internal page transitions
+  // ============================================================
+  const GullyRouter = (function () {
+    const pageCache = new Map();
+    let isNavigating = false;
+
+    function getNormalizedPath(urlOrPath) {
+      try {
+        const u = new URL(urlOrPath, window.location.origin);
+        let path = u.pathname;
+        if (path !== '/' && path.endsWith('/')) {
+          path = path.slice(0, -1);
+        }
+        return path || '/';
+      } catch (e) {
+        return urlOrPath || '/';
+      }
+    }
+
+    async function fetchPage(urlPath) {
+      const norm = getNormalizedPath(urlPath);
+      if (pageCache.has(norm)) {
+        return pageCache.get(norm);
+      }
+      
+      let res;
+      try {
+        res = await fetch(urlPath, {
+          headers: { 'X-Requested-With': 'GullyRouter' }
+        });
+      } catch (err) {}
+
+      // If server returned 404 for clean route, attempt with .html extension (local servers / static hosts)
+      if ((!res || !res.ok) && !urlPath.includes('.') && urlPath !== '/') {
+        try {
+          const fallbackRes = await fetch(`${urlPath}.html`, {
+            headers: { 'X-Requested-With': 'GullyRouter' }
+          });
+          if (fallbackRes && fallbackRes.ok) {
+            res = fallbackRes;
+          }
+        } catch (err) {}
+      } else if ((!res || !res.ok) && urlPath === '/') {
+        try {
+          const indexRes = await fetch('/index.html', {
+            headers: { 'X-Requested-With': 'GullyRouter' }
+          });
+          if (indexRes && indexRes.ok) {
+            res = indexRes;
+          }
+        } catch (err) {}
+      }
+
+      if (!res || !res.ok) {
+        throw new Error(`Failed to load page: HTTP ${res ? res.status : 'NetworkError'}`);
+      }
+      const html = await res.text();
+      pageCache.set(norm, html);
+      return html;
+    }
+
+    async function navigateTo(targetUrl, pushState = true) {
+      if (isNavigating) return;
+
+      const targetObj = new URL(targetUrl, window.location.origin);
+      const targetNormPath = getNormalizedPath(targetObj.pathname);
+      const currentNormPath = getNormalizedPath(window.location.pathname);
+      const targetHash = targetObj.hash;
+
+      // Same page anchor navigation
+      if (targetNormPath === currentNormPath) {
+        if (targetHash) {
+          if (pushState) {
+            history.pushState({ path: targetNormPath, hash: targetHash }, '', targetObj.pathname + targetObj.search + targetHash);
+          }
+          const targetEl = document.querySelector(targetHash);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth' });
+          }
+          return;
+        } else if (pushState) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      }
+
+      isNavigating = true;
+
+      try {
+        const html = await fetchPage(targetObj.pathname);
+        const parser = new DOMParser();
+        const newDoc = parser.parseFromString(html, 'text/html');
+
+        // 1. Update Document Title
+        if (newDoc.title) {
+          document.title = newDoc.title;
+        }
+
+        // 2. Update Meta Description and Canonical
+        const newMetaDesc = newDoc.querySelector('meta[name="description"]');
+        const curMetaDesc = document.querySelector('meta[name="description"]');
+        if (newMetaDesc && curMetaDesc) {
+          curMetaDesc.setAttribute('content', newMetaDesc.getAttribute('content'));
+        }
+        const newCanonical = newDoc.querySelector('link[rel="canonical"]');
+        const curCanonical = document.querySelector('link[rel="canonical"]');
+        if (newCanonical && curCanonical) {
+          curCanonical.setAttribute('href', newCanonical.getAttribute('href'));
+        }
+
+        // 3. Extract and swap #app-router-view without touching persistent audio shell
+        const newView = newDoc.getElementById('app-router-view') || newDoc.querySelector('main') || newDoc.body;
+        const curView = document.getElementById('app-router-view') || document.querySelector('main');
+
+        if (curView && newView) {
+          curView.innerHTML = newView.innerHTML;
+          if (newView.hasAttribute('data-page')) {
+            curView.setAttribute('data-page', newView.getAttribute('data-page'));
+          } else {
+            curView.removeAttribute('data-page');
+          }
+          if (newView.className) {
+            curView.className = newView.className;
+          }
+        }
+
+        // 4. Update History
+        if (pushState) {
+          history.pushState({ path: targetNormPath, hash: targetHash }, '', targetUrl);
+        }
+
+        // 5. Scroll to top or anchor
+        if (targetHash) {
+          setTimeout(() => {
+            const targetEl = document.querySelector(targetHash);
+            if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth' });
+            else window.scrollTo({ top: 0 });
+          }, 60);
+        } else {
+          window.scrollTo({ top: 0 });
+        }
+
+        // 6. Reinitialize Page Interactions
+        reinitializeCurrentPage();
+
+        // 7. Dispatch custom router event
+        window.dispatchEvent(new CustomEvent('gullygang:navigated', {
+          detail: { path: targetNormPath, hash: targetHash }
+        }));
+
+      } catch (err) {
+        console.warn('[GullyRouter] Client navigation fallback to standard browser request:', err);
+        window.location.href = targetUrl;
+      } finally {
+        isNavigating = false;
+      }
+    }
+
+    function reinitializeCurrentPage() {
+      const curView = document.getElementById('app-router-view');
+      const pageType = curView?.getAttribute('data-page') || (document.getElementById('carousel-stage') ? 'home' : 'article');
+
+      if (pageType === 'home' || document.getElementById('carousel-stage')) {
+        rebindPlayerDOM();
+        reconcileCurrentTrack(true);
+        setPlayState(state.isPlaying);
+        updateProgressUI();
+        initVisualsSystem();
+        initDropdownHandlers();
+        initEditorialExperienceAccordion();
+        initScrollReveal();
+        initVisualMomentParallax();
+        initGrandCta();
+        initFaqAccordion();
+        initStationCardClicks();
+        initPremium3DTilt();
+      }
+
+      LegalPagesEngine.init();
+      UserPlaylistEngine.init();
+      SupportEngine.init();
+      PlaylistSyncEngine.init();
+      initScrollReveal();
+    }
+
+    function rebindPlayerDOM() {
+      DOM.dynamicArtworkBg = document.getElementById('dynamic-artwork-bg');
+      DOM.ambientCanvas = document.getElementById('ambient-canvas');
+      DOM.liveTime = document.getElementById('live-time');
+      DOM.btnFullscreen = document.getElementById('btn-fullscreen');
+      DOM.btnWeather = document.getElementById('btn-weather');
+      DOM.weatherDropdown = document.getElementById('weather-dropdown');
+      DOM.weatherClock = document.getElementById('weather-clock');
+      DOM.btnPlaylistSelector = document.getElementById('btn-playlist-selector');
+      DOM.activePlaylistLabel = document.getElementById('active-playlist-label');
+      DOM.playlistChevron = document.getElementById('playlist-chevron');
+      DOM.playlistDropdown = document.getElementById('playlist-dropdown');
+      DOM.carouselStage = document.getElementById('carousel-stage');
+      DOM.cardP2 = document.getElementById('card-p2');
+      DOM.cardP1 = document.getElementById('card-p1');
+      DOM.cardCurr = document.getElementById('card-curr');
+      DOM.cardN1 = document.getElementById('card-n1');
+      DOM.cardN2 = document.getElementById('card-n2');
+      DOM.btnPrev = document.getElementById('btn-prev');
+      DOM.btnPlay = document.getElementById('btn-play');
+      DOM.playIcon = document.getElementById('play-icon');
+      DOM.btnNext = document.getElementById('btn-next');
+      DOM.btnShuffle = document.getElementById('btn-shuffle');
+      DOM.btnRepeat = document.getElementById('btn-repeat');
+      DOM.dockThumb = document.getElementById('dock-thumb');
+      DOM.dockTitle = document.getElementById('dock-title');
+      DOM.dockArtist = document.getElementById('dock-artist');
+      DOM.dockCurrentTime = document.getElementById('dock-current-time');
+      DOM.dockDuration = document.getElementById('dock-duration');
+      DOM.dockTimeCombined = document.getElementById('dock-time-combined');
+      DOM.dockRail = document.getElementById('dock-rail');
+      DOM.dockFill = document.getElementById('dock-fill');
+      DOM.dockThumbHandle = document.getElementById('dock-thumb-handle');
+      DOM.btnVol = document.getElementById('btn-vol');
+      DOM.volIcon = document.getElementById('vol-icon');
+      DOM.volSlider = document.getElementById('vol-slider');
+      DOM.playerRightControls = document.getElementById('player-right-controls');
+
+      cardRing = [DOM.cardP2, DOM.cardP1, DOM.cardCurr, DOM.cardN1, DOM.cardN2];
+      attachControlsListeners();
+      setupCardsInitial(true);
+      updateDockUI();
+    }
+
+    function init() {
+      // Intercept all internal navigation link clicks
+      document.addEventListener('click', (e) => {
+        const anchor = e.target.closest('a');
+        if (!anchor) return;
+
+        // Skip modified clicks (Ctrl, Cmd, Shift, Alt)
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+
+        // Skip download and external targets
+        if (anchor.hasAttribute('download') || anchor.target === '_blank') return;
+
+        const rawHref = anchor.getAttribute('href');
+        if (!rawHref) return;
+
+        // Skip protocol links and modal hash routes
+        if (/^(mailto:|tel:|javascript:|#\/)/i.test(rawHref)) return;
+
+        let targetUrl;
+        try {
+          targetUrl = new URL(anchor.href, window.location.origin);
+        } catch (err) {
+          return;
+        }
+
+        // Only intercept same-origin links
+        if (targetUrl.origin !== window.location.origin) return;
+
+        // Same-page in-page anchor links (e.g. href="#features" on /)
+        if (targetUrl.pathname === window.location.pathname && targetUrl.hash) {
+          const targetEl = document.querySelector(targetUrl.hash);
+          if (targetEl) {
+            e.preventDefault();
+            targetEl.scrollIntoView({ behavior: 'smooth' });
+            history.pushState({ path: targetUrl.pathname, hash: targetUrl.hash }, '', targetUrl.pathname + targetUrl.search + targetUrl.hash);
+            return;
+          }
+        }
+
+        // Intercept internal page navigation!
+        e.preventDefault();
+        navigateTo(targetUrl.pathname + targetUrl.search + targetUrl.hash, true);
+      });
+
+      // Handle browser back and forward buttons
+      window.addEventListener('popstate', () => {
+        navigateTo(window.location.pathname + window.location.search + window.location.hash, false);
+      });
+    }
+
+    return {
+      init,
+      navigateTo,
+      reinitializeCurrentPage
+    };
+  })();
+
   // --- Bootstrap ---
   function init() {
     let clockTimer = null;
@@ -6224,11 +6554,13 @@
         fetchRealLocationAndWeather(force);
       }
     }
-    // --- 1. CRITICAL INITIALIZATION (App Shell, Core Controls & Playlists) ---
+    // --- 1. CRITICAL INITIALIZATION (Router, App Shell, Core Controls & Playlists) ---
+    GullyRouter.init();
     initDropdownHandlers();
     initVisualsSystem();
     attachControlsListeners();
     setupCardsInitial(true);
+    persistMusicState();
 
     // --- 2. DEFERRED COOPERATIVE INITIALIZATION (Executed in Small Idle Time-Slices) ---
     const deferredTasks = [
