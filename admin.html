@@ -1674,8 +1674,7 @@
                 <button type="button" class="cms-toolbar-btn" title="Numbered List" onclick="AdminApp.insertMarkdown('1. ', '', 'List item')">1. List</button>
                 <div class="cms-toolbar-divider"></div>
                 <button type="button" class="cms-toolbar-btn" title="Insert Link" onclick="AdminApp.insertMarkdown('[', '](https://example.com)', 'Link text')">🔗 Link</button>
-                <button type="button" class="cms-toolbar-btn" title="Insert Image" onclick="AdminApp.insertMarkdown('![', '](https://example.com/image.jpg)', 'Image description')">🖼️ Img</button>
-                <button type="button" class="cms-toolbar-btn font-mono text-[11px]" title="Code Block" onclick="AdminApp.insertMarkdown('```\\n', '\\n```\\n', 'code here')">&lt;/&gt;</button>
+                <button type="button" class="cms-toolbar-btn font-mono text-[11px]" title="Code Block" onclick="AdminApp.insertCodeBlock()">&lt;/&gt;</button>
               </div>
 
               <!-- Editor & Preview Grid -->
@@ -1942,6 +1941,10 @@
         textarea.setSelectionRange(newCursorPos, newCursorPos);
 
         handleContentInput();
+      }
+
+      function insertCodeBlock() {
+        insertMarkdown('```\n', '\n```\n', 'code here');
       }
 
       function setEditorViewMode(mode) {
@@ -2417,6 +2420,7 @@
         handleExcerptInput,
         handleContentInput,
         insertMarkdown,
+        insertCodeBlock,
         setEditorViewMode,
         handleImgUrlInput,
         removeImage,
