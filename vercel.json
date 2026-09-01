@@ -4,16 +4,20 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/public?type=sitemap"
+    },
+    {
       "source": "/blog/:slug",
-      "destination": "/article"
+      "destination": "/api/article_render?slug=:slug"
+    },
+    {
+      "source": "/top-10-rappers-in-india",
+      "destination": "/api/article_render?slug=top-10-rappers-in-india"
     },
     {
       "source": "/blog",
       "destination": "/blog"
-    },
-    {
-      "source": "/top-10-rappers-in-india",
-      "destination": "/article"
     },
     {
       "source": "/admin",

@@ -1,7 +1,9 @@
-# Robots.txt for GULLYGANG
+# Robots.txt for GULLYGANG (https://gullygang.in)
 User-agent: *
 Allow: /
-Disallow: /api/
+Disallow: /admin
+Disallow: /api/admin
+Disallow: /admin.html
 
 # Sitemaps
 Sitemap: https://gullygang.in/sitemap.xml
