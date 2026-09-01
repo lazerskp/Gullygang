@@ -18,41 +18,33 @@
     })();
   </script>
 
-  <!-- Primary SEO Meta Tags -->
-  <title>GULLYGANG Journal — Music, Culture &amp; Stories</title>
-  <meta name="title" content="GULLYGANG Journal — Music, Culture &amp; Stories" />
-  <meta name="description" content="Stories about music, culture, artists and the world around them from GULLYGANG." />
-  <meta name="author" content="GULLYGANG Editorial" />
+  <!-- Primary SEO Meta Tags (Dynamically Updated by ArticleEngine) -->
+  <title id="meta-doc-title">GULLYGANG Journal</title>
+  <meta name="title" id="meta-name-title" content="GULLYGANG Journal" />
+  <meta name="description" id="meta-name-description" content="Editorial stories, music insights, and culture articles from GULLYGANG." />
+  <meta name="author" id="meta-name-author" content="GULLYGANG Editorial" />
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
-  <link rel="canonical" href="https://gullygang.in/blog" />
+  <link rel="canonical" id="meta-canonical-link" href="https://gullygang.in/blog" />
 
-  <!-- Multi-Language & Regional Hreflangs -->
-  <link rel="alternate" hreflang="x-default" href="https://gullygang.in/blog" />
-  <link rel="alternate" hreflang="en-IN" href="https://gullygang.in/blog" />
-  <link rel="alternate" hreflang="en" href="https://gullygang.in/blog" />
-
-  <!-- Geographic Meta -->
+  <!-- Multi-Language & Geographic Meta -->
   <meta name="geo.region" content="IN" />
   <meta name="geo.placename" content="India" />
 
-  <!-- Open Graph / Facebook / Discord -->
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://gullygang.in/blog" />
+  <!-- Open Graph / Social (Dynamically Updated) -->
+  <meta property="og:type" content="article" />
+  <meta property="og:url" id="meta-og-url" content="https://gullygang.in/blog" />
   <meta property="og:site_name" content="GULLYGANG" />
-  <meta property="og:title" content="GULLYGANG Journal — Music, Culture &amp; Stories" />
-  <meta property="og:description" content="Stories about music, culture, artists and the world around them from GULLYGANG." />
-  <meta property="og:image" content="https://gullygang.in/brand-cover.png" />
-  <meta property="og:image:width" content="1024" />
-  <meta property="og:image:height" content="1024" />
-  <meta property="og:image:alt" content="GULLYGANG Journal" />
+  <meta property="og:title" id="meta-og-title" content="GULLYGANG Journal" />
+  <meta property="og:description" id="meta-og-description" content="Editorial stories, music insights, and culture articles from GULLYGANG." />
+  <meta property="og:image" id="meta-og-image" content="https://gullygang.in/brand-cover.png" />
   <meta property="og:locale" content="en_IN" />
 
-  <!-- Twitter / X -->
+  <!-- Twitter Cards (Dynamically Updated) -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:url" content="https://gullygang.in/blog" />
-  <meta name="twitter:title" content="GULLYGANG Journal — Music, Culture &amp; Stories" />
-  <meta name="twitter:description" content="Stories about music, culture, artists and the world around them from GULLYGANG." />
-  <meta name="twitter:image" content="https://gullygang.in/brand-cover.png" />
+  <meta name="twitter:url" id="meta-tw-url" content="https://gullygang.in/blog" />
+  <meta name="twitter:title" id="meta-tw-title" content="GULLYGANG Journal" />
+  <meta name="twitter:description" id="meta-tw-description" content="Editorial stories, music insights, and culture articles from GULLYGANG." />
+  <meta name="twitter:image" id="meta-tw-image" content="https://gullygang.in/brand-cover.png" />
 
   <!-- Favicons -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -67,50 +59,6 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="/style.css" />
-
-  <!-- Structured Data: JSON-LD -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "BreadcrumbList",
-        "@id": "https://gullygang.in/blog#breadcrumb",
-        "itemListElement": [
-          {
-            "@type": "ListItem",
-            "position": 1,
-            "name": "Home",
-            "item": "https://gullygang.in/"
-          },
-          {
-            "@type": "ListItem",
-            "position": 2,
-            "name": "Journal",
-            "item": "https://gullygang.in/blog"
-          }
-        ]
-      },
-      {
-        "@type": "Blog",
-        "@id": "https://gullygang.in/blog#blog",
-        "name": "GULLYGANG Journal",
-        "description": "Stories about music, culture, artists and the world around them.",
-        "url": "https://gullygang.in/blog",
-        "inLanguage": "en-IN",
-        "publisher": {
-          "@type": "Organization",
-          "name": "GULLYGANG",
-          "url": "https://gullygang.in/",
-          "logo": {
-            "@type": "ImageObject",
-            "url": "https://gullygang.in/brand-cover.png"
-          }
-        }
-      }
-    ]
-  }
-  </script>
 </head>
 <body class="blog-body-root h-full flex flex-col font-sans selection:bg-emerald-500/20 selection:text-emerald-300">
 
@@ -135,7 +83,7 @@
   <div id="weather-ambient-overlay" class="weather-ambient-overlay pointer-events-none" aria-hidden="true"></div>
   <canvas id="weather-canvas" class="weather-canvas pointer-events-none" aria-hidden="true"></canvas>
 
-  <!-- Hidden YouTube Audio Host -->
+  <!-- Hidden YouTube Audio Host (Singleton) -->
   <div class="hidden-yt-host" aria-hidden="true">
     <div id="yt-player"></div>
   </div>
@@ -143,9 +91,9 @@
   <!-- ============================================================
        DYNAMIC PJAX ROUTER VIEWPORT (Swapped on Navigation)
        ============================================================ -->
-  <div id="app-router-view" data-page="blog" class="flex-1 flex flex-col min-h-full">
+  <div id="app-router-view" data-page="article" class="flex-1 flex flex-col min-h-full">
     
-    <!-- Minimal Editorial Top Navigation Bar: [GULLYGANG] ... [← Home] [Day/Night Toggle] -->
+    <!-- Minimal Editorial Top Navigation Bar: [GULLYGANG] ... [← Journal] [Day/Night Toggle] -->
     <header class="blog-nav-header">
       <div class="blog-nav-inner">
         <a href="/" class="blog-nav-brand" title="Return to GULLYGANG">
@@ -153,14 +101,14 @@
         </a>
 
         <div class="blog-nav-right">
-          <a href="/" class="blog-nav-home-link" title="Return to Home">
+          <a href="/blog" class="blog-nav-home-link" title="Return to Journal">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M19 12H5M12 19l-7-7 7-7"/>
             </svg>
-            <span>Home</span>
+            <span>Journal</span>
           </a>
 
-          <!-- Day / Night Theme Toggle (Blog Only) -->
+          <!-- Day / Night Theme Toggle (Blog & Article Only) -->
           <button type="button" id="btn-theme-toggle" class="blog-theme-toggle-btn" aria-label="Toggle Day / Night Mode" title="Toggle Day / Night Mode">
             <svg class="theme-icon-sun" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="4"></circle>
@@ -174,27 +122,83 @@
       </div>
     </header>
 
-    <!-- Main Editorial Blog Container -->
-    <main class="blog-page-container">
+    <!-- Main Editorial Article Reader Container -->
+    <main class="article-page-main" id="article-main-container">
+      
+      <!-- Article Reader Wrapper (Optimal reading width: ~720px - 820px) -->
+      <article class="article-reader-wrapper" id="article-reader-root">
 
-      <!-- Editorial Hero Headline -->
-      <section class="blog-intro-hero">
-        <h1 class="blog-journal-headline">GULLYGANG JOURNAL</h1>
-        <p class="blog-journal-subline">Stories about music, culture, artists and the world around them.</p>
-      </section>
-
-      <!-- Featured Article Hero Section (Dynamically Populated) -->
-      <section class="blog-featured-section mb-14" id="blog-featured-container" aria-label="Featured Story"></section>
-
-      <!-- Recent Stories Section -->
-      <section class="blog-recent-section" aria-label="Recent Stories">
-        <div class="blog-section-header">
-          <span class="blog-section-eyebrow">RECENT STORIES</span>
+        <!-- Loading State Skeleton -->
+        <div id="article-loading-skeleton" class="article-skeleton-wrap animate-pulse">
+          <div class="h-4 bg-white/10 rounded w-28 mb-4"></div>
+          <div class="h-10 bg-white/10 rounded w-full mb-3"></div>
+          <div class="h-10 bg-white/10 rounded w-3/4 mb-6"></div>
+          <div class="h-5 bg-white/10 rounded w-2/3 mb-8"></div>
+          <div class="h-80 bg-white/10 rounded-xl w-full mb-10"></div>
+          <div class="space-y-4">
+            <div class="h-4 bg-white/10 rounded w-full"></div>
+            <div class="h-4 bg-white/10 rounded w-5/6"></div>
+            <div class="h-4 bg-white/10 rounded w-4/6"></div>
+          </div>
         </div>
 
-        <div id="blog-stories-feed" class="blog-stories-feed">
-          <div class="py-12 text-center text-[var(--blog-text-muted)] text-xs uppercase tracking-widest font-mono">
-            Loading Stories...
+        <!-- Dynamic Article View Content -->
+        <div id="article-dynamic-content" class="article-dynamic-content hidden">
+          
+          <!-- Article Category & Tags Header -->
+          <div id="article-tags-wrap" class="article-tags-wrap"></div>
+
+          <!-- Article Main Headline -->
+          <h1 id="article-headline" class="article-headline"></h1>
+
+          <!-- Article Subheading / Excerpt -->
+          <p id="article-excerpt" class="article-excerpt"></p>
+
+          <!-- Article Meta Line (Author + Date + Reading Time) -->
+          <div class="article-meta-line">
+            <span id="article-author" class="article-author font-semibold"></span>
+            <span class="article-meta-dot">&bull;</span>
+            <time id="article-date" class="article-date"></time>
+            <span class="article-meta-dot">&bull;</span>
+            <span id="article-reading-time" class="article-reading-time"></span>
+          </div>
+
+          <!-- Featured 16:9 Image Box -->
+          <div id="article-featured-image-wrap" class="article-featured-image-wrap">
+            <img id="article-featured-image" src="" alt="" class="article-featured-image" loading="eager" decoding="async" />
+          </div>
+
+          <!-- Article Prose Content Body (Markdown rendered) -->
+          <div id="article-content-body" class="article-prose-body"></div>
+        </div>
+
+        <!-- 404 Story Not Found State (Graceful fallback) -->
+        <div id="article-404-state" class="article-404-container hidden">
+          <div class="article-404-icon">📖</div>
+          <h1 class="article-404-title">Story Not Found</h1>
+          <p class="article-404-desc">The article you are looking for does not exist, has been unpublished, or is scheduled for a future release.</p>
+          <div class="article-404-actions">
+            <a href="/blog" class="article-404-btn">← Return to Journal</a>
+            <a href="/" class="article-404-link">Back to Home</a>
+          </div>
+        </div>
+
+      </article>
+
+      <!-- In-Flow Natural Advertisement Placement -->
+      <div class="blog-direct-ad-section editorial-ad-placement-wrap max-w-4xl mx-auto my-12" id="article-ad-section" aria-label="Sponsored Advertisement">
+        <div class="editorial-ad-slot-box editorial-ad-banner-box" id="adsterra-article-container"></div>
+      </div>
+
+      <!-- MORE FROM GULLYGANG (Related Stories Section) -->
+      <section class="article-related-section" id="article-related-section" aria-label="More Stories from GULLYGANG">
+        <div class="article-related-inner">
+          <div class="article-related-header">
+            <span class="article-related-eyebrow">MORE FROM GULLYGANG</span>
+            <h2 class="article-related-title">Recent Editorial Stories</h2>
+          </div>
+          <div id="article-related-feed" class="article-related-grid">
+            <!-- Dynamically populated from API -->
           </div>
         </div>
       </section>
@@ -207,8 +211,8 @@
         <p class="blog-footer-copy">&copy; 2026 GULLYGANG. All rights reserved.</p>
         <div class="blog-footer-links">
           <a href="/" class="blog-footer-link">Home</a>
+          <a href="/blog" class="blog-footer-link">Journal</a>
           <a href="/#about" class="blog-footer-link">About</a>
-          <a href="/top-10-rappers-in-india" class="blog-footer-link">Top 10 Rappers</a>
         </div>
       </div>
     </footer>

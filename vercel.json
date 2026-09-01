@@ -8,8 +8,12 @@
       "destination": "/blog.html"
     },
     {
+      "source": "/blog/:slug",
+      "destination": "/article.html"
+    },
+    {
       "source": "/top-10-rappers-in-india",
-      "destination": "/top-10-rappers-in-india.html"
+      "destination": "/article.html"
     },
     {
       "source": "/admin",

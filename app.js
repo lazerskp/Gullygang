@@ -5061,36 +5061,160 @@
   })();
 
   // ============================================================
+  // GULLYGANG SAFE MARKDOWN PARSER & SANITIZER
+  // Strict XSS elimination, protocol validation, and prose formatting
+  // ============================================================
+  function renderSafeMarkdown(md) {
+    if (!md || typeof md !== 'string') return '';
+
+    // 1. Strict HTML tag escaping to eliminate raw XSS injections
+    let html = md
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // 2. Fenced Code Blocks (```code```)
+    html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+      return `<pre><code>${code.trim()}</code></pre>`;
+    });
+
+    // 3. Inline Code (`code`)
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // 4. Headings
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+    // 5. Blockquotes (> quote)
+    html = html.replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>');
+
+    // 6. Bold & Italic
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    // 7. Images: ![alt](url) - strictly validate URL protocol (http, https, relative)
+    html = html.replace(/!\[([^\]]*)\]\(((?:https?:\/\/|\/)[^)]+)\)/g, '<img src="$2" alt="$1" class="article-body-img" loading="lazy" decoding="async" onerror="this.style.display=\'none\'" />');
+
+    // 8. Links: [text](url) - strictly validate URL protocol and add rel="noopener noreferrer"
+    html = html.replace(/\[([^\]]+)\]\(((?:https?:\/\/|\/|mailto:)[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    // 9. Unordered Lists (- item or * item)
+    html = html.replace(/^\s*[-*]\s+(.*$)/gim, '<ul><li>$1</li></ul>');
+    html = html.replace(/<\/ul>\s*<ul>/g, '');
+
+    // 10. Ordered Lists (1. item)
+    html = html.replace(/^\s*\d+\.\s+(.*$)/gim, '<ol><li>$1</li></ol>');
+    html = html.replace(/<\/ol>\s*<ol>/g, '');
+
+    // 11. Paragraphs
+    const paragraphs = html.split(/\n\s*\n/);
+    return paragraphs.map(p => {
+      const trimmed = p.trim();
+      if (!trimmed) return '';
+      if (/^<(h1|h2|h3|pre|blockquote|ul|ol|img)/.test(trimmed)) {
+        return trimmed;
+      }
+      return `<p>${trimmed.replace(/\n/g, '<br/>')}</p>`;
+    }).join('\n');
+  }
+
+  // ============================================================
   // GULLYGANG EDITORIAL BLOG STORIES FEED ENGINE
-  // Hydrates stories from secure /api/public endpoint with clean layout
+  // Hydrates stories & featured editorial hero from secure /api/public endpoint
   // ============================================================
   const BlogEngine = (function () {
     async function init() {
       const feed = document.getElementById('blog-stories-feed');
-      if (!feed) return;
+      const featuredContainer = document.getElementById('blog-featured-container');
+      if (!feed && !featuredContainer) return;
 
       try {
-        const res = await fetch('/api/public?type=blog');
+        const urlParams = new URLSearchParams(window.location.search);
+        const tagParam = urlParams.get('tag');
+        const fetchUrl = tagParam 
+          ? `/api/public?type=blog&tag=${encodeURIComponent(tagParam)}`
+          : '/api/public?type=blog';
+
+        const res = await fetch(fetchUrl);
         if (res.ok) {
           const posts = await res.json();
           if (Array.isArray(posts) && posts.length > 0) {
-            renderPosts(posts);
+            renderFeatured(posts, featuredContainer);
+            renderRecentStories(posts, feed);
+            return;
           }
         }
+        if (feed) {
+          feed.innerHTML = '<div class="py-12 text-center text-[var(--blog-text-muted)] text-sm">No published stories at this time.</div>';
+        }
       } catch (err) {
-        console.warn('[BlogEngine] Failed to load remote stories, keeping fallback feed:', err);
+        console.warn('[BlogEngine] Failed to load remote stories:', err);
       }
     }
 
-    function renderPosts(posts) {
-      const feed = document.getElementById('blog-stories-feed');
+    function renderFeatured(posts, container) {
+      if (!container) return;
+
+      // Prioritize article with is_featured = true, otherwise promote newest post
+      const featuredPost = posts.find(p => p.is_featured === true) || posts[0];
+      if (!featuredPost) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const url = `/blog/${featuredPost.slug}`;
+      const dateStr = featuredPost.published_at ? new Date(featuredPost.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Editorial';
+      const tagsHtml = (Array.isArray(featuredPost.tags) && featuredPost.tags.length > 0)
+        ? featuredPost.tags.map(t => `<span class="blog-tag-pill">${escapeHtml(t)}</span>`).join('')
+        : '<span class="blog-tag-pill">FEATURED STORY</span>';
+
+      container.innerHTML = `
+        <a href="${url}" class="blog-featured-card group">
+          <div class="blog-featured-thumb-wrap">
+            <img src="${featuredPost.featured_image || 'https://gullygang.in/brand-cover.png'}" 
+                 alt="${escapeHtml(featuredPost.title)}" 
+                 class="blog-featured-thumb" 
+                 loading="eager" 
+                 decoding="async" 
+                 onerror="this.src='https://gullygang.in/brand-cover.png'" />
+          </div>
+          <div class="blog-featured-body">
+            <div class="blog-tags-row">${tagsHtml}</div>
+            <h2 class="blog-featured-title">${escapeHtml(featuredPost.title)}</h2>
+            <p class="blog-featured-excerpt">${escapeHtml(featuredPost.excerpt || '')}</p>
+            <div class="blog-featured-meta">
+              <span>${escapeHtml(featuredPost.author || 'GULLYGANG Editorial')}</span>
+              <span class="article-meta-dot">&bull;</span>
+              <span>${dateStr}</span>
+              <span class="article-meta-dot">&bull;</span>
+              <span>${escapeHtml(featuredPost.reading_time || '5 min read')}</span>
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    function renderRecentStories(posts, feed) {
       if (!feed) return;
 
-      feed.innerHTML = posts.map((post, idx) => {
-        const url = post.slug === 'top-10-rappers-in-india' ? '/top-10-rappers-in-india' : `/blog#${post.slug}`;
+      const featuredPost = posts.find(p => p.is_featured === true) || posts[0];
+      const recentStories = posts.filter(p => p.id !== featuredPost?.id);
+
+      if (recentStories.length === 0) {
+        feed.innerHTML = '<div class="py-8 text-center text-[var(--blog-text-muted)] text-xs uppercase tracking-wider">No additional recent stories</div>';
+        return;
+      }
+
+      feed.innerHTML = recentStories.map((post, idx) => {
+        const url = `/blog/${post.slug}`;
         const dateStr = post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Editorial';
         
-        // In-flow ad after the first story with natural collapse
+        const tagsHtml = (Array.isArray(post.tags) && post.tags.length > 0)
+          ? `<div class="flex items-center gap-1.5 mb-2">${post.tags.slice(0, 2).map(t => `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-[var(--blog-accent)] uppercase tracking-wider">${escapeHtml(t)}</span>`).join('')}</div>`
+          : '';
+
+        // In-flow natural ad after first story
         const adHtml = (idx === 0) ? `
           <div class="blog-direct-ad-section editorial-ad-placement-wrap" id="blog-ad-section-1" data-ad-placement="1" aria-label="Sponsored Advertisement">
             <div class="editorial-ad-slot-box editorial-ad-native-box" id="adsterra-blog-container-1"></div>
@@ -5101,9 +5225,15 @@
           <article class="blog-story-row">
             <a href="${url}" class="blog-story-link group">
               <div class="blog-story-thumb-wrap">
-                <img src="${post.featured_image || 'https://gullygang.in/brand-cover.png'}" alt="${escapeHtml(post.title)}" class="blog-story-thumb" loading="lazy" decoding="async" />
+                <img src="${post.featured_image || 'https://gullygang.in/brand-cover.png'}" 
+                     alt="${escapeHtml(post.title)}" 
+                     class="blog-story-thumb" 
+                     loading="lazy" 
+                     decoding="async" 
+                     onerror="this.src='https://gullygang.in/brand-cover.png'" />
               </div>
               <div class="blog-story-body">
+                ${tagsHtml}
                 <div class="blog-story-meta">
                   <span>${dateStr}</span>
                   <span class="blog-meta-dot">&bull;</span>
@@ -5125,6 +5255,227 @@
     }
 
     return { init };
+  })();
+
+  // ============================================================
+  // GULLYGANG DYNAMIC ARTICLE READER ENGINE
+  // Hydrates /blog/:slug articles with sanitized markdown, SEO, & related stories
+  // ============================================================
+  const ArticleEngine = (function () {
+    let currentArticleSlug = null;
+    let currentArticleData = null;
+
+    function getSlugFromPath() {
+      const path = window.location.pathname.replace(/\/+$/, '') || '/';
+      if (path.startsWith('/blog/')) {
+        return path.slice('/blog/'.length).trim();
+      }
+      if (path === '/top-10-rappers-in-india') {
+        return 'top-10-rappers-in-india';
+      }
+      return null;
+    }
+
+    async function init() {
+      const articleRoot = document.getElementById('article-reader-root');
+      if (!articleRoot) return;
+
+      const slug = getSlugFromPath();
+      if (!slug) {
+        show404();
+        return;
+      }
+
+      currentArticleSlug = slug;
+      showSkeleton();
+
+      try {
+        const res = await fetch(`/api/public?type=article&slug=${encodeURIComponent(slug)}`);
+        if (res.ok) {
+          const article = await res.json();
+          if (article && article.id) {
+            currentArticleData = article;
+            renderArticle(article);
+            fetchRelatedStories(slug);
+            return;
+          }
+        }
+        show404();
+      } catch (err) {
+        console.warn('[ArticleEngine] Failed to load article:', err);
+        show404();
+      }
+    }
+
+    function showSkeleton() {
+      document.getElementById('article-loading-skeleton')?.classList.remove('hidden');
+      document.getElementById('article-dynamic-content')?.classList.add('hidden');
+      document.getElementById('article-404-state')?.classList.add('hidden');
+    }
+
+    function show404() {
+      document.getElementById('article-loading-skeleton')?.classList.add('hidden');
+      document.getElementById('article-dynamic-content')?.classList.add('hidden');
+      document.getElementById('article-404-state')?.classList.remove('hidden');
+      document.title = 'Story Not Found | GULLYGANG Journal';
+    }
+
+    function renderArticle(article) {
+      document.getElementById('article-loading-skeleton')?.classList.add('hidden');
+      document.getElementById('article-404-state')?.classList.add('hidden');
+      document.getElementById('article-dynamic-content')?.classList.remove('hidden');
+
+      // 1. Tags
+      const tagsWrap = document.getElementById('article-tags-wrap');
+      if (tagsWrap) {
+        if (Array.isArray(article.tags) && article.tags.length > 0) {
+          tagsWrap.innerHTML = article.tags.map(t => `<span class="article-tag-pill">${escapeHtml(t)}</span>`).join('');
+          tagsWrap.classList.remove('hidden');
+        } else {
+          tagsWrap.innerHTML = '<span class="article-tag-pill">EDITORIAL</span>';
+        }
+      }
+
+      // 2. Headline & Excerpt
+      const headlineEl = document.getElementById('article-headline');
+      if (headlineEl) headlineEl.textContent = article.title || 'Untitled Article';
+
+      const excerptEl = document.getElementById('article-excerpt');
+      if (excerptEl) {
+        if (article.excerpt) {
+          excerptEl.textContent = article.excerpt;
+          excerptEl.classList.remove('hidden');
+        } else {
+          excerptEl.classList.add('hidden');
+        }
+      }
+
+      // 3. Meta (Author + Date + Reading Time)
+      const authorEl = document.getElementById('article-author');
+      if (authorEl) authorEl.textContent = article.author || 'GULLYGANG Editorial';
+
+      const dateEl = document.getElementById('article-date');
+      if (dateEl) {
+        const d = article.published_at ? new Date(article.published_at) : new Date(article.created_at);
+        dateEl.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        dateEl.setAttribute('datetime', d.toISOString());
+      }
+
+      const rtEl = document.getElementById('article-reading-time');
+      if (rtEl) rtEl.textContent = article.reading_time || '5 min read';
+
+      // 4. Featured Image
+      const imgWrap = document.getElementById('article-featured-image-wrap');
+      const imgEl = document.getElementById('article-featured-image');
+      if (imgWrap && imgEl) {
+        if (article.featured_image) {
+          imgEl.src = article.featured_image;
+          imgEl.alt = article.title || 'Article Cover';
+          imgWrap.classList.remove('hidden');
+        } else {
+          imgWrap.classList.add('hidden');
+        }
+      }
+
+      // 5. Article Content Body
+      const bodyEl = document.getElementById('article-content-body');
+      if (bodyEl) {
+        bodyEl.innerHTML = renderSafeMarkdown(article.content || '');
+      }
+
+      // 6. Dynamic SEO Tags
+      updateDynamicSEO(article);
+    }
+
+    function updateDynamicSEO(article) {
+      const pageTitle = (article.seo_title || article.title || 'GULLYGANG Journal') + ' | GULLYGANG';
+      document.title = pageTitle;
+
+      const desc = article.seo_description || article.excerpt || 'Stories about music, culture, artists and the world around them from GULLYGANG.';
+      const canonicalUrl = `https://gullygang.in/blog/${article.slug}`;
+      const imgUrl = article.featured_image || 'https://gullygang.in/brand-cover.png';
+
+      // Update Meta Tags
+      const setMeta = (idOrSelector, attr, val) => {
+        const el = document.querySelector(idOrSelector);
+        if (el) el.setAttribute(attr, val);
+      };
+
+      setMeta('meta[name="title"]', 'content', pageTitle);
+      setMeta('meta[name="description"]', 'content', desc);
+      setMeta('link[rel="canonical"]', 'href', canonicalUrl);
+
+      // Open Graph
+      setMeta('meta[property="og:title"]', 'content', pageTitle);
+      setMeta('meta[property="og:description"]', 'content', desc);
+      setMeta('meta[property="og:url"]', 'content', canonicalUrl);
+      setMeta('meta[property="og:image"]', 'content', imgUrl);
+
+      // Twitter Cards
+      setMeta('meta[name="twitter:title"]', 'content', pageTitle);
+      setMeta('meta[name="twitter:description"]', 'content', desc);
+      setMeta('meta[name="twitter:url"]', 'content', canonicalUrl);
+      setMeta('meta[name="twitter:image"]', 'content', imgUrl);
+    }
+
+    async function fetchRelatedStories(currentSlug) {
+      const feed = document.getElementById('article-related-feed');
+      if (!feed) return;
+
+      try {
+        const res = await fetch(`/api/public?type=related_articles&slug=${encodeURIComponent(currentSlug)}&limit=3`);
+        if (res.ok) {
+          const stories = await res.json();
+          if (Array.isArray(stories) && stories.length > 0) {
+            feed.innerHTML = stories.map(s => {
+              const url = `/blog/${s.slug}`;
+              const dateStr = s.published_at ? new Date(s.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Editorial';
+              return `
+                <a href="${url}" class="article-related-card group">
+                  <div class="article-related-thumb-wrap">
+                    <img src="${s.featured_image || 'https://gullygang.in/brand-cover.png'}" alt="${escapeHtml(s.title)}" class="article-related-thumb" loading="lazy" decoding="async" onerror="this.src='https://gullygang.in/brand-cover.png'" />
+                  </div>
+                  <h3 class="article-related-card-title">${escapeHtml(s.title)}</h3>
+                  <div class="article-related-card-meta">
+                    <span>${dateStr}</span> &bull; <span>${escapeHtml(s.reading_time || '4 min read')}</span>
+                  </div>
+                </a>
+              `;
+            }).join('');
+            document.getElementById('article-related-section')?.classList.remove('hidden');
+            return;
+          }
+        }
+        document.getElementById('article-related-section')?.classList.add('hidden');
+      } catch (e) {
+        document.getElementById('article-related-section')?.classList.add('hidden');
+      }
+    }
+
+    function handleRealtimeUpdate(eventData) {
+      const currentSlug = getSlugFromPath();
+      if (!currentSlug) return;
+
+      // If current article was modified or deleted
+      if (eventData && eventData.entityId) {
+        if (currentArticleData && currentArticleData.id === eventData.entityId) {
+          if (eventData.type === 'blog.deleted' || eventData.status === 'draft') {
+            show404();
+          } else {
+            init();
+          }
+          return;
+        }
+      }
+
+      // If other articles were modified, refresh related stories
+      fetchRelatedStories(currentSlug);
+    }
+
+    return {
+      init,
+      handleRealtimeUpdate
+    };
   })();
 
   // ============================================================
@@ -5340,6 +5691,9 @@
       try {
         if (typeof BlogEngine !== 'undefined' && typeof BlogEngine.init === 'function') {
           BlogEngine.init();
+        }
+        if (typeof ArticleEngine !== 'undefined' && typeof ArticleEngine.handleRealtimeUpdate === 'function') {
+          ArticleEngine.handleRealtimeUpdate(eventData);
         }
       } catch (err) {
         console.warn('[RealtimeSync] Blog refresh notice:', err);
@@ -7019,6 +7373,20 @@
         return pageCache.get(norm);
       }
       
+      // Dynamic article routes (/blog/:slug and /top-10-rappers-in-india)
+      if ((norm.startsWith('/blog/') && norm !== '/blog') || norm === '/top-10-rappers-in-india') {
+        try {
+          const articleRes = await fetch('/article.html', {
+            headers: { 'X-Requested-With': 'GullyRouter' }
+          });
+          if (articleRes && articleRes.ok) {
+            const html = await articleRes.text();
+            pageCache.set(norm, html);
+            return html;
+          }
+        } catch (err) {}
+      }
+
       let res;
       try {
         res = await fetch(urlPath, {
@@ -7174,6 +7542,7 @@
 
       ThemeEngine.init();
       BlogEngine.init();
+      ArticleEngine.init();
       LegalPagesEngine.init();
       UserPlaylistEngine.init();
       SupportEngine.init();
@@ -7351,6 +7720,8 @@
       () => PlaylistPreviewEngine.init(),
       () => RealtimeSyncEngine.init(),
       () => ThemeEngine.init(),
+      () => BlogEngine.init(),
+      () => ArticleEngine.init(),
       () => AdsterraEngine.init(),
       () => {
         if (window.WeatherEffects && typeof window.WeatherEffects.init === 'function') {

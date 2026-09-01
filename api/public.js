@@ -82,25 +82,91 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(rows);
     }
 
-    // 4. Public Blog Posts
-    if (type === 'blog') {
+    // 4. Public Blog Posts & Articles
+    if (type === 'blog' || type === 'article') {
       const slug = url.searchParams.get('slug');
+      const tag = url.searchParams.get('tag');
+
       if (slug) {
         const safeSlug = escapeSql(slug.trim());
         const rows = await queryInsForge(`
-          SELECT id, slug, title, excerpt, content, featured_image, reading_time, author, seo_title, seo_description, tags, is_featured, published_at
+          SELECT id, slug, title, excerpt, content, featured_image, reading_time, author, seo_title, seo_description, tags, is_featured, published_at, created_at
           FROM blog_posts
-          WHERE slug = '${safeSlug}' AND (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()));
+          WHERE slug = '${safeSlug}' AND (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))
+          LIMIT 1;
         `);
-        return res.status(200).json(rows[0] || null);
+        if (!rows || rows.length === 0) {
+          return res.status(404).json({ error: 'Article not found or not currently published' });
+        }
+        return res.status(200).json(rows[0]);
       }
 
-      const rows = await queryInsForge(`
-        SELECT id, slug, title, excerpt, featured_image, reading_time, author, tags, is_featured, published_at
+      let query = `
+        SELECT id, slug, title, excerpt, featured_image, reading_time, author, tags, is_featured, published_at, created_at
         FROM blog_posts
         WHERE (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))
-        ORDER BY is_featured DESC, published_at DESC;
-      `);
+      `;
+
+      if (tag) {
+        const safeTag = escapeSql(tag.trim().toLowerCase());
+        query += ` AND '${safeTag}' = ANY(tags)`;
+      }
+
+      query += ` ORDER BY is_featured DESC, published_at DESC, created_at DESC;`;
+
+      const rows = await queryInsForge(query);
+      return res.status(200).json(rows);
+    }
+
+    // 4.5 Related Stories (More from GULLYGANG)
+    if (type === 'related_articles') {
+      const currentSlug = url.searchParams.get('slug');
+      const limit = Math.min(parseInt(url.searchParams.get('limit') || 4, 10), 10);
+
+      let currentTags = [];
+      let currentId = null;
+
+      if (currentSlug) {
+        const safeSlug = escapeSql(currentSlug.trim());
+        const curRows = await queryInsForge(`
+          SELECT id, tags 
+          FROM blog_posts 
+          WHERE slug = '${safeSlug}' AND (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))
+          LIMIT 1;
+        `);
+        if (curRows.length > 0) {
+          currentId = curRows[0].id;
+          currentTags = Array.isArray(curRows[0].tags) ? curRows[0].tags : [];
+        }
+      }
+
+      let excludeClause = currentId ? `AND id != '${escapeSql(currentId)}'` : '';
+      let sql = '';
+
+      if (currentTags.length > 0) {
+        const safeTagsLiteral = currentTags.map(t => `'${escapeSql(t)}'`).join(',');
+        sql = `
+          SELECT id, slug, title, excerpt, featured_image, reading_time, author, tags, is_featured, published_at
+          FROM blog_posts
+          WHERE (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))
+          ${excludeClause}
+          ORDER BY (
+            CASE WHEN tags && ARRAY[${safeTagsLiteral}]::text[] THEN 1 ELSE 0 END
+          ) DESC, published_at DESC, created_at DESC
+          LIMIT ${limit};
+        `;
+      } else {
+        sql = `
+          SELECT id, slug, title, excerpt, featured_image, reading_time, author, tags, is_featured, published_at
+          FROM blog_posts
+          WHERE (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))
+          ${excludeClause}
+          ORDER BY published_at DESC, created_at DESC
+          LIMIT ${limit};
+        `;
+      }
+
+      const rows = await queryInsForge(sql);
       return res.status(200).json(rows);
     }
 
