@@ -8,7 +8,7 @@
       "destination": "/blog.html"
     },
     {
-      "source": "/blog/(.+)",
+      "source": "/blog/:path*",
       "destination": "/article.html"
     },
     {
