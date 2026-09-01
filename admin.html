@@ -685,6 +685,12 @@
       }
 
       function switchTab(tabId) {
+        if (isFormDirty) {
+          if (!confirm('You have unsaved changes in the editor. Discard changes and switch tabs?')) {
+            return;
+          }
+          isFormDirty = false;
+        }
         currentTab = tabId;
         document.querySelectorAll('.admin-nav-item').forEach(btn => {
           btn.classList.toggle('is-active', btn.getAttribute('data-tab') === tabId);
@@ -862,28 +868,50 @@
             tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">No articles published</td></tr>';
             return;
           }
-          tbody.innerHTML = res.data.posts.map(p => `
-            <tr>
-              <td>
-                <div class="flex items-center gap-3">
-                  ${p.featured_image ? `<img src="${p.featured_image}" class="w-10 h-10 rounded object-cover" />` : ''}
-                  <div>
-                    <p class="font-bold text-xs text-[var(--text-primary)] max-w-sm">${escapeHtml(p.title)}</p>
-                    <p class="text-xs text-[var(--text-tertiary)] truncate max-w-xs">${escapeHtml(p.excerpt || '')}</p>
+          tbody.innerHTML = res.data.posts.map(p => {
+            const isFeatured = !!p.is_featured;
+            let statusBadge = '<span class="admin-status-badge is-inactive">Draft</span>';
+            if (p.status === 'published') {
+              statusBadge = '<span class="admin-status-badge is-active">Published</span>';
+            } else if (p.status === 'scheduled') {
+              statusBadge = '<span class="admin-status-badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">Scheduled</span>';
+            }
+
+            const tagsHtml = (Array.isArray(p.tags) && p.tags.length > 0)
+              ? `<div class="flex flex-wrap gap-1 mt-1">${p.tags.map(t => `<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-[var(--text-tertiary)] font-mono">#${escapeHtml(t)}</span>`).join('')}</div>`
+              : '';
+
+            const dateStr = p.status === 'scheduled' && p.scheduled_at
+              ? `Scheduled: ${new Date(p.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+              : new Date(p.published_at || p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+            return `
+              <tr>
+                <td>
+                  <div class="flex items-center gap-3">
+                    ${p.featured_image ? `<img src="${escapeHtml(p.featured_image)}" class="w-12 h-8 rounded object-cover flex-shrink-0" onerror="this.style.display='none'" />` : ''}
+                    <div>
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        ${isFeatured ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">⭐ Featured</span>` : ''}
+                        <p class="font-bold text-xs text-[var(--text-primary)] max-w-sm">${escapeHtml(p.title)}</p>
+                      </div>
+                      <p class="text-xs text-[var(--text-tertiary)] truncate max-w-xs">${escapeHtml(p.excerpt || '')}</p>
+                      ${tagsHtml}
+                    </div>
                   </div>
-                </div>
-              </td>
-              <td><code>${escapeHtml(p.slug)}</code></td>
-              <td class="text-xs text-[var(--text-secondary)]">${escapeHtml(p.reading_time || '5 min')}</td>
-              <td><span class="admin-status-badge ${p.status === 'published' ? 'is-active' : 'is-inactive'}">${p.status}</span></td>
-              <td class="text-xs text-[var(--text-tertiary)]">${new Date(p.published_at || p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-              <td class="text-right">
-                <button type="button" class="admin-action-link text-xs mr-2" onclick="AdminApp.openEditPostModal('${p.id}')">Edit</button>
-                <a href="/${p.slug}" target="_blank" class="admin-action-link text-xs mr-2 text-[var(--accent-primary)]">View</a>
-                <button type="button" class="admin-action-link text-xs text-red-400" onclick="AdminApp.confirmDeletePost('${p.id}', '${escapeHtml(p.title)}')">Delete</button>
-              </td>
-            </tr>
-          `).join('');
+                </td>
+                <td><code>${escapeHtml(p.slug)}</code></td>
+                <td class="text-xs text-[var(--text-secondary)]">${escapeHtml(p.reading_time || '5 min read')}</td>
+                <td>${statusBadge}</td>
+                <td class="text-xs text-[var(--text-tertiary)] whitespace-nowrap">${dateStr}</td>
+                <td class="text-right">
+                  <button type="button" class="admin-action-link text-xs mr-2" onclick="AdminApp.openEditPostModal('${p.id}')">Edit</button>
+                  <a href="/${p.slug}" target="_blank" class="admin-action-link text-xs mr-2 text-[var(--accent-primary)]">View</a>
+                  <button type="button" class="admin-action-link text-xs text-red-400" onclick="AdminApp.confirmDeletePost('${p.id}', '${escapeHtml(p.title)}')">Delete</button>
+                </td>
+              </tr>
+            `;
+          }).join('');
         }
       }
 
@@ -968,13 +996,33 @@
       }
 
       // Modals and form helpers
-      function openModal(title, html) {
+      let isFormDirty = false;
+
+      function openModal(title, html, options = {}) {
+        isFormDirty = false;
+        const modalSurface = document.querySelector('.admin-modal-surface');
+        if (options.isEditorial) {
+          modalSurface?.classList.add('is-editorial');
+        } else {
+          modalSurface?.classList.remove('is-editorial');
+        }
         document.getElementById('admin-modal-title').textContent = title;
         document.getElementById('admin-modal-content').innerHTML = html;
         document.getElementById('admin-modal-backdrop').classList.remove('hidden');
       }
 
-      function closeModal() {
+      function closeModal(e, force = false) {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget && !e.target.closest('#btn-close-modal-x')) {
+          return;
+        }
+        if (isFormDirty && !force) {
+          if (!confirm('You have unsaved changes in this article. Discard changes?')) {
+            return;
+          }
+        }
+        isFormDirty = false;
+        const modalSurface = document.querySelector('.admin-modal-surface');
+        modalSurface?.classList.remove('is-editorial');
         document.getElementById('admin-modal-backdrop').classList.add('hidden');
       }
 
@@ -1354,124 +1402,774 @@
         }
       }
 
+      // ==========================================================
+      // STEP 7 — PREMIUM EDITORIAL PUBLISHING CMS
+      // ==========================================================
+      let editingPostId = null;
+      let slugCheckTimer = null;
+
+      function renderMarkdown(md) {
+        if (!md || !md.trim()) {
+          return '<p class="text-[var(--text-tertiary)] italic">Start typing markdown in the editor to see a live formatted preview...</p>';
+        }
+
+        // Escape raw HTML tags to prevent XSS
+        let html = md
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        // Code blocks: ```language ... ```
+        html = html.replace(/```([\s\S]*?)```/g, (m, code) => {
+          return `<pre><code>${code.trim()}</code></pre>`;
+        });
+
+        // Inline code: `code`
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Headings
+        html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+        html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+        html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+        // Blockquotes
+        html = html.replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>');
+
+        // Bold & Italic
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+        // Images: ![alt](url) - strict protocol check
+        html = html.replace(/!\[([^\]]*)\]\(((?:https?:\/\/|\/)[^)]+)\)/g, '<img src="$2" alt="$1" class="rounded max-h-80 object-cover my-2" onerror="this.style.display=\'none\'" />');
+
+        // Links: [text](url) - strict protocol check
+        html = html.replace(/\[([^\]]+)\]\(((?:https?:\/\/|\/|mailto:)[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+        // Unordered lists (- item)
+        html = html.replace(/^\s*-\s+(.*$)/gim, '<ul><li>$1</li></ul>');
+        html = html.replace(/<\/ul>\s*<ul>/g, '');
+
+        // Ordered lists (1. item)
+        html = html.replace(/^\s*\d+\.\s+(.*$)/gim, '<ol><li>$1</li></ol>');
+        html = html.replace(/<\/ol>\s*<ol>/g, '');
+
+        // Paragraphs
+        const paragraphs = html.split(/\n\s*\n/);
+        return paragraphs.map(p => {
+          const trimmed = p.trim();
+          if (!trimmed) return '';
+          if (/^<(h1|h2|h3|pre|blockquote|ul|ol|img)/.test(trimmed)) {
+            return trimmed;
+          }
+          return `<p>${trimmed.replace(/\n/g, '<br/>')}</p>`;
+        }).join('\n');
+      }
+
+      function slugify(text) {
+        return (text || '')
+          .toLowerCase()
+          .trim()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/[\s_-]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      }
+
+      function countWords(str) {
+        if (!str || typeof str !== 'string') return 0;
+        const clean = str.replace(/[#*`_~\[\]()>-]/g, ' ').trim();
+        return clean ? clean.split(/\s+/).filter(Boolean).length : 0;
+      }
+
+      function calculateReadingTimeLive(content) {
+        const words = countWords(content);
+        const mins = Math.max(1, Math.ceil(words / 200));
+        return `${mins} min read`;
+      }
+
+      function markDirty() {
+        isFormDirty = true;
+      }
+
+      function hasUnsavedChanges() {
+        return isFormDirty;
+      }
+
       function openAddPostModal() {
-        openModal('Write Editorial Article', `
-          <form class="space-y-3" onsubmit="AdminApp.handleSavePost(event)">
-            <div class="form-group">
-              <label class="form-label">Article Title</label>
-              <input type="text" id="m-post-title" class="form-input" placeholder="e.g. The Evolution of Drill Rap in South Asia" required oninput="AdminApp.autoFillSlug()" />
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="form-group">
-                <label class="form-label">Slug</label>
-                <input type="text" id="m-post-slug" class="form-input" placeholder="evolution-of-drill-rap" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Reading Time</label>
-                <input type="text" id="m-post-time" class="form-input" value="5 min read" />
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Featured Image URL</label>
-              <input type="url" id="m-post-img" class="form-input" placeholder="https://images.unsplash.com/..." />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Short Excerpt</label>
-              <textarea id="m-post-excerpt" class="form-textarea h-16" placeholder="Brief summary of the story..."></textarea>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Article Content (Markdown)</label>
-              <textarea id="m-post-content" class="form-textarea h-48 font-mono text-xs" placeholder="## Section Title\n\nArticle paragraph content..." required></textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="form-group">
-                <label class="form-label">Status</label>
-                <select id="m-post-status" class="form-select w-full">
-                  <option value="published">Published</option>
-                  <option value="draft">Draft</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Author</label>
-                <input type="text" id="m-post-author" class="form-input" value="GULLYGANG Editorial" />
-              </div>
-            </div>
-            <button type="submit" class="admin-primary-btn w-full mt-4">Publish Article</button>
-          </form>
-        `);
+        openPostModal(null);
       }
 
       async function openEditPostModal(id) {
         const res = await apiRequest('blog', { params: { id } });
         if (!res.ok || !res.data.post) return showToast('Failed to load article', 'error');
-        const p = res.data.post;
-
-        openModal('Edit Article', `
-          <form class="space-y-3" onsubmit="AdminApp.handleSavePost(event, '${p.id}')">
-            <div class="form-group">
-              <label class="form-label">Article Title</label>
-              <input type="text" id="m-post-title" class="form-input" value="${escapeHtml(p.title)}" required />
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="form-group">
-                <label class="form-label">Slug</label>
-                <input type="text" id="m-post-slug" class="form-input" value="${escapeHtml(p.slug)}" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Reading Time</label>
-                <input type="text" id="m-post-time" class="form-input" value="${escapeHtml(p.reading_time || '5 min read')}" />
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Featured Image URL</label>
-              <input type="url" id="m-post-img" class="form-input" value="${escapeHtml(p.featured_image || '')}" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Short Excerpt</label>
-              <textarea id="m-post-excerpt" class="form-textarea h-16">${escapeHtml(p.excerpt || '')}</textarea>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Article Content (Markdown)</label>
-              <textarea id="m-post-content" class="form-textarea h-48 font-mono text-xs" required>${escapeHtml(p.content || '')}</textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="form-group">
-                <label class="form-label">Status</label>
-                <select id="m-post-status" class="form-select w-full">
-                  <option value="published" ${p.status === 'published' ? 'selected' : ''}>Published</option>
-                  <option value="draft" ${p.status === 'draft' ? 'selected' : ''}>Draft</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Author</label>
-                <input type="text" id="m-post-author" class="form-input" value="${escapeHtml(p.author || 'GULLYGANG Editorial')}" />
-              </div>
-            </div>
-            <button type="submit" class="admin-primary-btn w-full mt-4">Save Changes</button>
-          </form>
-        `);
+        openPostModal(res.data.post);
       }
 
-      function autoFillSlug() {
-        const title = document.getElementById('m-post-title').value;
-        const slug = document.getElementById('m-post-slug');
-        if (slug && (!slug.dataset.manual || slug.value === '')) {
-          slug.value = title.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
+      function openPostModal(p = null) {
+        editingPostId = p ? p.id : null;
+        isFormDirty = false;
+
+        const isEdit = !!p;
+        const initialTitle = p?.title || '';
+        const initialSlug = p?.slug || '';
+        const initialExcerpt = p?.excerpt || '';
+        const initialContent = p?.content || '';
+        const initialImg = p?.featured_image || '';
+        const initialAuthor = p?.author || 'GULLYGANG Editorial';
+        const initialStatus = p?.status || 'published';
+        const initialIsFeatured = !!p?.is_featured;
+        const initialTags = Array.isArray(p?.tags) ? p.tags.join(', ') : (p?.tags || '');
+        const initialSeoTitle = p?.seo_title || '';
+        const initialSeoDesc = p?.seo_description || '';
+
+        let scheduledDateVal = '';
+        if (p?.scheduled_at) {
+          try {
+            const d = new Date(p.scheduled_at);
+            scheduledDateVal = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+          } catch(e) {}
+        }
+
+        const rt = calculateReadingTimeLive(initialContent);
+
+        const modalHtml = `
+          <form id="cms-editor-form" class="space-y-4" onsubmit="AdminApp.handleSavePost(event, ${isEdit ? `'${p.id}'` : 'null'})">
+            
+            <!-- Top Controls Row -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle)]">
+              <div class="flex items-center gap-2">
+                <span id="m-post-rt-badge" class="admin-badge-pill">⏱️ ${rt}</span>
+                <span id="m-post-words-badge" class="text-xs text-[var(--text-tertiary)]">${countWords(initialContent)} words</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <select id="m-post-status" class="form-select text-xs py-1 px-2.5 font-semibold" onchange="AdminApp.handleStatusChange()">
+                  <option value="published" ${initialStatus === 'published' ? 'selected' : ''}>● Published</option>
+                  <option value="scheduled" ${initialStatus === 'scheduled' ? 'selected' : ''}>◌ Scheduled</option>
+                  <option value="draft" ${initialStatus === 'draft' ? 'selected' : ''}>○ Draft</option>
+                </select>
+                <button type="submit" id="m-post-top-submit" class="admin-primary-btn text-xs py-1.5 px-3">
+                  ${initialStatus === 'draft' ? 'Save Draft' : (initialStatus === 'scheduled' ? 'Schedule' : (isEdit ? 'Save Changes' : 'Publish'))}
+                </button>
+              </div>
+            </div>
+
+            <!-- Scheduled DateTime Row (Conditional) -->
+            <div id="m-post-schedule-wrap" class="${initialStatus === 'scheduled' ? '' : 'hidden'} p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex flex-wrap items-center gap-3">
+              <label class="text-xs font-semibold text-blue-400">📅 Scheduled Publication Date & Time (UTC/Local):</label>
+              <input type="datetime-local" id="m-post-scheduled-at" class="form-input text-xs py-1 px-2 w-auto" value="${scheduledDateVal}" onchange="AdminApp.markDirty()" />
+            </div>
+
+            <!-- Title & Slug -->
+            <div class="space-y-3">
+              <div class="form-group">
+                <div class="flex items-center justify-between mb-1">
+                  <label class="form-label mb-0">Article Title <span class="text-red-400">*</span></label>
+                  <span id="m-title-counter" class="cms-char-badge ${initialTitle.length >= 50 && initialTitle.length <= 60 ? 'is-good' : ''}">
+                    ${initialTitle.length} / 60 recommended
+                  </span>
+                </div>
+                <input type="text" id="m-post-title" class="form-input text-sm font-semibold" 
+                  value="${escapeHtml(initialTitle)}" 
+                  placeholder="e.g. Top 10 Rappers in India (2026 Edition)" 
+                  required 
+                  oninput="AdminApp.handleTitleInput()" />
+              </div>
+
+              <div class="form-group">
+                <div class="flex items-center justify-between mb-1">
+                  <label class="form-label mb-0">URL Slug <span class="text-red-400">*</span></label>
+                  <div class="flex items-center gap-2">
+                    <span id="m-slug-status"></span>
+                    <button type="button" class="text-xs text-[var(--accent-primary)] hover:underline flex items-center gap-1" onclick="AdminApp.regenerateSlug()">
+                      ↻ Regenerate from title
+                    </button>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-[var(--text-tertiary)] font-mono">/</span>
+                  <input type="text" id="m-post-slug" class="form-input font-mono text-xs flex-1" 
+                    value="${escapeHtml(initialSlug)}" 
+                    placeholder="top-10-rappers-in-india" 
+                    data-manual="${isEdit ? 'true' : 'false'}"
+                    required 
+                    oninput="AdminApp.handleSlugInput()" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Featured Image (URL + Drag-and-Drop / Click Upload) -->
+            <div class="form-group">
+              <label class="form-label">Featured Image</label>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+                <div class="space-y-2">
+                  <input type="url" id="m-post-img" class="form-input text-xs" 
+                    value="${escapeHtml(initialImg)}" 
+                    placeholder="Paste image URL (https://...) or upload below" 
+                    oninput="AdminApp.handleImgUrlInput()" />
+                  
+                  <div id="m-dropzone" class="cms-dropzone" 
+                    ondragover="AdminApp.handleDragOver(event)" 
+                    ondragleave="AdminApp.handleDragLeave(event)" 
+                    ondrop="AdminApp.handleDrop(event)"
+                    onclick="document.getElementById('m-file-input').click()">
+                    <input type="file" id="m-file-input" class="hidden" accept="image/jpeg,image/png,image/webp,image/gif" onchange="AdminApp.handleFileSelect(event)" />
+                    <p class="text-xs font-semibold text-[var(--text-primary)]">📁 Click or Drag & Drop to Upload</p>
+                    <p class="text-[11px] text-[var(--text-tertiary)] mt-0.5">JPG, PNG, WebP up to 5MB (Hosted on InsForge Storage)</p>
+                    <div id="m-upload-progress" class="hidden text-xs text-[var(--accent-primary)] font-semibold mt-2">
+                      <span class="inline-block animate-spin mr-1">◌</span> Uploading to InsForge CDN...
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 16:9 Image Preview Box -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between text-xs text-[var(--text-tertiary)]">
+                    <span>16:9 Preview</span>
+                    <button type="button" id="btn-remove-img" class="${initialImg ? '' : 'hidden'} text-xs text-red-400 hover:underline" onclick="AdminApp.removeImage()">Remove</button>
+                  </div>
+                  <div id="m-img-preview-wrap" class="cms-image-preview-box flex items-center justify-center">
+                    <img id="m-img-preview" src="${escapeHtml(initialImg || '')}" class="${initialImg ? '' : 'hidden'}" onerror="this.classList.add('hidden'); document.getElementById('m-img-fallback').classList.remove('hidden');" />
+                    <div id="m-img-fallback" class="${initialImg ? 'hidden' : ''} text-center p-4 text-[var(--text-tertiary)]">
+                      <span class="text-2xl opacity-40">🖼️</span>
+                      <p class="text-xs mt-1">No featured image selected</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Excerpt -->
+            <div class="form-group">
+              <div class="flex items-center justify-between mb-1">
+                <label class="form-label mb-0">Short Excerpt (Feed Summary)</label>
+                <span id="m-excerpt-counter" class="cms-char-badge ${initialExcerpt.length >= 140 && initialExcerpt.length <= 160 ? 'is-good' : ''}">
+                  ${initialExcerpt.length} / 160 recommended
+                </span>
+              </div>
+              <textarea id="m-post-excerpt" class="form-textarea h-16 text-xs" 
+                placeholder="Brief summary displayed on article cards..."
+                oninput="AdminApp.handleExcerptInput()">${escapeHtml(initialExcerpt)}</textarea>
+            </div>
+
+            <!-- Premium Markdown Editor Toolbar & Live Split Preview -->
+            <div class="form-group">
+              <div class="flex items-center justify-between mb-1">
+                <label class="form-label mb-0">Article Content (Markdown) <span class="text-red-400">*</span></label>
+                <div class="flex items-center gap-1 bg-white/5 p-0.5 rounded text-xs">
+                  <button type="button" id="btn-view-write" class="px-2 py-0.5 rounded font-semibold text-[var(--text-primary)] bg-white/10" onclick="AdminApp.setEditorViewMode('write')">Write</button>
+                  <button type="button" id="btn-view-preview" class="px-2 py-0.5 rounded font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]" onclick="AdminApp.setEditorViewMode('preview')">Preview</button>
+                  <button type="button" id="btn-view-split" class="hidden md:inline-block px-2 py-0.5 rounded font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]" onclick="AdminApp.setEditorViewMode('split')">Split</button>
+                </div>
+              </div>
+
+              <!-- Markdown Toolbar -->
+              <div class="cms-toolbar">
+                <button type="button" class="cms-toolbar-btn font-bold" title="Bold" onclick="AdminApp.insertMarkdown('**', '**', 'bold text')">B</button>
+                <button type="button" class="cms-toolbar-btn italic font-serif" title="Italic" onclick="AdminApp.insertMarkdown('*', '*', 'italic text')">I</button>
+                <div class="cms-toolbar-divider"></div>
+                <button type="button" class="cms-toolbar-btn" title="Heading 2" onclick="AdminApp.insertMarkdown('## ', '', 'Heading 2')">H2</button>
+                <button type="button" class="cms-toolbar-btn" title="Heading 3" onclick="AdminApp.insertMarkdown('### ', '', 'Heading 3')">H3</button>
+                <button type="button" class="cms-toolbar-btn font-serif" title="Quote" onclick="AdminApp.insertMarkdown('> ', '', 'Quote text')">”</button>
+                <div class="cms-toolbar-divider"></div>
+                <button type="button" class="cms-toolbar-btn" title="Bullet List" onclick="AdminApp.insertMarkdown('- ', '', 'List item')">• List</button>
+                <button type="button" class="cms-toolbar-btn" title="Numbered List" onclick="AdminApp.insertMarkdown('1. ', '', 'List item')">1. List</button>
+                <div class="cms-toolbar-divider"></div>
+                <button type="button" class="cms-toolbar-btn" title="Insert Link" onclick="AdminApp.insertMarkdown('[', '](https://example.com)', 'Link text')">🔗 Link</button>
+                <button type="button" class="cms-toolbar-btn" title="Insert Image" onclick="AdminApp.insertMarkdown('![', '](https://example.com/image.jpg)', 'Image description')">🖼️ Img</button>
+                <button type="button" class="cms-toolbar-btn font-mono text-[11px]" title="Code Block" onclick="AdminApp.insertMarkdown('```\\n', '\\n```\\n', 'code here')">&lt;/&gt;</button>
+              </div>
+
+              <!-- Editor & Preview Grid -->
+              <div id="cms-editor-grid" class="cms-editor-grid">
+                <div id="cms-pane-write" class="w-full">
+                  <textarea id="m-post-content" class="cms-textarea" 
+                    placeholder="## Section Title&#10;&#10;Write article content here using standard Markdown syntax..." 
+                    required 
+                    oninput="AdminApp.handleContentInput()">${escapeHtml(initialContent)}</textarea>
+                </div>
+                <div id="cms-pane-preview" class="w-full">
+                  <div id="m-post-preview-pane" class="cms-preview-pane">
+                    ${renderMarkdown(initialContent)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SEO & Editorial Meta Accordion / Section -->
+            <div class="border border-[var(--border-subtle)] rounded-lg p-4 bg-white/[0.02] space-y-3">
+              <p class="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">⚙️ Publishing & SEO Metadata</p>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="form-group">
+                  <label class="form-label">Author Name</label>
+                  <input type="text" id="m-post-author" class="form-input text-xs" value="${escapeHtml(initialAuthor)}" oninput="AdminApp.markDirty()" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Internal Tags (Comma-separated)</label>
+                  <input type="text" id="m-post-tags" class="form-input text-xs" 
+                    value="${escapeHtml(initialTags)}" 
+                    placeholder="hip-hop, drill, indian-rap, culture" 
+                    oninput="AdminApp.markDirty()" />
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 pt-1">
+                <label class="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)] cursor-pointer">
+                  <input type="checkbox" id="m-post-featured" ${initialIsFeatured ? 'checked' : ''} onchange="AdminApp.markDirty()" />
+                  <span>⭐ Feature this article on top of editorial feeds</span>
+                </label>
+              </div>
+
+              <!-- SEO Meta Preview & Fields -->
+              <div class="space-y-3 pt-2 border-t border-[var(--border-subtle)]">
+                <div class="form-group">
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="form-label mb-0">SEO Title Tag</label>
+                    <span id="m-seo-title-counter" class="cms-char-badge">${(initialSeoTitle || initialTitle).length} / 60</span>
+                  </div>
+                  <input type="text" id="m-post-seo-title" class="form-input text-xs" 
+                    value="${escapeHtml(initialSeoTitle)}" 
+                    placeholder="Defaults to Article Title" 
+                    oninput="AdminApp.handleSeoInput()" />
+                </div>
+
+                <div class="form-group">
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="form-label mb-0">SEO Meta Description</label>
+                    <span id="m-seo-desc-counter" class="cms-char-badge">${(initialSeoDesc || initialExcerpt).length} / 160</span>
+                  </div>
+                  <textarea id="m-post-seo-desc" class="form-textarea h-14 text-xs" 
+                    placeholder="Defaults to Short Excerpt" 
+                    oninput="AdminApp.handleSeoInput()">${escapeHtml(initialSeoDesc)}</textarea>
+                </div>
+
+                <!-- Google Search Simulation Card -->
+                <div class="p-3 rounded bg-[#1f1f23] border border-white/5 space-y-1">
+                  <p class="text-[11px] text-zinc-400 font-mono flex items-center gap-1">
+                    <span>https://gullygang.in</span> › <span id="seo-preview-slug">${initialSlug || 'article-slug'}</span>
+                  </p>
+                  <p id="seo-preview-title" class="text-sm font-semibold text-[#8ab4f8] truncate">
+                    ${escapeHtml(initialSeoTitle || initialTitle || 'Article Title Preview')}
+                  </p>
+                  <p id="seo-preview-desc" class="text-xs text-zinc-300 line-clamp-2">
+                    ${escapeHtml(initialSeoDesc || initialExcerpt || 'Meta description preview for search engines and social cards...')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom Action Buttons -->
+            <div class="flex items-center justify-between gap-3 pt-3 border-t border-[var(--border-subtle)]">
+              <button type="button" class="admin-subtle-btn text-xs" onclick="AdminApp.closeModal(event)">
+                Discard / Cancel
+              </button>
+              <div class="flex items-center gap-2">
+                <button type="button" class="admin-subtle-btn text-xs" onclick="AdminApp.handleSavePost(event, ${isEdit ? `'${p.id}'` : 'null'}, 'draft')">
+                  Save as Draft
+                </button>
+                <button type="submit" id="m-post-bottom-submit" class="admin-primary-btn text-xs py-2 px-4">
+                  ${initialStatus === 'draft' ? 'Save Draft' : (initialStatus === 'scheduled' ? 'Schedule Article' : (isEdit ? 'Save Changes' : 'Publish Article'))}
+                </button>
+              </div>
+            </div>
+          </form>
+        `;
+
+        openModal(isEdit ? 'Edit Editorial Article' : 'Write Editorial Article', modalHtml, { isEditorial: true });
+        
+        if (initialSlug) {
+          checkSlugAvailability(initialSlug);
+        }
+
+        if (window.innerWidth >= 1024) {
+          setEditorViewMode('split');
+        } else {
+          setEditorViewMode('write');
         }
       }
 
-      async function handleSavePost(e, id = null) {
+      function handleTitleInput() {
+        markDirty();
+        const titleEl = document.getElementById('m-post-title');
+        const title = titleEl ? titleEl.value : '';
+        const len = title.length;
+        
+        const counter = document.getElementById('m-title-counter');
+        if (counter) {
+          counter.textContent = `${len} / 60 recommended`;
+          counter.className = `cms-char-badge ${len >= 50 && len <= 60 ? 'is-good' : (len > 70 ? 'is-warn' : '')}`;
+        }
+
+        const wordsBadge = document.getElementById('m-title-words');
+        if (wordsBadge) {
+          wordsBadge.textContent = `${countWords(title)} words`;
+        }
+
+        const slugEl = document.getElementById('m-post-slug');
+        if (slugEl && slugEl.dataset.manual !== 'true') {
+          const autoSlug = slugify(title);
+          slugEl.value = autoSlug;
+          checkSlugAvailability(autoSlug);
+          
+          const seoSlugPreview = document.getElementById('seo-preview-slug');
+          if (seoSlugPreview) seoSlugPreview.textContent = autoSlug || 'article-slug';
+        }
+
+        const seoTitleInput = document.getElementById('m-post-seo-title');
+        if (seoTitleInput && !seoTitleInput.value.trim()) {
+          const seoPreviewTitle = document.getElementById('seo-preview-title');
+          if (seoPreviewTitle) seoPreviewTitle.textContent = title || 'Article Title Preview';
+          const seoCounter = document.getElementById('m-seo-title-counter');
+          if (seoCounter) seoCounter.textContent = `${len} / 60`;
+        }
+      }
+
+      function handleSlugInput() {
+        markDirty();
+        const slugEl = document.getElementById('m-post-slug');
+        if (!slugEl) return;
+        slugEl.dataset.manual = 'true';
+        const formatted = slugify(slugEl.value);
+        checkSlugAvailability(formatted);
+
+        const seoSlugPreview = document.getElementById('seo-preview-slug');
+        if (seoSlugPreview) seoSlugPreview.textContent = formatted || 'article-slug';
+      }
+
+      function regenerateSlug() {
+        markDirty();
+        const titleEl = document.getElementById('m-post-title');
+        const slugEl = document.getElementById('m-post-slug');
+        if (titleEl && slugEl) {
+          slugEl.dataset.manual = 'false';
+          const autoSlug = slugify(titleEl.value);
+          slugEl.value = autoSlug;
+          checkSlugAvailability(autoSlug);
+          const seoSlugPreview = document.getElementById('seo-preview-slug');
+          if (seoSlugPreview) seoSlugPreview.textContent = autoSlug || 'article-slug';
+          showToast('Slug regenerated from title');
+        }
+      }
+
+      function checkSlugAvailability(slug) {
+        clearTimeout(slugCheckTimer);
+        const statusEl = document.getElementById('m-slug-status');
+        if (!statusEl) return;
+
+        if (!slug) {
+          statusEl.innerHTML = '<span class="text-amber-400 text-xs">⚠️ Slug required</span>';
+          return;
+        }
+
+        statusEl.innerHTML = '<span class="text-[var(--text-tertiary)] text-xs animate-pulse">Checking...</span>';
+
+        slugCheckTimer = setTimeout(async () => {
+          const res = await apiRequest('check_slug', {
+            params: {
+              slug,
+              excludeId: editingPostId || ''
+            }
+          });
+
+          if (!statusEl) return;
+
+          if (res.ok && res.data) {
+            if (res.data.available) {
+              statusEl.innerHTML = '<span class="text-emerald-400 text-xs font-semibold">✓ Available</span>';
+            } else if (res.data.error) {
+              statusEl.innerHTML = `<span class="text-amber-400 text-xs" title="${escapeHtml(res.data.error)}">⚠️ Invalid format</span>`;
+            } else {
+              statusEl.innerHTML = `<span class="text-amber-400 text-xs" title="In use: ${escapeHtml(res.data.existingTitle || '')}">⚠️ Slug in use</span>`;
+            }
+          }
+        }, 300);
+      }
+
+      function handleExcerptInput() {
+        markDirty();
+        const excerptEl = document.getElementById('m-post-excerpt');
+        const val = excerptEl ? excerptEl.value : '';
+        const len = val.length;
+
+        const counter = document.getElementById('m-excerpt-counter');
+        if (counter) {
+          counter.textContent = `${len} / 160 recommended`;
+          counter.className = `cms-char-badge ${len >= 140 && len <= 160 ? 'is-good' : (len > 180 ? 'is-warn' : '')}`;
+        }
+
+        const seoDescInput = document.getElementById('m-post-seo-desc');
+        if (seoDescInput && !seoDescInput.value.trim()) {
+          const seoPreviewDesc = document.getElementById('seo-preview-desc');
+          if (seoPreviewDesc) seoPreviewDesc.textContent = val || 'Meta description preview...';
+          const seoDescCounter = document.getElementById('m-seo-desc-counter');
+          if (seoDescCounter) seoDescCounter.textContent = `${len} / 160`;
+        }
+      }
+
+      function handleContentInput() {
+        markDirty();
+        const contentEl = document.getElementById('m-post-content');
+        const content = contentEl ? contentEl.value : '';
+
+        const rt = calculateReadingTimeLive(content);
+        const words = countWords(content);
+
+        const rtBadge = document.getElementById('m-post-rt-badge');
+        if (rtBadge) rtBadge.textContent = `⏱️ ${rt}`;
+
+        const wordsBadge = document.getElementById('m-post-words-badge');
+        if (wordsBadge) wordsBadge.textContent = `${words} words`;
+
+        const previewPane = document.getElementById('m-post-preview-pane');
+        if (previewPane) {
+          previewPane.innerHTML = renderMarkdown(content);
+        }
+      }
+
+      function insertMarkdown(prefix, suffix = '', placeholder = 'text') {
+        markDirty();
+        const textarea = document.getElementById('m-post-content');
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selText = textarea.value.substring(start, end);
+        const replacement = prefix + (selText || placeholder) + suffix;
+
+        textarea.setRangeText(replacement, start, end, 'select');
+        textarea.focus();
+
+        const newCursorPos = selText ? (start + replacement.length) : (start + prefix.length + placeholder.length);
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+
+        handleContentInput();
+      }
+
+      function setEditorViewMode(mode) {
+        const paneWrite = document.getElementById('cms-pane-write');
+        const panePreview = document.getElementById('cms-pane-preview');
+        const grid = document.getElementById('cms-editor-grid');
+        
+        const btnWrite = document.getElementById('btn-view-write');
+        const btnPreview = document.getElementById('btn-view-preview');
+        const btnSplit = document.getElementById('btn-view-split');
+
+        [btnWrite, btnPreview, btnSplit].forEach(b => {
+          if (b) {
+            b.classList.remove('bg-white/10', 'text-[var(--text-primary)]');
+            b.classList.add('text-[var(--text-secondary)]');
+          }
+        });
+
+        if (mode === 'split') {
+          paneWrite?.classList.remove('hidden');
+          panePreview?.classList.remove('hidden');
+          grid?.style.setProperty('grid-template-columns', '1fr 1fr');
+          btnSplit?.classList.add('bg-white/10', 'text-[var(--text-primary)]');
+        } else if (mode === 'preview') {
+          paneWrite?.classList.add('hidden');
+          panePreview?.classList.remove('hidden');
+          grid?.style.setProperty('grid-template-columns', '1fr');
+          btnPreview?.classList.add('bg-white/10', 'text-[var(--text-primary)]');
+        } else {
+          paneWrite?.classList.remove('hidden');
+          panePreview?.classList.add('hidden');
+          grid?.style.setProperty('grid-template-columns', '1fr');
+          btnWrite?.classList.add('bg-white/10', 'text-[var(--text-primary)]');
+        }
+      }
+
+      function handleImgUrlInput() {
+        markDirty();
+        const urlInput = document.getElementById('m-post-img');
+        const imgEl = document.getElementById('m-img-preview');
+        const fallbackEl = document.getElementById('m-img-fallback');
+        const removeBtn = document.getElementById('btn-remove-img');
+        const url = urlInput ? urlInput.value.trim() : '';
+
+        if (url) {
+          if (imgEl) {
+            imgEl.src = url;
+            imgEl.classList.remove('hidden');
+          }
+          fallbackEl?.classList.add('hidden');
+          removeBtn?.classList.remove('hidden');
+        } else {
+          imgEl?.classList.add('hidden');
+          fallbackEl?.classList.remove('hidden');
+          removeBtn?.classList.add('hidden');
+        }
+      }
+
+      function removeImage() {
+        markDirty();
+        const urlInput = document.getElementById('m-post-img');
+        if (urlInput) urlInput.value = '';
+        handleImgUrlInput();
+      }
+
+      function handleDragOver(e) {
         e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('m-dropzone')?.classList.add('is-dragover');
+      }
+
+      function handleDragLeave(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('m-dropzone')?.classList.remove('is-dragover');
+      }
+
+      function handleDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('m-dropzone')?.classList.remove('is-dragover');
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+          uploadImageFile(files[0]);
+        }
+      }
+
+      function handleFileSelect(e) {
+        const files = e.target?.files;
+        if (files && files.length > 0) {
+          uploadImageFile(files[0]);
+        }
+      }
+
+      async function uploadImageFile(file) {
+        if (!file) return;
+
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!allowed.includes(file.type)) {
+          showToast('Please upload a JPG, PNG, WebP, or GIF image.', 'error');
+          return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+          showToast('Image file exceeds maximum 5MB size limit.', 'error');
+          return;
+        }
+
+        const progressEl = document.getElementById('m-upload-progress');
+        progressEl?.classList.remove('hidden');
+
+        try {
+          const reader = new FileReader();
+          reader.onload = async function() {
+            const base64Data = reader.result.split(',')[1];
+            const res = await apiRequest('upload', {
+              method: 'POST',
+              body: {
+                filename: file.name,
+                contentType: file.type,
+                base64: base64Data
+              }
+            });
+
+            progressEl?.classList.add('hidden');
+
+            if (res.ok && res.data?.url) {
+              const urlInput = document.getElementById('m-post-img');
+              if (urlInput) urlInput.value = res.data.url;
+              handleImgUrlInput();
+              showToast('Featured image uploaded to InsForge CDN');
+            } else {
+              showToast(res.data?.error || 'Image upload failed', 'error');
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch(err) {
+          progressEl?.classList.add('hidden');
+          showToast('Upload error: ' + err.message, 'error');
+        }
+      }
+
+      function handleStatusChange() {
+        markDirty();
+        const status = document.getElementById('m-post-status')?.value || 'published';
+        const scheduleWrap = document.getElementById('m-post-schedule-wrap');
+        const topBtn = document.getElementById('m-post-top-submit');
+        const bottomBtn = document.getElementById('m-post-bottom-submit');
+
+        if (status === 'scheduled') {
+          scheduleWrap?.classList.remove('hidden');
+          if (topBtn) topBtn.textContent = 'Schedule';
+          if (bottomBtn) bottomBtn.textContent = 'Schedule Article';
+        } else {
+          scheduleWrap?.classList.add('hidden');
+          if (status === 'draft') {
+            if (topBtn) topBtn.textContent = 'Save Draft';
+            if (bottomBtn) bottomBtn.textContent = 'Save Draft';
+          } else {
+            if (topBtn) topBtn.textContent = editingPostId ? 'Save Changes' : 'Publish';
+            if (bottomBtn) bottomBtn.textContent = editingPostId ? 'Save Changes' : 'Publish Article';
+          }
+        }
+      }
+
+      function handleSeoInput() {
+        markDirty();
+        const seoTitle = document.getElementById('m-post-seo-title')?.value.trim() || '';
+        const articleTitle = document.getElementById('m-post-title')?.value.trim() || '';
+        const displayTitle = seoTitle || articleTitle || 'Article Title Preview';
+
+        const seoDesc = document.getElementById('m-post-seo-desc')?.value.trim() || '';
+        const excerpt = document.getElementById('m-post-excerpt')?.value.trim() || '';
+        const displayDesc = seoDesc || excerpt || 'Meta description preview for search engines...';
+
+        const titleCounter = document.getElementById('m-seo-title-counter');
+        if (titleCounter) titleCounter.textContent = `${displayTitle.length} / 60`;
+
+        const descCounter = document.getElementById('m-seo-desc-counter');
+        if (descCounter) descCounter.textContent = `${displayDesc.length} / 160`;
+
+        const previewTitle = document.getElementById('seo-preview-title');
+        if (previewTitle) previewTitle.textContent = displayTitle;
+
+        const previewDesc = document.getElementById('seo-preview-desc');
+        if (previewDesc) previewDesc.textContent = displayDesc;
+      }
+
+      async function handleSavePost(e, id = null, forceStatus = null) {
+        if (e) e.preventDefault();
+
+        const title = document.getElementById('m-post-title')?.value.trim() || '';
+        const slug = slugify(document.getElementById('m-post-slug')?.value || title);
+        const content = document.getElementById('m-post-content')?.value.trim() || '';
+        const excerpt = document.getElementById('m-post-excerpt')?.value.trim() || '';
+        const featuredImage = document.getElementById('m-post-img')?.value.trim() || '';
+        const author = document.getElementById('m-post-author')?.value.trim() || 'GULLYGANG Editorial';
+        const seoTitle = document.getElementById('m-post-seo-title')?.value.trim() || '';
+        const seoDescription = document.getElementById('m-post-seo-desc')?.value.trim() || '';
+        const status = forceStatus || document.getElementById('m-post-status')?.value || 'published';
+        const isFeatured = document.getElementById('m-post-featured')?.checked || false;
+        const tagsRaw = document.getElementById('m-post-tags')?.value || '';
+        const scheduledAtVal = document.getElementById('m-post-scheduled-at')?.value || '';
+
+        if (!title) return showToast('Article title is required', 'error');
+        if (!content) return showToast('Article content is required', 'error');
+        if (!slug) return showToast('A valid URL slug is required', 'error');
+
+        const topBtn = document.getElementById('m-post-top-submit');
+        const bottomBtn = document.getElementById('m-post-bottom-submit');
+
+        if (topBtn) topBtn.disabled = true;
+        if (bottomBtn) bottomBtn.disabled = true;
+
         const payload = {
           id,
-          title: document.getElementById('m-post-title').value.trim(),
-          slug: document.getElementById('m-post-slug').value.trim(),
-          excerpt: document.getElementById('m-post-excerpt').value.trim(),
-          content: document.getElementById('m-post-content').value.trim(),
-          featured_image: document.getElementById('m-post-img').value.trim(),
-          reading_time: document.getElementById('m-post-time').value.trim(),
-          author: document.getElementById('m-post-author').value.trim(),
-          status: document.getElementById('m-post-status').value
+          title,
+          slug,
+          excerpt,
+          content,
+          featured_image: featuredImage,
+          author,
+          seo_title: seoTitle,
+          seo_description: seoDescription,
+          status,
+          is_featured: isFeatured,
+          tags: tagsRaw.split(',').map(t => t.trim()).filter(Boolean),
+          scheduled_at: status === 'scheduled' && scheduledAtVal ? new Date(scheduledAtVal).toISOString() : null
         };
 
         const res = await apiRequest('blog', {
@@ -1479,10 +2177,14 @@
           body: payload
         });
 
+        if (topBtn) topBtn.disabled = false;
+        if (bottomBtn) bottomBtn.disabled = false;
+
         if (res.ok) {
-          showToast(id ? 'Article updated' : 'Article published');
-          broadcastSyncEvent(id ? 'blog.updated' : 'blog.created', id || res.data?.post?.id, { slug: payload.slug, status: payload.status });
-          closeModal();
+          isFormDirty = false;
+          showToast(status === 'draft' ? 'Draft saved successfully' : (status === 'scheduled' ? 'Article scheduled successfully' : (id ? 'Article updated successfully' : 'Article published!')));
+          broadcastSyncEvent(id ? 'blog.updated' : 'blog.created', id || res.data?.post?.id, { slug: payload.slug, status: payload.status, is_featured: isFeatured });
+          closeModal(null, true);
           loadBlog();
           loadOverview(true);
         } else {
@@ -1507,7 +2209,7 @@
         if (res.ok) {
           showToast('Article deleted');
           broadcastSyncEvent('blog.deleted', id);
-          closeModal();
+          closeModal(null, true);
           loadBlog();
           loadOverview(true);
         } else {
@@ -1651,6 +2353,14 @@
           showToast('Signed out of Admin');
         });
 
+        // Unsaved changes beforeunload protection
+        window.addEventListener('beforeunload', (e) => {
+          if (isFormDirty) {
+            e.preventDefault();
+            e.returnValue = '';
+          }
+        });
+
         // Day/Night Theme Toggle
         document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
           if (window.ThemeEngine) {
@@ -1700,7 +2410,25 @@
         deleteVisual,
         openAddPostModal,
         openEditPostModal,
-        autoFillSlug,
+        handleTitleInput,
+        handleSlugInput,
+        regenerateSlug,
+        checkSlugAvailability,
+        handleExcerptInput,
+        handleContentInput,
+        insertMarkdown,
+        setEditorViewMode,
+        handleImgUrlInput,
+        removeImage,
+        handleDragOver,
+        handleDragLeave,
+        handleDrop,
+        handleFileSelect,
+        uploadImageFile,
+        handleStatusChange,
+        handleSeoInput,
+        markDirty,
+        hasUnsavedChanges,
         handleSavePost,
         confirmDeletePost,
         deletePost,

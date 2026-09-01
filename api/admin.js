@@ -206,6 +206,21 @@ function sanitizeSlug(slug, fallbackTitle = '') {
   return s || 'item-' + Date.now();
 }
 
+// Calculate reading time from content (approx. 200 words per minute)
+function calculateReadingTime(content) {
+  if (!content || typeof content !== 'string') return '1 min read';
+  const clean = content.replace(/[#*`_~\[\]()>-]/g, ' ').trim();
+  const words = clean ? clean.split(/\s+/).filter(Boolean).length : 0;
+  const minutes = Math.max(1, Math.ceil(words / 200));
+  return `${minutes} min read`;
+}
+
+// Validate blog post slug format (^[a-z0-9]+(?:-[a-z0-9]+)*$)
+function isValidPostSlug(slug) {
+  if (!slug || typeof slug !== 'string') return false;
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.trim());
+}
+
 // Extract standard 11-char YouTube ID
 function extractYouTubeId(urlOrId) {
   if (!urlOrId || typeof urlOrId !== 'string') return '';
@@ -648,7 +663,78 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 8. BLOG POSTS CRUD
+    // 7.5 SLUG CHECK & MEDIA UPLOAD
+    // ==========================================================
+    if (action === 'check_slug' && req.method === 'GET') {
+      const slug = (url.searchParams.get('slug') || '').trim().toLowerCase();
+      const excludeId = url.searchParams.get('excludeId');
+
+      if (!slug || !isValidPostSlug(slug)) {
+        return res.status(200).json({
+          available: false,
+          error: 'Slug must contain only lowercase alphanumeric characters and single hyphens (e.g. top-10-rappers).'
+        });
+      }
+
+      let query = `SELECT id, title FROM blog_posts WHERE slug = '${escapeSql(slug)}'`;
+      if (excludeId && isValidUUID(excludeId)) {
+        query += ` AND id != '${escapeSql(excludeId)}'`;
+      }
+      query += ` LIMIT 1;`;
+
+      const existing = await queryInsForge(query);
+      const isAvailable = existing.length === 0;
+      return res.status(200).json({
+        available: isAvailable,
+        existingTitle: existing[0]?.title || null
+      });
+    }
+
+    if (action === 'upload' && req.method === 'POST') {
+      const body = await parseBody(req);
+      const { filename, contentType, base64 } = body;
+
+      if (!base64 || !contentType) {
+        return res.status(400).json({ error: 'Image file payload and contentType are required' });
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+      if (!allowedTypes.includes(contentType.toLowerCase())) {
+        return res.status(400).json({ error: 'Unsupported file type. Please upload a JPG, PNG, WebP, GIF, or SVG image.' });
+      }
+
+      const buffer = Buffer.from(base64, 'base64');
+      if (buffer.length > 5 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Image size exceeds maximum limit of 5MB.' });
+      }
+
+      const ext = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+      const cleanBase = (filename || 'featured').replace(/[^\w-]/g, '_').toLowerCase();
+      const objectKey = `blog/${Date.now()}-${cleanBase}.${ext}`;
+
+      const { createAdminClient } = await getSdk();
+      const host = getInsForgeHost();
+      const apiKey = getInsForgeApiKey();
+      const client = createAdminClient({ baseUrl: host, apiKey });
+
+      const bucket = client.storage.from('blog-media');
+      const blob = new Blob([buffer], { type: contentType });
+      const uploadRes = await bucket.upload(objectKey, blob);
+
+      if (uploadRes.error) {
+        console.error('[AdminAPI] Upload error:', uploadRes.error);
+        return res.status(500).json({ error: uploadRes.error.message || 'Failed to upload image to storage' });
+      }
+
+      return res.status(200).json({
+        success: true,
+        url: uploadRes.data.url,
+        key: objectKey
+      });
+    }
+
+    // ==========================================================
+    // 8. BLOG POSTS CRUD (UPGRADED CMS)
     // ==========================================================
     if (action === 'blog') {
       if (req.method === 'GET') {
@@ -665,9 +751,9 @@ module.exports = async function handler(req, res) {
         }
 
         const posts = await queryInsForge(`
-          SELECT id, slug, title, excerpt, featured_image, reading_time, author, status, published_at, created_at, updated_at 
+          SELECT id, slug, title, excerpt, featured_image, reading_time, author, status, tags, is_featured, scheduled_at, published_at, created_at, updated_at 
           FROM blog_posts 
-          ORDER BY published_at DESC, created_at DESC;
+          ORDER BY is_featured DESC, published_at DESC, created_at DESC;
         `);
         return res.status(200).json({ posts });
       }
@@ -679,22 +765,74 @@ module.exports = async function handler(req, res) {
         const excerpt = (body.excerpt || '').trim();
         const content = sanitizeHtml(body.content || '');
         const featuredImage = (body.featured_image || '').trim();
-        const readingTime = (body.reading_time || '5 min read').trim();
+        const readingTime = calculateReadingTime(content);
         const author = (body.author || 'GULLYGANG Editorial').trim();
         const seoTitle = (body.seo_title || title).trim();
         const seoDesc = (body.seo_description || excerpt).trim();
-        const status = body.status === 'draft' ? 'draft' : 'published';
+        const status = ['draft', 'scheduled', 'published'].includes(body.status) ? body.status : 'published';
+        const isFeatured = !!body.is_featured;
 
         if (!title) return res.status(400).json({ error: 'Article title is required' });
         if (!content) return res.status(400).json({ error: 'Article content is required' });
+        if (!isValidPostSlug(slug)) {
+          return res.status(400).json({ error: 'Invalid slug format. Use lowercase alphanumeric characters and hyphens.' });
+        }
+
+        // Uniqueness check for slug
+        const existing = await queryInsForge(`SELECT id FROM blog_posts WHERE slug = '${escapeSql(slug)}' LIMIT 1;`);
+        if (existing.length > 0) {
+          return res.status(409).json({ error: `The slug "${slug}" is already in use by another article.` });
+        }
+
+        // Parse scheduled_at
+        let scheduledAtSql = 'NULL';
+        if (status === 'scheduled' && body.scheduled_at) {
+          const pDate = new Date(body.scheduled_at);
+          if (!isNaN(pDate.getTime())) {
+            scheduledAtSql = `'${pDate.toISOString()}'::timestamptz`;
+          }
+        }
+
+        // Parse tags
+        let tagsArr = [];
+        if (Array.isArray(body.tags)) {
+          tagsArr = body.tags.map(t => String(t).trim().toLowerCase().replace(/[^\w-]/g, '')).filter(Boolean);
+        } else if (typeof body.tags === 'string') {
+          tagsArr = body.tags.split(',').map(t => t.trim().toLowerCase().replace(/[^\w-]/g, '')).filter(Boolean);
+        }
+        const tagsSql = tagsArr.length > 0 
+          ? `ARRAY[${tagsArr.map(t => `'${escapeSql(t)}'`).join(', ')}]::text[]`
+          : `'{}'::text[]`;
+
+        // If featured, atomically unset other featured posts
+        if (isFeatured) {
+          await queryInsForge(`UPDATE blog_posts SET is_featured = false;`);
+        }
 
         const inserted = await queryInsForge(`
-          INSERT INTO blog_posts (slug, title, excerpt, content, featured_image, reading_time, author, seo_title, seo_description, status, published_at, created_at, updated_at)
-          VALUES ('${escapeSql(slug)}', '${escapeSql(title)}', '${escapeSql(excerpt)}', '${escapeSql(content)}', '${escapeSql(featuredImage)}', '${escapeSql(readingTime)}', '${escapeSql(author)}', '${escapeSql(seoTitle)}', '${escapeSql(seoDesc)}', '${escapeSql(status)}', NOW(), NOW(), NOW())
+          INSERT INTO blog_posts (slug, title, excerpt, content, featured_image, reading_time, author, seo_title, seo_description, status, tags, is_featured, scheduled_at, published_at, created_at, updated_at)
+          VALUES (
+            '${escapeSql(slug)}', 
+            '${escapeSql(title)}', 
+            '${escapeSql(excerpt)}', 
+            '${escapeSql(content)}', 
+            '${escapeSql(featuredImage)}', 
+            '${escapeSql(readingTime)}', 
+            '${escapeSql(author)}', 
+            '${escapeSql(seoTitle)}', 
+            '${escapeSql(seoDesc)}', 
+            '${escapeSql(status)}',
+            ${tagsSql},
+            ${isFeatured},
+            ${scheduledAtSql},
+            NOW(), 
+            NOW(), 
+            NOW()
+          )
           RETURNING *;
         `);
         const newPost = inserted[0];
-        await recordSyncEvent('blog.created', newPost?.id, { slug, status });
+        await recordSyncEvent('blog.created', newPost?.id, { slug, status, is_featured: isFeatured });
         return res.status(201).json({ post: newPost });
       }
 
@@ -708,14 +846,49 @@ module.exports = async function handler(req, res) {
         const excerpt = (body.excerpt || '').trim();
         const content = sanitizeHtml(body.content || '');
         const featuredImage = (body.featured_image || '').trim();
-        const readingTime = (body.reading_time || '5 min read').trim();
+        const readingTime = calculateReadingTime(content);
         const author = (body.author || 'GULLYGANG Editorial').trim();
         const seoTitle = (body.seo_title || title).trim();
         const seoDesc = (body.seo_description || excerpt).trim();
-        const status = body.status === 'draft' ? 'draft' : 'published';
+        const status = ['draft', 'scheduled', 'published'].includes(body.status) ? body.status : 'published';
+        const isFeatured = !!body.is_featured;
 
         if (!title) return res.status(400).json({ error: 'Article title is required' });
         if (!content) return res.status(400).json({ error: 'Article content is required' });
+        if (!isValidPostSlug(slug)) {
+          return res.status(400).json({ error: 'Invalid slug format. Use lowercase alphanumeric characters and hyphens.' });
+        }
+
+        // Uniqueness check excluding self
+        const existing = await queryInsForge(`SELECT id FROM blog_posts WHERE slug = '${escapeSql(slug)}' AND id != '${escapeSql(id)}' LIMIT 1;`);
+        if (existing.length > 0) {
+          return res.status(409).json({ error: `The slug "${slug}" is already in use by another article.` });
+        }
+
+        // Parse scheduled_at
+        let scheduledAtSql = 'NULL';
+        if (status === 'scheduled' && body.scheduled_at) {
+          const pDate = new Date(body.scheduled_at);
+          if (!isNaN(pDate.getTime())) {
+            scheduledAtSql = `'${pDate.toISOString()}'::timestamptz`;
+          }
+        }
+
+        // Parse tags
+        let tagsArr = [];
+        if (Array.isArray(body.tags)) {
+          tagsArr = body.tags.map(t => String(t).trim().toLowerCase().replace(/[^\w-]/g, '')).filter(Boolean);
+        } else if (typeof body.tags === 'string') {
+          tagsArr = body.tags.split(',').map(t => t.trim().toLowerCase().replace(/[^\w-]/g, '')).filter(Boolean);
+        }
+        const tagsSql = tagsArr.length > 0 
+          ? `ARRAY[${tagsArr.map(t => `'${escapeSql(t)}'`).join(', ')}]::text[]`
+          : `'{}'::text[]`;
+
+        // If featured, atomically unset other featured posts
+        if (isFeatured) {
+          await queryInsForge(`UPDATE blog_posts SET is_featured = false WHERE id != '${escapeSql(id)}';`);
+        }
 
         const updated = await queryInsForge(`
           UPDATE blog_posts
@@ -729,12 +902,15 @@ module.exports = async function handler(req, res) {
               seo_title = '${escapeSql(seoTitle)}',
               seo_description = '${escapeSql(seoDesc)}',
               status = '${escapeSql(status)}',
+              tags = ${tagsSql},
+              is_featured = ${isFeatured},
+              scheduled_at = ${scheduledAtSql},
               updated_at = NOW()
           WHERE id = '${escapeSql(id)}'
           RETURNING *;
         `);
         const updatedPost = updated[0];
-        await recordSyncEvent('blog.updated', id, { slug, status });
+        await recordSyncEvent('blog.updated', id, { slug, status, is_featured: isFeatured });
         return res.status(200).json({ post: updatedPost });
       }
 

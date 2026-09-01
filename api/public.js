@@ -88,18 +88,18 @@ module.exports = async function handler(req, res) {
       if (slug) {
         const safeSlug = escapeSql(slug.trim());
         const rows = await queryInsForge(`
-          SELECT id, slug, title, excerpt, content, featured_image, reading_time, author, seo_title, seo_description, published_at
+          SELECT id, slug, title, excerpt, content, featured_image, reading_time, author, seo_title, seo_description, tags, is_featured, published_at
           FROM blog_posts
-          WHERE slug = '${safeSlug}' AND status = 'published';
+          WHERE slug = '${safeSlug}' AND (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()));
         `);
         return res.status(200).json(rows[0] || null);
       }
 
       const rows = await queryInsForge(`
-        SELECT id, slug, title, excerpt, featured_image, reading_time, author, published_at
+        SELECT id, slug, title, excerpt, featured_image, reading_time, author, tags, is_featured, published_at
         FROM blog_posts
-        WHERE status = 'published'
-        ORDER BY published_at DESC;
+        WHERE (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))
+        ORDER BY is_featured DESC, published_at DESC;
       `);
       return res.status(200).json(rows);
     }

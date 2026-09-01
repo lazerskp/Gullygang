@@ -8154,5 +8154,194 @@ body.admin-nav-open {
   }
 }
 
+/* ============================================================
+   STEP 7 — PREMIUM EDITORIAL CMS EDITOR STYLES
+   ============================================================ */
+.admin-modal-surface.is-editorial {
+  width: min(1140px, 96vw);
+  max-width: 1140px;
+  padding: 20px 24px;
+}
+
+.cms-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  min-height: 400px;
+}
+
+@media (max-width: 1023px) {
+  .cms-editor-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cms-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+}
+
+.cms-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cms-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.cms-toolbar-btn:active {
+  transform: scale(0.95);
+}
+
+.cms-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border-subtle);
+  margin: 0 4px;
+}
+
+.cms-textarea {
+  width: 100%;
+  min-height: 380px;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0 0 8px 8px;
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.cms-textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.cms-preview-pane {
+  background: rgba(14, 14, 19, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px 20px;
+  min-height: 380px;
+  max-height: 520px;
+  overflow-y: auto;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.cms-preview-pane h1, .cms-preview-pane h2, .cms-preview-pane h3 {
+  color: var(--text-primary);
+  font-weight: 700;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+}
+
+.cms-preview-pane h2 { font-size: 1.35em; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; }
+.cms-preview-pane h3 { font-size: 1.15em; }
+.cms-preview-pane p { margin-bottom: 1em; color: var(--text-secondary); }
+.cms-preview-pane blockquote {
+  border-left: 3px solid var(--accent-primary);
+  padding-left: 14px;
+  margin: 1em 0;
+  font-style: italic;
+  color: var(--text-primary);
+}
+.cms-preview-pane ul { list-style-type: disc; padding-left: 20px; margin-bottom: 1em; color: var(--text-secondary); }
+.cms-preview-pane ol { list-style-type: decimal; padding-left: 20px; margin-bottom: 1em; color: var(--text-secondary); }
+.cms-preview-pane code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+}
+.cms-preview-pane pre {
+  background: #070709;
+  border: 1px solid var(--border-subtle);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+.cms-preview-pane pre code { background: transparent; padding: 0; }
+.cms-preview-pane img { max-width: 100%; border-radius: 8px; margin: 1em 0; }
+.cms-preview-pane a { color: var(--accent-primary); text-decoration: underline; }
+
+.cms-char-badge {
+  font-size: 11px;
+  font-family: monospace;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-tertiary);
+  transition: all 0.2s ease;
+}
+
+.cms-char-badge.is-good {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.cms-char-badge.is-warn {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.cms-dropzone {
+  border: 1px dashed var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.2s ease;
+}
+
+.cms-dropzone:hover, .cms-dropzone.is-dragover {
+  border-color: var(--accent-primary);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.cms-image-preview-box {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: #000;
+}
+
+.cms-image-preview-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 
 
