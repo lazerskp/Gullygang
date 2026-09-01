@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#070709" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+
+  <title>GULLYGANG Admin Control Center</title>
+
+  <!-- Immediate Theme Hydration (Prevents Flash) -->
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('gullygang_theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        } else {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- Google Fonts & Stylesheet -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Cabinet+Grotesk:wght@800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="admin-body-layout min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
+
+  <!-- ============================================================
+       1. UNAUTHENTICATED STATE: MINIMAL LUXURY LOGIN SCREEN
+       ============================================================ -->
+  <div id="admin-login-view" class="admin-login-wrapper flex items-center justify-center min-h-screen p-4">
+    <div class="admin-login-card w-full max-w-md">
+      <div class="admin-login-header text-center mb-8">
+        <span class="admin-brand-eyebrow">CONTROL CENTER</span>
+        <h1 class="admin-brand-title">GULLYGANG</h1>
+        <p class="admin-brand-subtitle">Secure management access</p>
+      </div>
+
+      <div id="login-error-banner" class="admin-alert-banner hidden" role="alert">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span id="login-error-text">Invalid credentials</span>
+      </div>
+
+      <form id="admin-login-form" class="space-y-4" autocomplete="off">
+        <div class="form-group">
+          <label for="admin-email" class="form-label">Email Address</label>
+          <input type="email" id="admin-email" class="form-input" placeholder="admin@gullygang.in" required autocomplete="username" />
+        </div>
+
+        <div class="form-group">
+          <div class="flex items-center justify-between">
+            <label for="admin-password" class="form-label">Password</label>
+            <button type="button" id="btn-toggle-pwd" class="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Show</button>
+          </div>
+          <input type="password" id="admin-password" class="form-input" placeholder="••••••••••••" required autocomplete="current-password" />
+        </div>
+
+        <button type="submit" id="btn-login-submit" class="admin-primary-btn w-full mt-2">
+          <span class="btn-text">Sign In</span>
+          <span class="btn-loader hidden">
+            <svg class="animate-spin" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" stroke-dasharray="40" stroke-dashoffset="15"></circle>
+            </svg>
+          </span>
+        </button>
+      </form>
+
+      <div class="admin-login-footer text-center mt-8">
+        <a href="/" class="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">&larr; Return to Public Website</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       2. AUTHENTICATED STATE: FULL ADMIN CONTROL CENTER
+       ============================================================ -->
+  <div id="admin-dashboard-view" class="admin-dashboard-layout hidden flex min-h-screen">
+    
+    <!-- Collapsible Sidebar Navigation -->
+    <aside class="admin-sidebar" id="admin-sidebar">
+      <div class="admin-sidebar-header flex items-center justify-between p-5 border-b border-[var(--border-subtle)]">
+        <a href="/admin" class="flex items-center gap-2 text-decoration-none">
+          <span class="font-extrabold tracking-wider text-base">GULLYGANG</span>
+          <span class="admin-badge-pill">ADMIN</span>
+        </a>
+        <button type="button" id="btn-close-mobile-nav" class="lg:hidden p-1 text-[var(--text-secondary)]" aria-label="Close Navigation">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <nav class="admin-nav-menu p-3 space-y-1" aria-label="Admin Navigation">
+        <button type="button" class="admin-nav-item is-active" data-tab="overview">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          <span>Overview</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-tab="playlists">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15V6M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM12 12H3M16 6H3M12 18H3"/></svg>
+          <span>Playlists</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-tab="songs">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span>Songs & Queue</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-tab="visuals">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+          <span>Visuals</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-tab="blog">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>Blog Posts</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-tab="ads">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+          <span>Advertisements</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-tab="settings">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Site Settings</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-tab="users">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Admin Users</span>
+        </button>
+      </nav>
+
+      <div class="admin-sidebar-footer mt-auto p-4 border-t border-[var(--border-subtle)] space-y-2">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+          <span id="admin-user-email-label" class="text-xs text-[var(--text-secondary)] truncate">admin@gullygang.in</span>
+        </div>
+        <button type="button" id="btn-admin-logout" class="admin-logout-btn w-full">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Admin Workspace Area -->
+    <main class="admin-main-workspace flex-1 flex flex-col min-w-0">
+      
+      <!-- Top Action Bar -->
+      <header class="admin-topbar flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+        <div class="flex items-center gap-3">
+          <button type="button" id="btn-open-mobile-nav" class="lg:hidden p-2 text-[var(--text-secondary)]" aria-label="Open Navigation">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          </button>
+          <h2 id="current-tab-title" class="text-lg font-bold text-[var(--text-primary)]">Overview</h2>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <!-- Day / Night Theme Toggle -->
+          <button type="button" id="btn-theme-toggle" class="theme-toggle-btn" aria-label="Toggle Light/Dark Theme" title="Toggle Theme">
+            <svg class="theme-icon-sun" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <svg class="theme-icon-moon hidden" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </button>
+
+          <a href="/" target="_blank" class="admin-subtle-btn flex items-center gap-1 text-xs">
+            <span>View Public Site</span>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></svg>
+          </a>
+        </div>
+      </header>
+
+      <!-- Dynamic Tab Content Panels -->
+      <div class="admin-content-viewport p-6 flex-1 overflow-y-auto">
+        
+        <!-- 1. OVERVIEW TAB -->
+        <section id="tab-overview" class="admin-tab-panel">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="admin-stat-card">
+              <span class="stat-label">Playlists</span>
+              <div class="stat-value-row">
+                <span id="stat-playlists-active" class="stat-num font-extrabold">--</span>
+                <span id="stat-playlists-total" class="stat-sub">/ -- total</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <span class="stat-label">Total Songs</span>
+              <div class="stat-value-row">
+                <span id="stat-songs-total" class="stat-num font-extrabold">--</span>
+                <span class="stat-sub">in rotation</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <span class="stat-label">Visual Atmosphere</span>
+              <div class="stat-value-row">
+                <span id="stat-visuals-active" class="stat-num font-extrabold">--</span>
+                <span id="stat-visuals-total" class="stat-sub">/ -- active</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <span class="stat-label">Blog Stories</span>
+              <div class="stat-value-row">
+                <span id="stat-blogs-published" class="stat-num font-extrabold">--</span>
+                <span id="stat-blogs-total" class="stat-sub">/ -- total</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="admin-section-box">
+            <h3 class="text-sm font-bold tracking-wider uppercase text-[var(--text-secondary)] mb-4">Quick Management Actions</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button type="button" class="admin-quick-action-btn" onclick="AdminApp.switchTab('songs'); AdminApp.openAddSongModal();">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Add Song to Queue</span>
+              </button>
+              <button type="button" class="admin-quick-action-btn" onclick="AdminApp.switchTab('blog'); AdminApp.openAddPostModal();">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Write Editorial Story</span>
+              </button>
+              <button type="button" class="admin-quick-action-btn" onclick="AdminApp.switchTab('visuals'); AdminApp.openAddVisualModal();">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Add Background Visual</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. PLAYLISTS TAB -->
+        <section id="tab-playlists" class="admin-tab-panel hidden">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-sm text-[var(--text-secondary)]">Manage public music stations, artwork, and YouTube source sync.</p>
+            <button type="button" class="admin-primary-btn text-xs py-2 px-3" onclick="AdminApp.openAddPlaylistModal()">
+              + New Playlist
+            </button>
+          </div>
+          <div class="admin-table-container">
+            <table class="admin-data-table">
+              <thead>
+                <tr>
+                  <th>Playlist</th>
+                  <th>Slug</th>
+                  <th>Songs</th>
+                  <th>Order</th>
+                  <th>Status</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="playlists-table-body">
+                <tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">Loading playlists...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 3. SONGS & QUEUE TAB -->
+        <section id="tab-songs" class="admin-tab-panel hidden">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div class="flex items-center gap-3">
+              <select id="song-playlist-filter" class="form-select text-xs py-2 px-3" onchange="AdminApp.loadSongs()">
+                <option value="">All Playlists</option>
+              </select>
+              <input type="text" id="song-search-input" class="form-input text-xs py-2 px-3 w-48" placeholder="Search title/artist..." oninput="AdminApp.debounceLoadSongs()" />
+            </div>
+            <button type="button" class="admin-primary-btn text-xs py-2 px-3" onclick="AdminApp.openAddSongModal()">
+              + Add Song
+            </button>
+          </div>
+          <div class="admin-table-container">
+            <table class="admin-data-table">
+              <thead>
+                <tr>
+                  <th>Track</th>
+                  <th>Artist</th>
+                  <th>Playlist</th>
+                  <th>YouTube ID</th>
+                  <th>Order</th>
+                  <th>Status</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="songs-table-body">
+                <tr><td colspan="7" class="text-center py-6 text-[var(--text-tertiary)]">Loading songs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 4. VISUALS TAB -->
+        <section id="tab-visuals" class="admin-tab-panel hidden">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-sm text-[var(--text-secondary)]">Manage atmospheric video backgrounds synced with music player.</p>
+            <button type="button" class="admin-primary-btn text-xs py-2 px-3" onclick="AdminApp.openAddVisualModal()">
+              + Add Visual
+            </button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="visuals-grid-container">
+            <div class="col-span-full text-center py-6 text-[var(--text-tertiary)]">Loading visuals...</div>
+          </div>
+        </section>
+
+        <!-- 5. BLOG POSTS TAB -->
+        <section id="tab-blog" class="admin-tab-panel hidden">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-sm text-[var(--text-secondary)]">Publish and manage editorial stories, rankings, and culture articles.</p>
+            <button type="button" class="admin-primary-btn text-xs py-2 px-3" onclick="AdminApp.openAddPostModal()">
+              + Write New Article
+            </button>
+          </div>
+          <div class="admin-table-container">
+            <table class="admin-data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Slug</th>
+                  <th>Reading Time</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="blog-table-body">
+                <tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">Loading articles...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 6. ADVERTISEMENTS TAB -->
+        <section id="tab-ads" class="admin-tab-panel hidden max-w-3xl">
+          <div class="admin-section-box space-y-6">
+            <div>
+              <h3 class="text-base font-bold text-[var(--text-primary)]">Direct In-Flow Advertisements</h3>
+              <p class="text-xs text-[var(--text-secondary)] mt-1">Configure natural direct ad placements without heavy cards or box wrappers.</p>
+            </div>
+
+            <form id="ads-settings-form" class="space-y-4" onsubmit="AdminApp.saveAdsSettings(event)">
+              <div class="flex items-center justify-between py-3 border-b border-[var(--border-subtle)]">
+                <div>
+                  <p class="text-sm font-semibold text-[var(--text-primary)]">Blog Placement #1 (Above Recent Stories)</p>
+                  <p class="text-xs text-[var(--text-tertiary)]">Native editorial sponsor slot on /blog</p>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="ad-blog-1-active" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="flex items-center justify-between py-3 border-b border-[var(--border-subtle)]">
+                <div>
+                  <p class="text-sm font-semibold text-[var(--text-primary)]">Blog Placement #2 (Below Recent Stories)</p>
+                  <p class="text-xs text-[var(--text-tertiary)]">Bottom responsive ad banner on /blog</p>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="ad-blog-2-active" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="flex items-center justify-between py-3 border-b border-[var(--border-subtle)]">
+                <div>
+                  <p class="text-sm font-semibold text-[var(--text-primary)]">About Page Placement #1</p>
+                  <p class="text-xs text-[var(--text-tertiary)]">Top sponsor placement on modal / about</p>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="ad-about-1-active" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="flex items-center justify-between py-3 border-b border-[var(--border-subtle)]">
+                <div>
+                  <p class="text-sm font-semibold text-[var(--text-primary)]">About Page Placement #2</p>
+                  <p class="text-xs text-[var(--text-tertiary)]">Bottom sponsor placement on modal / about</p>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="ad-about-2-active" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Ad Micro-Label</label>
+                <input type="text" id="ad-label-text" class="form-input" value="ADVERTISEMENT" />
+              </div>
+
+              <button type="submit" class="admin-primary-btn mt-4">Save Ad Settings</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- 7. SITE SETTINGS TAB -->
+        <section id="tab-settings" class="admin-tab-panel hidden max-w-3xl">
+          <div class="admin-section-box space-y-6">
+            <div>
+              <h3 class="text-base font-bold text-[var(--text-primary)]">Global Website Settings</h3>
+              <p class="text-xs text-[var(--text-secondary)] mt-1">Configure brand metadata, support destinations, and system maintenance.</p>
+            </div>
+
+            <form id="general-settings-form" class="space-y-4" onsubmit="AdminApp.saveGeneralSettings(event)">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="form-group">
+                  <label class="form-label">Site Name</label>
+                  <input type="text" id="setting-site-name" class="form-input" value="GULLYGANG" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Tagline</label>
+                  <input type="text" id="setting-tagline" class="form-input" value="Music That Feels Different" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Support GULLYGANG Link</label>
+                <input type="url" id="setting-support-link" class="form-input" placeholder="https://pages.razorpay.com/gullygang" />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="form-group">
+                  <label class="form-label">Instagram URL</label>
+                  <input type="url" id="setting-instagram-url" class="form-input" placeholder="https://instagram.com/gullygang" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">YouTube Channel URL</label>
+                  <input type="url" id="setting-youtube-url" class="form-input" placeholder="https://youtube.com/@gullygang" />
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between py-3 border-t border-[var(--border-subtle)]">
+                <div>
+                  <p class="text-sm font-semibold text-[var(--text-primary)]">Maintenance Mode</p>
+                  <p class="text-xs text-[var(--text-tertiary)]">Shows maintenance page to public visitors while allowing admin access</p>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" id="setting-maintenance-mode" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <button type="submit" class="admin-primary-btn mt-4">Save Site Settings</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- 8. ADMIN USERS TAB -->
+        <section id="tab-users" class="admin-tab-panel hidden max-w-4xl">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-sm text-[var(--text-secondary)]">Authorized administrators with project control access.</p>
+            <button type="button" class="admin-primary-btn text-xs py-2 px-3" onclick="AdminApp.openAddUserModal()">
+              + Add Admin User
+            </button>
+          </div>
+          <div class="admin-table-container">
+            <table class="admin-data-table">
+              <thead>
+                <tr>
+                  <th>Admin Email</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Verified</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body">
+                <tr><td colspan="5" class="text-center py-6 text-[var(--text-tertiary)]">Loading admin users...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ============================================================
+       3. MODAL DIALOGS (SHARED & ACCESSIBLE)
+       ============================================================ -->
+  <!-- Generic Modal Backdrop & Frame -->
+  <div id="admin-modal-backdrop" class="admin-modal-backdrop hidden" onclick="AdminApp.closeModal(event)">
+    <div class="admin-modal-surface" onclick="event.stopPropagation()">
+      <div class="admin-modal-header flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+        <h3 id="admin-modal-title" class="text-base font-bold text-[var(--text-primary)]">Modal Title</h3>
+        <button type="button" class="text-[var(--text-secondary)] hover:text-[var(--text-primary)]" onclick="AdminApp.closeModal()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="admin-modal-content" class="admin-modal-body py-4"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Node -->
+  <div id="admin-toast-container" class="admin-toast-container" aria-live="polite"></div>
+
+  <!-- Admin Application Client Controller -->
+  <script>
+    const AdminApp = (function() {
+      const TOKEN_KEY = 'gullygang_admin_token';
+      const USER_KEY = 'gullygang_admin_user';
+
+      let currentTab = 'overview';
+      let songDebounceTimer = null;
+
+      function getToken() {
+        return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+      }
+
+      function setSession(token, user) {
+        sessionStorage.setItem(TOKEN_KEY, token);
+        sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+      }
+
+      function clearSession() {
+        sessionStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(USER_KEY);
+        localStorage.removeItem(TOKEN_KEY);
+      }
+
+      async function apiRequest(action, options = {}) {
+        const token = getToken();
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          ...(options.headers || {})
+        };
+
+        const method = options.method || 'GET';
+        const url = `/api/admin?action=${action}` + (options.params ? `&${new URLSearchParams(options.params).toString()}` : '');
+
+        try {
+          const res = await fetch(url, {
+            method,
+            headers,
+            body: options.body ? JSON.stringify(options.body) : undefined
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (res.status === 401 || res.status === 403) {
+            if (action !== 'login') {
+              showToast('Session expired or unauthorized. Please sign in.', 'error');
+              clearSession();
+              showLoginView();
+            }
+          }
+          return { ok: res.ok, status: res.status, data };
+        } catch (err) {
+          console.error('[AdminApp] Request error:', err);
+          return { ok: false, status: 500, data: { error: 'Network communication failure' } };
+        }
+      }
+
+      function showToast(message, type = 'success') {
+        const container = document.getElementById('admin-toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = `admin-toast ${type === 'error' ? 'is-error' : 'is-success'}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => {
+          toast.classList.add('fade-out');
+          setTimeout(() => toast.remove(), 300);
+        }, 3000);
+      }
+
+      function showLoginView() {
+        document.getElementById('admin-login-view').classList.remove('hidden');
+        document.getElementById('admin-dashboard-view').classList.add('hidden');
+      }
+
+      function showDashboardView(user) {
+        document.getElementById('admin-login-view').classList.add('hidden');
+        document.getElementById('admin-dashboard-view').classList.remove('hidden');
+        document.getElementById('admin-user-email-label').textContent = user?.email || 'admin@gullygang.in';
+        loadTabData(currentTab);
+      }
+
+      async function checkAuth() {
+        const token = getToken();
+        if (!token) {
+          showLoginView();
+          return;
+        }
+
+        const res = await apiRequest('session');
+        if (res.ok && res.data.user) {
+          showDashboardView(res.data.user);
+        } else {
+          clearSession();
+          showLoginView();
+        }
+      }
+
+      function switchTab(tabId) {
+        currentTab = tabId;
+        document.querySelectorAll('.admin-nav-item').forEach(btn => {
+          btn.classList.toggle('is-active', btn.getAttribute('data-tab') === tabId);
+        });
+        document.querySelectorAll('.admin-tab-panel').forEach(panel => {
+          panel.classList.toggle('hidden', panel.id !== `tab-${tabId}`);
+        });
+        const titles = {
+          overview: 'Overview',
+          playlists: 'Playlists Management',
+          songs: 'Songs & Queue',
+          visuals: 'Visuals Atmosphere',
+          blog: 'Blog Articles',
+          ads: 'Advertisements',
+          settings: 'Site Settings',
+          users: 'Admin Users'
+        };
+        document.getElementById('current-tab-title').textContent = titles[tabId] || 'Admin';
+        loadTabData(tabId);
+        
+        // Close mobile nav drawer if open
+        document.getElementById('admin-sidebar').classList.remove('is-open-mobile');
+      }
+
+      function loadTabData(tabId) {
+        if (tabId === 'overview') loadOverview();
+        if (tabId === 'playlists') loadPlaylists();
+        if (tabId === 'songs') loadSongs();
+        if (tabId === 'visuals') loadVisuals();
+        if (tabId === 'blog') loadBlog();
+        if (tabId === 'ads') loadAds();
+        if (tabId === 'settings') loadSettings();
+        if (tabId === 'users') loadUsers();
+      }
+
+      async function loadOverview() {
+        const res = await apiRequest('overview');
+        if (res.ok && res.data.counts) {
+          const c = res.data.counts;
+          document.getElementById('stat-playlists-active').textContent = c.playlists_active;
+          document.getElementById('stat-playlists-total').textContent = `/ ${c.playlists_total} total`;
+          document.getElementById('stat-songs-total').textContent = c.songs_total;
+          document.getElementById('stat-visuals-active').textContent = c.visuals_active;
+          document.getElementById('stat-visuals-total').textContent = `/ ${c.visuals_total} active`;
+          document.getElementById('stat-blogs-published').textContent = c.blogs_published;
+          document.getElementById('stat-blogs-total').textContent = `/ ${c.blogs_total} total`;
+        }
+      }
+
+      async function loadPlaylists() {
+        const tbody = document.getElementById('playlists-table-body');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">Loading...</td></tr>';
+        const res = await apiRequest('playlists');
+        if (res.ok && res.data.playlists) {
+          if (res.data.playlists.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">No playlists found</td></tr>';
+            return;
+          }
+          tbody.innerHTML = res.data.playlists.map(p => `
+            <tr>
+              <td>
+                <div class="flex items-center gap-3">
+                  <span class="text-xl">${p.icon || '🎵'}</span>
+                  <div>
+                    <p class="font-bold text-[var(--text-primary)]">${escapeHtml(p.name)}</p>
+                    <p class="text-xs text-[var(--text-tertiary)] truncate max-w-xs">${escapeHtml(p.youtube_playlist_url || '')}</p>
+                  </div>
+                </div>
+              </td>
+              <td><code>${escapeHtml(p.slug)}</code></td>
+              <td><span class="admin-badge-pill">${p.song_count || 0} tracks</span></td>
+              <td>${p.display_order || 0}</td>
+              <td>
+                <span class="admin-status-badge ${p.is_active ? 'is-active' : 'is-inactive'}">
+                  ${p.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </td>
+              <td class="text-right">
+                <button type="button" class="admin-action-link text-xs mr-2" onclick='AdminApp.openEditPlaylistModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>Edit</button>
+                <button type="button" class="admin-action-link text-xs text-red-400" onclick="AdminApp.confirmDeletePlaylist('${p.id}', '${escapeHtml(p.name)}')">Delete</button>
+              </td>
+            </tr>
+          `).join('');
+
+          // Hydrate playlist filter in Songs tab
+          const filter = document.getElementById('song-playlist-filter');
+          filter.innerHTML = '<option value="">All Playlists</option>' + res.data.playlists.map(p => `
+            <option value="${p.id}">${escapeHtml(p.name)} (${p.song_count || 0})</option>
+          `).join('');
+        }
+      }
+
+      async function loadSongs() {
+        const tbody = document.getElementById('songs-table-body');
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-[var(--text-tertiary)]">Loading...</td></tr>';
+        const playlistId = document.getElementById('song-playlist-filter').value;
+        const q = document.getElementById('song-search-input').value.trim();
+
+        const res = await apiRequest('songs', { params: { playlist_id: playlistId, q } });
+        if (res.ok && res.data.songs) {
+          if (res.data.songs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-[var(--text-tertiary)]">No songs matching criteria</td></tr>';
+            return;
+          }
+          tbody.innerHTML = res.data.songs.map(s => `
+            <tr>
+              <td>
+                <div class="flex items-center gap-2.5">
+                  <img src="${s.thumbnail || `https://i.ytimg.com/vi/${s.youtube_id}/default.jpg`}" class="w-8 h-8 rounded object-cover" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 1 1\\'%3E%3Crect width=\\'1\\' height=\\'1\\' fill=\\'%23111\\'/ %3E%3C/svg%3E'" />
+                  <span class="font-semibold text-xs text-[var(--text-primary)] max-w-xs truncate">${escapeHtml(s.title)}</span>
+                </div>
+              </td>
+              <td class="text-xs text-[var(--text-secondary)]">${escapeHtml(s.artist || 'GULLYGANG')}</td>
+              <td class="text-xs">${escapeHtml(s.playlist_name || '—')}</td>
+              <td><a href="https://youtu.be/${s.youtube_id}" target="_blank" class="text-xs font-mono text-[var(--accent-primary)] hover:underline">${s.youtube_id}</a></td>
+              <td class="text-xs">${s.display_order || 0}</td>
+              <td><span class="admin-status-badge ${s.is_active !== false ? 'is-active' : 'is-inactive'}">${s.is_active !== false ? 'Active' : 'Hidden'}</span></td>
+              <td class="text-right">
+                <button type="button" class="admin-action-link text-xs mr-2" onclick='AdminApp.openEditSongModal(${JSON.stringify(s).replace(/'/g, "&#39;")})'>Edit</button>
+                <button type="button" class="admin-action-link text-xs text-red-400" onclick="AdminApp.confirmDeleteSong('${s.id}', '${escapeHtml(s.title)}')">Delete</button>
+              </td>
+            </tr>
+          `).join('');
+        }
+      }
+
+      function debounceLoadSongs() {
+        clearTimeout(songDebounceTimer);
+        songDebounceTimer = setTimeout(() => loadSongs(), 300);
+      }
+
+      async function loadVisuals() {
+        const grid = document.getElementById('visuals-grid-container');
+        grid.innerHTML = '<div class="col-span-full text-center py-6 text-[var(--text-tertiary)]">Loading visuals...</div>';
+        const res = await apiRequest('visuals');
+        if (res.ok && res.data.visuals) {
+          if (res.data.visuals.length === 0) {
+            grid.innerHTML = '<div class="col-span-full text-center py-6 text-[var(--text-tertiary)]">No visuals registered</div>';
+            return;
+          }
+          grid.innerHTML = res.data.visuals.map(v => `
+            <div class="admin-visual-card">
+              <div class="visual-card-preview relative aspect-video bg-black rounded-lg overflow-hidden mb-3">
+                <iframe src="${v.url}${v.url.includes('?') ? '&' : '?'}autoplay=0&controls=0&mute=1" class="w-full h-full pointer-events-none" loading="lazy"></iframe>
+              </div>
+              <div class="flex items-start justify-between">
+                <div>
+                  <h4 class="font-bold text-sm text-[var(--text-primary)]">${escapeHtml(v.name)}</h4>
+                  <p class="text-xs text-[var(--text-tertiary)] font-mono truncate max-w-xs">${escapeHtml(v.url)}</p>
+                </div>
+                <span class="admin-status-badge ${v.is_active ? 'is-active' : 'is-inactive'}">${v.is_active ? 'Active' : 'Off'}</span>
+              </div>
+              <div class="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-subtle)] text-xs">
+                <span class="text-[var(--text-tertiary)]">Order: ${v.display_order || 0}</span>
+                <div class="flex gap-2">
+                  <button type="button" class="admin-action-link" onclick='AdminApp.openEditVisualModal(${JSON.stringify(v).replace(/'/g, "&#39;")})'>Edit</button>
+                  <button type="button" class="admin-action-link text-red-400" onclick="AdminApp.confirmDeleteVisual('${v.id}', '${escapeHtml(v.name)}')">Delete</button>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        }
+      }
+
+      async function loadBlog() {
+        const tbody = document.getElementById('blog-table-body');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">Loading articles...</td></tr>';
+        const res = await apiRequest('blog');
+        if (res.ok && res.data.posts) {
+          if (res.data.posts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">No articles published</td></tr>';
+            return;
+          }
+          tbody.innerHTML = res.data.posts.map(p => `
+            <tr>
+              <td>
+                <div class="flex items-center gap-3">
+                  ${p.featured_image ? `<img src="${p.featured_image}" class="w-10 h-10 rounded object-cover" />` : ''}
+                  <div>
+                    <p class="font-bold text-xs text-[var(--text-primary)] max-w-sm">${escapeHtml(p.title)}</p>
+                    <p class="text-xs text-[var(--text-tertiary)] truncate max-w-xs">${escapeHtml(p.excerpt || '')}</p>
+                  </div>
+                </div>
+              </td>
+              <td><code>${escapeHtml(p.slug)}</code></td>
+              <td class="text-xs text-[var(--text-secondary)]">${escapeHtml(p.reading_time || '5 min')}</td>
+              <td><span class="admin-status-badge ${p.status === 'published' ? 'is-active' : 'is-inactive'}">${p.status}</span></td>
+              <td class="text-xs text-[var(--text-tertiary)]">${new Date(p.published_at || p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+              <td class="text-right">
+                <button type="button" class="admin-action-link text-xs mr-2" onclick="AdminApp.openEditPostModal('${p.id}')">Edit</button>
+                <a href="/${p.slug}" target="_blank" class="admin-action-link text-xs mr-2 text-[var(--accent-primary)]">View</a>
+                <button type="button" class="admin-action-link text-xs text-red-400" onclick="AdminApp.confirmDeletePost('${p.id}', '${escapeHtml(p.title)}')">Delete</button>
+              </td>
+            </tr>
+          `).join('');
+        }
+      }
+
+      async function loadAds() {
+        const res = await apiRequest('ads');
+        if (res.ok && res.data.ads) {
+          const a = res.data.ads;
+          document.getElementById('ad-blog-1-active').checked = !!a.blog_ad_1_active;
+          document.getElementById('ad-blog-2-active').checked = !!a.blog_ad_2_active;
+          document.getElementById('ad-about-1-active').checked = !!a.about_ad_1_active;
+          document.getElementById('ad-about-2-active').checked = !!a.about_ad_2_active;
+          document.getElementById('ad-label-text').value = a.ad_label || 'ADVERTISEMENT';
+        }
+      }
+
+      async function saveAdsSettings(e) {
+        e.preventDefault();
+        const payload = {
+          blog_ad_1_active: document.getElementById('ad-blog-1-active').checked,
+          blog_ad_2_active: document.getElementById('ad-blog-2-active').checked,
+          about_ad_1_active: document.getElementById('ad-about-1-active').checked,
+          about_ad_2_active: document.getElementById('ad-about-2-active').checked,
+          ad_label: document.getElementById('ad-label-text').value.trim() || 'ADVERTISEMENT',
+          provider: 'adsterra'
+        };
+        const res = await apiRequest('ads', { method: 'PUT', body: payload });
+        if (res.ok) {
+          showToast('Advertisement settings updated successfully');
+        } else {
+          showToast(res.data.error || 'Failed to update ads settings', 'error');
+        }
+      }
+
+      async function loadSettings() {
+        const res = await apiRequest('settings');
+        if (res.ok && res.data.settings) {
+          const s = res.data.settings;
+          document.getElementById('setting-site-name').value = s.site_name || 'GULLYGANG';
+          document.getElementById('setting-tagline').value = s.tagline || 'Music That Feels Different';
+          document.getElementById('setting-support-link').value = s.support_link || '';
+          document.getElementById('setting-instagram-url').value = s.instagram_url || '';
+          document.getElementById('setting-youtube-url').value = s.youtube_url || '';
+          document.getElementById('setting-maintenance-mode').checked = !!s.maintenance_mode;
+        }
+      }
+
+      async function saveGeneralSettings(e) {
+        e.preventDefault();
+        const payload = {
+          site_name: document.getElementById('setting-site-name').value.trim(),
+          tagline: document.getElementById('setting-tagline').value.trim(),
+          support_link: document.getElementById('setting-support-link').value.trim(),
+          instagram_url: document.getElementById('setting-instagram-url').value.trim(),
+          youtube_url: document.getElementById('setting-youtube-url').value.trim(),
+          maintenance_mode: document.getElementById('setting-maintenance-mode').checked
+        };
+        const res = await apiRequest('settings', { method: 'PUT', body: payload });
+        if (res.ok) {
+          showToast('General site settings updated');
+        } else {
+          showToast(res.data.error || 'Failed to save settings', 'error');
+        }
+      }
+
+      async function loadUsers() {
+        const tbody = document.getElementById('users-table-body');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-[var(--text-tertiary)]">Loading...</td></tr>';
+        const res = await apiRequest('users');
+        if (res.ok && res.data.users) {
+          tbody.innerHTML = res.data.users.map(u => `
+            <tr>
+              <td class="font-bold text-xs text-[var(--text-primary)]">${escapeHtml(u.email)}</td>
+              <td class="text-xs text-[var(--text-secondary)]">${escapeHtml(u.profile?.name || 'Administrator')}</td>
+              <td><span class="admin-badge-pill">Project Admin</span></td>
+              <td><span class="admin-status-badge is-active">Verified</span></td>
+              <td class="text-xs text-[var(--text-tertiary)]">${new Date(u.created_at).toLocaleDateString()}</td>
+            </tr>
+          `).join('');
+        }
+      }
+
+      // Modals and form helpers
+      function openModal(title, html) {
+        document.getElementById('admin-modal-title').textContent = title;
+        document.getElementById('admin-modal-content').innerHTML = html;
+        document.getElementById('admin-modal-backdrop').classList.remove('hidden');
+      }
+
+      function closeModal() {
+        document.getElementById('admin-modal-backdrop').classList.add('hidden');
+      }
+
+      function openAddPlaylistModal() {
+        openModal('Create New Playlist', `
+          <form class="space-y-3" onsubmit="AdminApp.handleSavePlaylist(event)">
+            <div class="form-group">
+              <label class="form-label">Playlist Name</label>
+              <input type="text" id="m-playlist-name" class="form-input" placeholder="e.g. Desi Hip Hop" required />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Slug</label>
+                <input type="text" id="m-playlist-slug" class="form-input" placeholder="desi-hip-hop" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Emoji / Icon</label>
+                <input type="text" id="m-playlist-icon" class="form-input" value="🔥" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">YouTube Playlist URL / ID</label>
+              <input type="text" id="m-playlist-url" class="form-input" placeholder="https://youtube.com/playlist?list=..." />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Display Order</label>
+                <input type="number" id="m-playlist-order" class="form-input" value="1" />
+              </div>
+              <div class="form-group flex items-center pt-5">
+                <label class="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" id="m-playlist-active" checked />
+                  <span>Active & Visible</span>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="admin-primary-btn w-full mt-4">Save Playlist</button>
+          </form>
+        `);
+      }
+
+      function openEditPlaylistModal(p) {
+        openModal('Edit Playlist', `
+          <form class="space-y-3" onsubmit="AdminApp.handleSavePlaylist(event, '${p.id}')">
+            <div class="form-group">
+              <label class="form-label">Playlist Name</label>
+              <input type="text" id="m-playlist-name" class="form-input" value="${escapeHtml(p.name)}" required />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Slug</label>
+                <input type="text" id="m-playlist-slug" class="form-input" value="${escapeHtml(p.slug || '')}" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Emoji / Icon</label>
+                <input type="text" id="m-playlist-icon" class="form-input" value="${escapeHtml(p.icon || '🎵')}" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">YouTube Playlist URL / ID</label>
+              <input type="text" id="m-playlist-url" class="form-input" value="${escapeHtml(p.youtube_playlist_url || '')}" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Display Order</label>
+                <input type="number" id="m-playlist-order" class="form-input" value="${p.display_order || 0}" />
+              </div>
+              <div class="form-group flex items-center pt-5">
+                <label class="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" id="m-playlist-active" ${p.is_active ? 'checked' : ''} />
+                  <span>Active & Visible</span>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="admin-primary-btn w-full mt-4">Update Playlist</button>
+          </form>
+        `);
+      }
+
+      async function handleSavePlaylist(e, id = null) {
+        e.preventDefault();
+        const payload = {
+          id,
+          name: document.getElementById('m-playlist-name').value.trim(),
+          slug: document.getElementById('m-playlist-slug').value.trim(),
+          icon: document.getElementById('m-playlist-icon').value.trim(),
+          youtube_playlist_url: document.getElementById('m-playlist-url').value.trim(),
+          display_order: parseInt(document.getElementById('m-playlist-order').value || 0),
+          is_active: document.getElementById('m-playlist-active').checked
+        };
+
+        const res = await apiRequest('playlists', {
+          method: id ? 'PUT' : 'POST',
+          body: payload
+        });
+
+        if (res.ok) {
+          showToast(id ? 'Playlist updated' : 'Playlist created');
+          closeModal();
+          loadPlaylists();
+        } else {
+          showToast(res.data.error || 'Failed to save playlist', 'error');
+        }
+      }
+
+      function confirmDeletePlaylist(id, name) {
+        openModal('Delete Playlist', `
+          <div class="space-y-4">
+            <p class="text-sm text-[var(--text-secondary)]">Are you sure you want to delete <strong>${name}</strong>? All songs associated with this playlist will also be removed.</p>
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" class="admin-subtle-btn text-xs" onclick="AdminApp.closeModal()">Cancel</button>
+              <button type="button" class="admin-primary-btn text-xs bg-red-600 hover:bg-red-700" onclick="AdminApp.deletePlaylist('${id}')">Delete Permanently</button>
+            </div>
+          </div>
+        `);
+      }
+
+      async function deletePlaylist(id) {
+        const res = await apiRequest('playlists', { method: 'DELETE', params: { id } });
+        if (res.ok) {
+          showToast('Playlist deleted');
+          closeModal();
+          loadPlaylists();
+        } else {
+          showToast(res.data.error || 'Delete failed', 'error');
+        }
+      }
+
+      function openAddSongModal() {
+        const playlistId = document.getElementById('song-playlist-filter').value;
+        openModal('Add Song to Queue', `
+          <form class="space-y-3" onsubmit="AdminApp.handleSaveSong(event)">
+            <div class="form-group">
+              <label class="form-label">Song Title</label>
+              <input type="text" id="m-song-title" class="form-input" placeholder="e.g. Dior" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Artist Name</label>
+              <input type="text" id="m-song-artist" class="form-input" placeholder="e.g. Karan Aujla" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">YouTube URL or 11-char Video ID</label>
+              <input type="text" id="m-song-yt" class="form-input" placeholder="https://youtu.be/... or video ID" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target Playlist</label>
+              <select id="m-song-playlist" class="form-select w-full">
+                ${document.getElementById('song-playlist-filter').innerHTML.replace('value=""', 'value="" disabled')}
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Display Order</label>
+                <input type="number" id="m-song-order" class="form-input" value="1" />
+              </div>
+              <div class="form-group flex items-center pt-5">
+                <label class="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" id="m-song-active" checked />
+                  <span>Active Track</span>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="admin-primary-btn w-full mt-4">Add Song</button>
+          </form>
+        `);
+        if (playlistId) {
+          const select = document.getElementById('m-song-playlist');
+          if (select) select.value = playlistId;
+        }
+      }
+
+      function openEditSongModal(s) {
+        openModal('Edit Song', `
+          <form class="space-y-3" onsubmit="AdminApp.handleSaveSong(event, '${s.id}')">
+            <div class="form-group">
+              <label class="form-label">Song Title</label>
+              <input type="text" id="m-song-title" class="form-input" value="${escapeHtml(s.title)}" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Artist Name</label>
+              <input type="text" id="m-song-artist" class="form-input" value="${escapeHtml(s.artist || '')}" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">YouTube URL or ID</label>
+              <input type="text" id="m-song-yt" class="form-input" value="${escapeHtml(s.youtube_id)}" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Playlist</label>
+              <select id="m-song-playlist" class="form-select w-full">
+                ${document.getElementById('song-playlist-filter').innerHTML.replace('value=""', 'value="" disabled')}
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Display Order</label>
+                <input type="number" id="m-song-order" class="form-input" value="${s.display_order || 0}" />
+              </div>
+              <div class="form-group flex items-center pt-5">
+                <label class="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" id="m-song-active" ${s.is_active !== false ? 'checked' : ''} />
+                  <span>Active Track</span>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="admin-primary-btn w-full mt-4">Update Song</button>
+          </form>
+        `);
+        const select = document.getElementById('m-song-playlist');
+        if (select && s.playlist_id) select.value = s.playlist_id;
+      }
+
+      async function handleSaveSong(e, id = null) {
+        e.preventDefault();
+        const payload = {
+          id,
+          title: document.getElementById('m-song-title').value.trim(),
+          artist: document.getElementById('m-song-artist').value.trim(),
+          youtube_id: document.getElementById('m-song-yt').value.trim(),
+          playlist_id: document.getElementById('m-song-playlist').value,
+          display_order: parseInt(document.getElementById('m-song-order').value || 0),
+          is_active: document.getElementById('m-song-active').checked
+        };
+
+        const res = await apiRequest('songs', {
+          method: id ? 'PUT' : 'POST',
+          body: payload
+        });
+
+        if (res.ok) {
+          showToast(id ? 'Song updated' : 'Song added to rotation');
+          closeModal();
+          loadSongs();
+        } else {
+          showToast(res.data.error || 'Failed to save song', 'error');
+        }
+      }
+
+      function confirmDeleteSong(id, title) {
+        openModal('Delete Song', `
+          <div class="space-y-4">
+            <p class="text-sm text-[var(--text-secondary)]">Remove <strong>${title}</strong> from this playlist?</p>
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" class="admin-subtle-btn text-xs" onclick="AdminApp.closeModal()">Cancel</button>
+              <button type="button" class="admin-primary-btn text-xs bg-red-600 hover:bg-red-700" onclick="AdminApp.deleteSong('${id}')">Remove</button>
+            </div>
+          </div>
+        `);
+      }
+
+      async function deleteSong(id) {
+        const res = await apiRequest('songs', { method: 'DELETE', params: { id } });
+        if (res.ok) {
+          showToast('Song removed');
+          closeModal();
+          loadSongs();
+        } else {
+          showToast(res.data.error || 'Delete failed', 'error');
+        }
+      }
+
+      function openAddVisualModal() {
+        openModal('Add Background Visual', `
+          <form class="space-y-3" onsubmit="AdminApp.handleSaveVisual(event)">
+            <div class="form-group">
+              <label class="form-label">Visual Name / Atmosphere</label>
+              <input type="text" id="m-visual-name" class="form-input" placeholder="e.g. Tokyo Midnight Rain" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Video Stream URL (YouTube Embed / MP4)</label>
+              <input type="url" id="m-visual-url" class="form-input" placeholder="https://www.youtube.com/embed/..." required />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Display Order</label>
+                <input type="number" id="m-visual-order" class="form-input" value="1" />
+              </div>
+              <div class="form-group flex items-center pt-5">
+                <label class="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" id="m-visual-active" checked />
+                  <span>Active in Atmosphere</span>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="admin-primary-btn w-full mt-4">Save Visual</button>
+          </form>
+        `);
+      }
+
+      function openEditVisualModal(v) {
+        openModal('Edit Visual Atmosphere', `
+          <form class="space-y-3" onsubmit="AdminApp.handleSaveVisual(event, '${v.id}')">
+            <div class="form-group">
+              <label class="form-label">Visual Name</label>
+              <input type="text" id="m-visual-name" class="form-input" value="${escapeHtml(v.name)}" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Video URL</label>
+              <input type="url" id="m-visual-url" class="form-input" value="${escapeHtml(v.url)}" required />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Display Order</label>
+                <input type="number" id="m-visual-order" class="form-input" value="${v.display_order || 0}" />
+              </div>
+              <div class="form-group flex items-center pt-5">
+                <label class="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" id="m-visual-active" ${v.is_active ? 'checked' : ''} />
+                  <span>Active in Atmosphere</span>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="admin-primary-btn w-full mt-4">Update Visual</button>
+          </form>
+        `);
+      }
+
+      async function handleSaveVisual(e, id = null) {
+        e.preventDefault();
+        const payload = {
+          id,
+          name: document.getElementById('m-visual-name').value.trim(),
+          url: document.getElementById('m-visual-url').value.trim(),
+          display_order: parseInt(document.getElementById('m-visual-order').value || 0),
+          is_active: document.getElementById('m-visual-active').checked
+        };
+
+        const res = await apiRequest('visuals', {
+          method: id ? 'PUT' : 'POST',
+          body: payload
+        });
+
+        if (res.ok) {
+          showToast(id ? 'Visual updated' : 'Visual added');
+          closeModal();
+          loadVisuals();
+        } else {
+          showToast(res.data.error || 'Failed to save visual', 'error');
+        }
+      }
+
+      function confirmDeleteVisual(id, name) {
+        openModal('Delete Visual', `
+          <div class="space-y-4">
+            <p class="text-sm text-[var(--text-secondary)]">Delete visual atmosphere <strong>${name}</strong>?</p>
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" class="admin-subtle-btn text-xs" onclick="AdminApp.closeModal()">Cancel</button>
+              <button type="button" class="admin-primary-btn text-xs bg-red-600 hover:bg-red-700" onclick="AdminApp.deleteVisual('${id}')">Delete</button>
+            </div>
+          </div>
+        `);
+      }
+
+      async function deleteVisual(id) {
+        const res = await apiRequest('visuals', { method: 'DELETE', params: { id } });
+        if (res.ok) {
+          showToast('Visual removed');
+          closeModal();
+          loadVisuals();
+        } else {
+          showToast(res.data.error || 'Delete failed', 'error');
+        }
+      }
+
+      function openAddPostModal() {
+        openModal('Write Editorial Article', `
+          <form class="space-y-3" onsubmit="AdminApp.handleSavePost(event)">
+            <div class="form-group">
+              <label class="form-label">Article Title</label>
+              <input type="text" id="m-post-title" class="form-input" placeholder="e.g. The Evolution of Drill Rap in South Asia" required oninput="AdminApp.autoFillSlug()" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Slug</label>
+                <input type="text" id="m-post-slug" class="form-input" placeholder="evolution-of-drill-rap" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Reading Time</label>
+                <input type="text" id="m-post-time" class="form-input" value="5 min read" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Featured Image URL</label>
+              <input type="url" id="m-post-img" class="form-input" placeholder="https://images.unsplash.com/..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Short Excerpt</label>
+              <textarea id="m-post-excerpt" class="form-textarea h-16" placeholder="Brief summary of the story..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Article Content (Markdown)</label>
+              <textarea id="m-post-content" class="form-textarea h-48 font-mono text-xs" placeholder="## Section Title\n\nArticle paragraph content..." required></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Status</label>
+                <select id="m-post-status" class="form-select w-full">
+                  <option value="published">Published</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Author</label>
+                <input type="text" id="m-post-author" class="form-input" value="GULLYGANG Editorial" />
+              </div>
+            </div>
+            <button type="submit" class="admin-primary-btn w-full mt-4">Publish Article</button>
+          </form>
+        `);
+      }
+
+      async function openEditPostModal(id) {
+        const res = await apiRequest('blog', { params: { id } });
+        if (!res.ok || !res.data.post) return showToast('Failed to load article', 'error');
+        const p = res.data.post;
+
+        openModal('Edit Article', `
+          <form class="space-y-3" onsubmit="AdminApp.handleSavePost(event, '${p.id}')">
+            <div class="form-group">
+              <label class="form-label">Article Title</label>
+              <input type="text" id="m-post-title" class="form-input" value="${escapeHtml(p.title)}" required />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Slug</label>
+                <input type="text" id="m-post-slug" class="form-input" value="${escapeHtml(p.slug)}" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Reading Time</label>
+                <input type="text" id="m-post-time" class="form-input" value="${escapeHtml(p.reading_time || '5 min read')}" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Featured Image URL</label>
+              <input type="url" id="m-post-img" class="form-input" value="${escapeHtml(p.featured_image || '')}" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Short Excerpt</label>
+              <textarea id="m-post-excerpt" class="form-textarea h-16">${escapeHtml(p.excerpt || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Article Content (Markdown)</label>
+              <textarea id="m-post-content" class="form-textarea h-48 font-mono text-xs" required>${escapeHtml(p.content || '')}</textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="form-group">
+                <label class="form-label">Status</label>
+                <select id="m-post-status" class="form-select w-full">
+                  <option value="published" ${p.status === 'published' ? 'selected' : ''}>Published</option>
+                  <option value="draft" ${p.status === 'draft' ? 'selected' : ''}>Draft</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Author</label>
+                <input type="text" id="m-post-author" class="form-input" value="${escapeHtml(p.author || 'GULLYGANG Editorial')}" />
+              </div>
+            </div>
+            <button type="submit" class="admin-primary-btn w-full mt-4">Save Changes</button>
+          </form>
+        `);
+      }
+
+      function autoFillSlug() {
+        const title = document.getElementById('m-post-title').value;
+        const slug = document.getElementById('m-post-slug');
+        if (slug && (!slug.dataset.manual || slug.value === '')) {
+          slug.value = title.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
+        }
+      }
+
+      async function handleSavePost(e, id = null) {
+        e.preventDefault();
+        const payload = {
+          id,
+          title: document.getElementById('m-post-title').value.trim(),
+          slug: document.getElementById('m-post-slug').value.trim(),
+          excerpt: document.getElementById('m-post-excerpt').value.trim(),
+          content: document.getElementById('m-post-content').value.trim(),
+          featured_image: document.getElementById('m-post-img').value.trim(),
+          reading_time: document.getElementById('m-post-time').value.trim(),
+          author: document.getElementById('m-post-author').value.trim(),
+          status: document.getElementById('m-post-status').value
+        };
+
+        const res = await apiRequest('blog', {
+          method: id ? 'PUT' : 'POST',
+          body: payload
+        });
+
+        if (res.ok) {
+          showToast(id ? 'Article updated' : 'Article published');
+          closeModal();
+          loadBlog();
+        } else {
+          showToast(res.data.error || 'Failed to save article', 'error');
+        }
+      }
+
+      function confirmDeletePost(id, title) {
+        openModal('Delete Article', `
+          <div class="space-y-4">
+            <p class="text-sm text-[var(--text-secondary)]">Delete article <strong>${title}</strong>? This action cannot be undone.</p>
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" class="admin-subtle-btn text-xs" onclick="AdminApp.closeModal()">Cancel</button>
+              <button type="button" class="admin-primary-btn text-xs bg-red-600 hover:bg-red-700" onclick="AdminApp.deletePost('${id}')">Delete Article</button>
+            </div>
+          </div>
+        `);
+      }
+
+      async function deletePost(id) {
+        const res = await apiRequest('blog', { method: 'DELETE', params: { id } });
+        if (res.ok) {
+          showToast('Article deleted');
+          closeModal();
+          loadBlog();
+        } else {
+          showToast(res.data.error || 'Delete failed', 'error');
+        }
+      }
+
+      function openAddUserModal() {
+        openModal('Add Project Admin', `
+          <form class="space-y-3" onsubmit="AdminApp.handleSaveUser(event)">
+            <div class="form-group">
+              <label class="form-label">Full Name</label>
+              <input type="text" id="m-user-name" class="form-input" placeholder="Admin Name" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Admin Email</label>
+              <input type="email" id="m-user-email" class="form-input" placeholder="colleague@gullygang.in" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Temporary Password</label>
+              <input type="password" id="m-user-password" class="form-input" placeholder="••••••••••••" required />
+            </div>
+            <button type="submit" class="admin-primary-btn w-full mt-4">Create Admin Account</button>
+          </form>
+        `);
+      }
+
+      async function handleSaveUser(e) {
+        e.preventDefault();
+        const payload = {
+          name: document.getElementById('m-user-name').value.trim(),
+          email: document.getElementById('m-user-email').value.trim(),
+          password: document.getElementById('m-user-password').value
+        };
+
+        const res = await apiRequest('users', {
+          method: 'POST',
+          body: payload
+        });
+
+        if (res.ok) {
+          showToast('Admin user created successfully');
+          closeModal();
+          loadUsers();
+        } else {
+          showToast(res.data.error || 'Failed to create user', 'error');
+        }
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function init() {
+        // Attach Tab Click Delegation
+        document.querySelectorAll('.admin-nav-item').forEach(btn => {
+          btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+        });
+
+        // Mobile Nav Toggles
+        document.getElementById('btn-open-mobile-nav')?.addEventListener('click', () => {
+          document.getElementById('admin-sidebar').classList.add('is-open-mobile');
+        });
+        document.getElementById('btn-close-mobile-nav')?.addEventListener('click', () => {
+          document.getElementById('admin-sidebar').classList.remove('is-open-mobile');
+        });
+
+        // Login Form Submission
+        document.getElementById('admin-login-form')?.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const email = document.getElementById('admin-email').value.trim();
+          const password = document.getElementById('admin-password').value;
+          const submitBtn = document.getElementById('btn-login-submit');
+          const errorBanner = document.getElementById('login-error-banner');
+          const errorText = document.getElementById('login-error-text');
+
+          submitBtn.disabled = true;
+          submitBtn.querySelector('.btn-text').classList.add('hidden');
+          submitBtn.querySelector('.btn-loader').classList.remove('hidden');
+          errorBanner.classList.add('hidden');
+
+          const res = await apiRequest('login', {
+            method: 'POST',
+            body: { email, password }
+          });
+
+          submitBtn.disabled = false;
+          submitBtn.querySelector('.btn-text').classList.remove('hidden');
+          submitBtn.querySelector('.btn-loader').classList.add('hidden');
+
+          if (res.ok && res.data.accessToken) {
+            setSession(res.data.accessToken, res.data.user);
+            showDashboardView(res.data.user);
+            showToast('Welcome to GULLYGANG Admin Control Center');
+          } else {
+            errorText.textContent = res.data.error || 'Invalid credentials or unauthorized account';
+            errorBanner.classList.remove('hidden');
+          }
+        });
+
+        // Toggle Password Visibility
+        document.getElementById('btn-toggle-pwd')?.addEventListener('click', function() {
+          const input = document.getElementById('admin-password');
+          if (input.type === 'password') {
+            input.type = 'text';
+            this.textContent = 'Hide';
+          } else {
+            input.type = 'password';
+            this.textContent = 'Show';
+          }
+        });
+
+        // Logout
+        document.getElementById('btn-admin-logout')?.addEventListener('click', () => {
+          clearSession();
+          showLoginView();
+          showToast('Signed out of Admin');
+        });
+
+        // Day/Night Theme Toggle
+        document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
+          if (window.ThemeEngine) {
+            window.ThemeEngine.toggle();
+          } else {
+            const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+            const next = cur === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('gullygang_theme', next);
+          }
+        });
+
+        // Verify initial auth session
+        checkAuth();
+      }
+
+      return {
+        init,
+        switchTab,
+        loadTabData,
+        loadPlaylists,
+        loadSongs,
+        debounceLoadSongs,
+        loadVisuals,
+        loadBlog,
+        loadAds,
+        saveAdsSettings,
+        loadSettings,
+        saveGeneralSettings,
+        loadUsers,
+        openModal,
+        closeModal,
+        openAddPlaylistModal,
+        openEditPlaylistModal,
+        handleSavePlaylist,
+        confirmDeletePlaylist,
+        deletePlaylist,
+        openAddSongModal,
+        openEditSongModal,
+        handleSaveSong,
+        confirmDeleteSong,
+        deleteSong,
+        openAddVisualModal,
+        openEditVisualModal,
+        handleSaveVisual,
+        confirmDeleteVisual,
+        deleteVisual,
+        openAddPostModal,
+        openEditPostModal,
+        autoFillSlug,
+        handleSavePost,
+        confirmDeletePost,
+        deletePost,
+        openAddUserModal,
+        handleSaveUser
+      };
+    })();
+
+    document.addEventListener('DOMContentLoaded', AdminApp.init);
+  </script>
+</body>
+</html>

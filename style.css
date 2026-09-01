@@ -6940,4 +6940,510 @@ body.is-stage-hidden .top-weather-hub {
   }
 }
 
+/* ============================================================
+   GULLYGANG ADMIN CONTROL CENTER STYLES
+   ============================================================ */
+
+.admin-body-layout {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+}
+
+/* 1. Admin Login View */
+.admin-login-wrapper {
+  background: radial-gradient(circle at 50% 30%, rgba(16, 185, 129, 0.05) 0%, transparent 60%), var(--bg-primary);
+}
+
+.admin-login-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 36px 32px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+}
+
+.admin-brand-eyebrow {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  margin-bottom: 6px;
+}
+
+.admin-brand-title {
+  font-family: 'Cabinet Grotesk', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.admin-brand-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.admin-alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+/* 2. Admin Form Controls */
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.form-textarea {
+  resize: vertical;
+}
+
+/* 3. Buttons & Status Badges */
+.admin-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 8px;
+  background: var(--accent-primary);
+  color: #050507;
+  font-weight: 700;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.admin-primary-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.admin-primary-btn:active {
+  transform: translateY(0);
+}
+
+.admin-primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-subtle-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.admin-subtle-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+
+.admin-action-link {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.admin-action-link:hover {
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+
+.admin-logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.admin-badge-pill {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-primary);
+}
+
+.admin-status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  text-transform: capitalize;
+}
+
+.admin-status-badge.is-active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.admin-status-badge.is-inactive {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+}
+
+/* Switch Toggle */
+.switch-toggle {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+}
+
+.switch-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-toggle .slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border-subtle);
+  transition: .3s;
+  border-radius: 24px;
+}
+
+.switch-toggle .slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+.switch-toggle input:checked + .slider {
+  background-color: var(--accent-primary);
+}
+
+.switch-toggle input:checked + .slider:before {
+  transform: translateX(18px);
+}
+
+/* 4. Dashboard Layout & Sidebar */
+.admin-sidebar {
+  width: 250px;
+  min-width: 250px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.admin-nav-item:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.admin-nav-item.is-active {
+  background: var(--bg-card);
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.admin-nav-item.is-active svg {
+  stroke: var(--accent-primary);
+}
+
+.admin-main-workspace {
+  background: var(--bg-primary);
+}
+
+/* 5. Stat Cards & Content Boxes */
+.admin-stat-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.admin-stat-card .stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.admin-stat-card .stat-num {
+  font-size: 24px;
+  color: var(--text-primary);
+}
+
+.admin-stat-card .stat-sub {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-left: 4px;
+}
+
+.admin-section-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 22px 24px;
+}
+
+.admin-quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.admin-quick-action-btn:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+/* 6. Admin Data Tables */
+.admin-table-container {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.admin-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.admin-data-table th {
+  padding: 12px 16px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-data-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.admin-data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-data-table tr:hover td {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* 7. Visuals Grid */
+.admin-visual-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+/* 8. Modals & Toast */
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.admin-modal-surface {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 24px;
+  width: min(580px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.admin-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.admin-toast {
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  animation: slideInToast 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.3s ease;
+  pointer-events: auto;
+}
+
+.admin-toast.is-success {
+  background: #10b981;
+  color: #050507;
+}
+
+.admin-toast.is-error {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.admin-toast.fade-out {
+  opacity: 0;
+}
+
+@keyframes slideInToast {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 9. Mobile Responsive Drawer */
+@media (max-width: 1023px) {
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 999;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .admin-sidebar.is-open-mobile {
+    transform: translateX(0);
+  }
+}
+
+
 

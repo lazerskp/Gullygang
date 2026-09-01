@@ -6933,6 +6933,9 @@
           }
         }
 
+        // Skip admin portal navigation (standalone authenticated control center)
+        if (targetUrl.pathname === '/admin' || targetUrl.pathname.startsWith('/admin/')) return;
+
         // Intercept internal page navigation!
         e.preventDefault();
         navigateTo(targetUrl.pathname + targetUrl.search + targetUrl.hash, true);
