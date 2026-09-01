@@ -86,6 +86,9 @@
        ============================================================ -->
   <div id="admin-dashboard-view" class="admin-dashboard-layout hidden flex min-h-screen">
     
+    <!-- Mobile Nav Drawer Backdrop -->
+    <div id="admin-nav-backdrop" class="admin-nav-backdrop hidden" aria-hidden="true"></div>
+
     <!-- Collapsible Sidebar Navigation -->
     <aside class="admin-sidebar" id="admin-sidebar">
       <div class="admin-sidebar-header flex items-center justify-between p-5 border-b border-[var(--border-subtle)]">
@@ -605,6 +608,8 @@
         
         // Close mobile nav drawer if open
         document.getElementById('admin-sidebar').classList.remove('is-open-mobile');
+        document.getElementById('admin-nav-backdrop')?.classList.add('hidden');
+        document.body.classList.remove('admin-nav-open');
       }
 
       function loadTabData(tabId) {
@@ -1445,12 +1450,28 @@
           btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
         });
 
-        // Mobile Nav Toggles
-        document.getElementById('btn-open-mobile-nav')?.addEventListener('click', () => {
-          document.getElementById('admin-sidebar').classList.add('is-open-mobile');
-        });
-        document.getElementById('btn-close-mobile-nav')?.addEventListener('click', () => {
-          document.getElementById('admin-sidebar').classList.remove('is-open-mobile');
+        // Mobile Nav Drawer (off-canvas with backdrop, Escape + backdrop close)
+        const adminSidebar = document.getElementById('admin-sidebar');
+        const adminNavBackdrop = document.getElementById('admin-nav-backdrop');
+
+        function openAdminNavDrawer() {
+          adminSidebar?.classList.add('is-open-mobile');
+          adminNavBackdrop?.classList.remove('hidden');
+          document.body.classList.add('admin-nav-open');
+        }
+
+        function closeAdminNavDrawer() {
+          adminSidebar?.classList.remove('is-open-mobile');
+          adminNavBackdrop?.classList.add('hidden');
+          document.body.classList.remove('admin-nav-open');
+        }
+
+        document.getElementById('btn-open-mobile-nav')?.addEventListener('click', openAdminNavDrawer);
+        document.getElementById('btn-close-mobile-nav')?.addEventListener('click', closeAdminNavDrawer);
+        adminNavBackdrop?.addEventListener('click', closeAdminNavDrawer);
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') closeAdminNavDrawer();
         });
 
         // Login Form Submission
