@@ -4947,24 +4947,48 @@
   // ============================================================
   // AUTHORITATIVE DAY / NIGHT THEME ENGINE
   // ============================================================
+  // ============================================================
+  // GULLYGANG EDITORIAL BLOG-ONLY THEME ENGINE (DAY / NIGHT)
+  // Scoped exclusively to /blog and article reader pages
+  // ============================================================
   const ThemeEngine = (function () {
-    const STORAGE_KEY = 'gullygang_theme';
+    const STORAGE_KEY = 'gullygang_blog_theme';
 
-    function getPreferredTheme() {
+    function isBlogContext() {
+      if (typeof document === 'undefined') return false;
+      const curView = document.getElementById('app-router-view');
+      const pageType = curView?.getAttribute('data-page');
+      if (pageType === 'blog' || pageType === 'article') return true;
+      const path = (typeof window !== 'undefined' ? window.location.pathname : '');
+      return path.startsWith('/blog') || path.startsWith('/top-10-rappers');
+    }
+
+    function getPreferredBlogTheme() {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored === 'light' || stored === 'dark') return stored;
+        if (stored === 'day' || stored === 'night') return stored;
+        if (stored === 'light') return 'day';
+        if (stored === 'dark') return 'night';
       } catch (e) {}
-      return 'dark';
+      return 'night'; // Default to signature night mode
     }
 
     function applyTheme(theme, persist = true) {
-      const normalized = theme === 'light' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', normalized);
-      document.documentElement.classList.toggle('light-theme', normalized === 'light');
-      document.documentElement.classList.toggle('dark-theme', normalized === 'dark');
+      const normalized = (theme === 'day' || theme === 'light') ? 'day' : 'night';
+      
+      if (isBlogContext()) {
+        document.documentElement.setAttribute('data-blog-theme', normalized);
+        document.documentElement.setAttribute('data-theme', normalized === 'day' ? 'light' : 'dark');
+        document.documentElement.classList.toggle('blog-day-theme', normalized === 'day');
+        document.documentElement.classList.toggle('blog-night-theme', normalized === 'night');
+      } else {
+        document.documentElement.removeAttribute('data-blog-theme');
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.classList.remove('blog-day-theme');
+        document.documentElement.classList.remove('blog-night-theme');
+      }
 
-      if (persist) {
+      if (persist && isBlogContext()) {
         try {
           localStorage.setItem(STORAGE_KEY, normalized);
         } catch (e) {}
@@ -4974,38 +4998,44 @@
     }
 
     function updateToggleButtons(theme) {
-      const toggleBtns = document.querySelectorAll('#btn-theme-toggle, .btn-theme-toggle');
+      const toggleBtns = document.querySelectorAll('#btn-theme-toggle, .blog-theme-toggle-btn, .btn-theme-toggle');
       toggleBtns.forEach((btn) => {
         const sunIcon = btn.querySelector('.theme-icon-sun');
         const moonIcon = btn.querySelector('.theme-icon-moon');
-        if (theme === 'light') {
+        if (theme === 'day') {
           sunIcon?.classList.add('hidden');
           moonIcon?.classList.remove('hidden');
-          btn.setAttribute('aria-label', 'Switch to Dark theme');
-          btn.setAttribute('title', 'Switch to Dark theme');
+          btn.setAttribute('aria-label', 'Switch to Night mode');
+          btn.setAttribute('title', 'Switch to Night mode');
         } else {
           sunIcon?.classList.remove('hidden');
           moonIcon?.classList.add('hidden');
-          btn.setAttribute('aria-label', 'Switch to Light theme');
-          btn.setAttribute('title', 'Switch to Light theme');
+          btn.setAttribute('aria-label', 'Switch to Day mode');
+          btn.setAttribute('title', 'Switch to Day mode');
         }
       });
     }
 
     function toggle() {
-      const current = document.documentElement.getAttribute('data-theme') || getPreferredTheme();
-      const newTheme = current === 'light' ? 'dark' : 'light';
+      if (!isBlogContext()) return;
+      const current = document.documentElement.getAttribute('data-blog-theme') || getPreferredBlogTheme();
+      const newTheme = (current === 'day' || current === 'light') ? 'night' : 'day';
       applyTheme(newTheme, true);
     }
 
     function init() {
-      const activeTheme = document.documentElement.getAttribute('data-theme') || getPreferredTheme();
-      applyTheme(activeTheme, false);
+      if (isBlogContext()) {
+        const activeTheme = getPreferredBlogTheme();
+        applyTheme(activeTheme, false);
+      } else {
+        document.documentElement.removeAttribute('data-blog-theme');
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
 
       if (!window.__gullygang_theme_delegation_attached) {
         window.__gullygang_theme_delegation_attached = true;
         document.addEventListener('click', (e) => {
-          const btn = e.target.closest('#btn-theme-toggle, .btn-theme-toggle');
+          const btn = e.target.closest('#btn-theme-toggle, .blog-theme-toggle-btn, .btn-theme-toggle');
           if (btn) {
             e.preventDefault();
             e.stopPropagation();
@@ -5019,7 +5049,8 @@
       init,
       toggle,
       applyTheme,
-      getTheme: () => document.documentElement.getAttribute('data-theme') || getPreferredTheme()
+      isBlogContext,
+      getTheme: () => isBlogContext() ? (document.documentElement.getAttribute('data-blog-theme') || getPreferredBlogTheme()) : 'night'
     };
 
     if (typeof window !== 'undefined') {
@@ -5027,6 +5058,73 @@
     }
 
     return engine;
+  })();
+
+  // ============================================================
+  // GULLYGANG EDITORIAL BLOG STORIES FEED ENGINE
+  // Hydrates stories from secure /api/public endpoint with clean layout
+  // ============================================================
+  const BlogEngine = (function () {
+    async function init() {
+      const feed = document.getElementById('blog-stories-feed');
+      if (!feed) return;
+
+      try {
+        const res = await fetch('/api/public?type=blog');
+        if (res.ok) {
+          const posts = await res.json();
+          if (Array.isArray(posts) && posts.length > 0) {
+            renderPosts(posts);
+          }
+        }
+      } catch (err) {
+        console.warn('[BlogEngine] Failed to load remote stories, keeping fallback feed:', err);
+      }
+    }
+
+    function renderPosts(posts) {
+      const feed = document.getElementById('blog-stories-feed');
+      if (!feed) return;
+
+      feed.innerHTML = posts.map((post, idx) => {
+        const url = post.slug === 'top-10-rappers-in-india' ? '/top-10-rappers-in-india' : `/blog#${post.slug}`;
+        const dateStr = post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Editorial';
+        
+        // In-flow ad after the first story with natural collapse
+        const adHtml = (idx === 0) ? `
+          <div class="blog-direct-ad-section editorial-ad-placement-wrap" id="blog-ad-section-1" data-ad-placement="1" aria-label="Sponsored Advertisement">
+            <div class="editorial-ad-slot-box editorial-ad-native-box" id="adsterra-blog-container-1"></div>
+          </div>
+        ` : '';
+
+        return `
+          <article class="blog-story-row">
+            <a href="${url}" class="blog-story-link group">
+              <div class="blog-story-thumb-wrap">
+                <img src="${post.featured_image || 'https://gullygang.in/brand-cover.png'}" alt="${escapeHtml(post.title)}" class="blog-story-thumb" loading="lazy" decoding="async" />
+              </div>
+              <div class="blog-story-body">
+                <div class="blog-story-meta">
+                  <span>${dateStr}</span>
+                  <span class="blog-meta-dot">&bull;</span>
+                  <span>${escapeHtml(post.reading_time || '4 min read')}</span>
+                </div>
+                <h2 class="blog-story-title">${escapeHtml(post.title)}</h2>
+                <p class="blog-story-excerpt">${escapeHtml(post.excerpt || '')}</p>
+              </div>
+            </a>
+          </article>
+          <div class="blog-hairline-sep" aria-hidden="true"></div>
+          ${adHtml}
+        `;
+      }).join('');
+
+      if (window.AdsterraEngine && typeof window.AdsterraEngine.init === 'function') {
+        window.AdsterraEngine.init();
+      }
+    }
+
+    return { init };
   })();
 
   // ============================================================
@@ -6820,6 +6918,7 @@
       }
 
       ThemeEngine.init();
+      BlogEngine.init();
       LegalPagesEngine.init();
       UserPlaylistEngine.init();
       SupportEngine.init();
