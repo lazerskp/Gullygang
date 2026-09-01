@@ -25,8 +25,42 @@ module.exports = async function handler(req, res) {
   const type = url.searchParams.get('type') || 'playlists';
 
   try {
-    // 0. Public Sync Version (Real-time synchronization check)
-    if (type === 'sync_version' || type === 'events') {
+    // 0. Native Push Realtime Stream (Server-Sent Events)
+    if (type === 'events' || type === 'stream') {
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.status(200);
+
+      const rows = await queryInsForge(`SELECT value, updated_at FROM site_settings WHERE key = 'sync_version';`);
+      const val = rows[0]?.value || { version: Date.now() };
+      res.write(`event: init\ndata: ${JSON.stringify(val)}\n\n`);
+
+      const { registerSseSubscriber, unregisterSseSubscriber } = require('./_db.js');
+      registerSseSubscriber(res);
+
+      const heartbeat = setInterval(() => {
+        try {
+          res.write(`event: ping\ndata: {"time":${Date.now()}}\n\n`);
+        } catch (_) {
+          clearInterval(heartbeat);
+          unregisterSseSubscriber(res);
+        }
+      }, 15000);
+      if (heartbeat.unref) heartbeat.unref();
+
+      req.on('close', () => {
+        clearInterval(heartbeat);
+        unregisterSseSubscriber(res);
+      });
+
+      // Stream remains open until client disconnects
+      return;
+    }
+
+    // 0.5 Lightweight sync version check (for offline recovery only)
+    if (type === 'sync_version') {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       const rows = await queryInsForge(`SELECT value, updated_at FROM site_settings WHERE key = 'sync_version';`);
       const val = rows[0]?.value || {};

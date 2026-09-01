@@ -107,6 +107,42 @@ function isValidUrl(str) {
   }
 }
 
+let cachedAdminClient = null;
+
+/**
+ * Get or initialize privileged InsForge SDK Client
+ */
+async function getAdminClient() {
+  if (cachedAdminClient) return cachedAdminClient;
+  const { createAdminClient } = await import('@insforge/sdk');
+  const host = getInsForgeHost();
+  const apiKey = getInsForgeApiKey();
+  cachedAdminClient = createAdminClient({ baseUrl: host, apiKey });
+  return cachedAdminClient;
+}
+
+// In-memory registry for active SSE event stream listeners
+const sseSubscribers = new Set();
+
+function registerSseSubscriber(res) {
+  sseSubscribers.add(res);
+}
+
+function unregisterSseSubscriber(res) {
+  sseSubscribers.delete(res);
+}
+
+function broadcastSseEvent(event, data) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseSubscribers) {
+    try {
+      client.write(payload);
+    } catch (_) {
+      sseSubscribers.delete(client);
+    }
+  }
+}
+
 /**
  * Record atomic sync change event for real-time client synchronization
  */
@@ -130,9 +166,14 @@ async function recordSyncEvent(type, entityId = null, extra = {}) {
       ON CONFLICT (key) DO UPDATE
       SET value = EXCLUDED.value, updated_at = NOW();
     `);
+
+    // Immediately push to all active SSE subscribers!
+    broadcastSseEvent('sync', eventPayload);
+
     return eventPayload;
   } catch (err) {
     console.warn('[SyncTracker] Failed to record sync event:', err.message);
+    broadcastSseEvent('sync', eventPayload);
     return eventPayload;
   }
 }
@@ -140,12 +181,16 @@ async function recordSyncEvent(type, entityId = null, extra = {}) {
 module.exports = {
   getInsForgeHost,
   getInsForgeApiKey,
+  getAdminClient,
   queryInsForge,
   escapeSql,
   isValidUUID,
   isValidInteger,
   isValidSlug,
   isValidUrl,
-  recordSyncEvent
+  recordSyncEvent,
+  registerSseSubscriber,
+  unregisterSseSubscriber,
+  broadcastSseEvent
 };
 

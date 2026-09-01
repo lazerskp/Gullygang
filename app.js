@@ -5480,15 +5480,15 @@
 
   // ============================================================
   // GULLYGANG CENTRAL REAL-TIME SYNCHRONIZATION ENGINE
-  // Instant multi-tab & InsForge cloud sync with zero playback disruption
+  // Native Push Server-Sent Events (SSE) & BroadcastChannel (Zero 3s/5s Polling)
   // ============================================================
   const RealtimeSyncEngine = (function () {
     let lastKnownVersion = 0;
-    let syncTimer = null;
-    let isSyncing = false;
+    let eventSource = null;
     let broadcastChannel = null;
-    let retryDelay = 2000;
-    const MAX_RETRY_DELAY = 30000;
+    let offlineFallbackTimer = null;
+    let retryCount = 0;
+    let connectionState = 'disconnected'; // 'connected' | 'connecting' | 'reconnecting' | 'offline'
 
     function init() {
       if (window.__GULLYGANG_REALTIME_INITIALIZED__) return;
@@ -5516,59 +5516,139 @@
         }
       });
 
-      // 3. Adaptive background heartbeat sync with InsForge
-      scheduleNextPoll(3000);
+      // 3. Connect to Native Push Server-Sent Events Stream
+      connect();
 
-      // 4. Instant sync on focus / foreground / network recovery
-      window.addEventListener('focus', () => checkCloudSync(true));
+      // 4. Focus & visibility reconnect listeners
+      window.addEventListener('focus', () => {
+        if (connectionState !== 'connected') connect();
+      });
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          checkCloudSync(true);
+        if (!document.hidden && connectionState !== 'connected') {
+          connect();
         }
       });
-      window.addEventListener('online', () => checkCloudSync(true));
+      window.addEventListener('online', () => {
+        connect();
+      });
     }
 
-    function scheduleNextPoll(delayMs) {
-      if (syncTimer) clearTimeout(syncTimer);
-      const interval = delayMs || (document.hidden ? 15000 : 5000);
-      syncTimer = setTimeout(async () => {
-        await checkCloudSync();
-        scheduleNextPoll();
-      }, interval);
-    }
+    function connect() {
+      if (typeof EventSource === 'undefined') {
+        scheduleOfflineFallback();
+        return;
+      }
 
-    async function checkCloudSync(force = false) {
-      if (isSyncing) return;
-      isSyncing = true;
+      if (eventSource) {
+        try { eventSource.close(); } catch (_) {}
+        eventSource = null;
+      }
+
+      connectionState = 'connecting';
+      updateConnectionBadge();
 
       try {
-        const res = await fetch(`/api/public?type=sync_version&_t=${Date.now()}`, {
-          cache: 'no-store'
+        eventSource = new EventSource('/api/public?type=events');
+
+        eventSource.addEventListener('init', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            lastKnownVersion = data.version || 0;
+            connectionState = 'connected';
+            stopOfflineFallback();
+            retryCount = 0;
+            updateConnectionBadge();
+          } catch (_) {}
         });
 
-        if (res.ok) {
-          retryDelay = 2000;
-          const data = await res.json();
-          const remoteVersion = data.version || 0;
+        eventSource.addEventListener('sync', (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            if (payload && payload.version) {
+              lastKnownVersion = payload.version;
+            }
+            handleSyncPayload(payload);
+          } catch (err) {
+            console.warn('[RealtimeSync] Parse sync event error:', err);
+          }
+        });
 
-          if (lastKnownVersion === 0) {
-            lastKnownVersion = remoteVersion;
-          } else if (remoteVersion > lastKnownVersion || force) {
-            lastKnownVersion = remoteVersion;
-            if (data.last_event) {
-              handleSyncPayload({ version: remoteVersion, ...data.last_event });
-            } else {
-              refreshAll(remoteVersion);
+        eventSource.addEventListener('ping', () => {
+          if (connectionState !== 'connected') {
+            connectionState = 'connected';
+            stopOfflineFallback();
+            updateConnectionBadge();
+          }
+        });
+
+        eventSource.onopen = () => {
+          connectionState = 'connected';
+          stopOfflineFallback();
+          retryCount = 0;
+          updateConnectionBadge();
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource?.readyState === EventSource.CLOSED) {
+            connectionState = 'reconnecting';
+          } else {
+            connectionState = 'offline';
+          }
+          updateConnectionBadge();
+          scheduleOfflineFallback();
+        };
+      } catch (err) {
+        connectionState = 'offline';
+        updateConnectionBadge();
+        scheduleOfflineFallback();
+      }
+    }
+
+    function updateConnectionBadge() {
+      const badge = document.getElementById('admin-realtime-badge') || document.querySelector('.admin-realtime-badge');
+      if (!badge) return;
+      badge.setAttribute('data-state', connectionState);
+      const label = badge.querySelector('.admin-badge-label') || badge;
+      if (connectionState === 'connected') {
+        badge.className = 'admin-badge admin-badge-connected';
+        if (label !== badge) label.textContent = 'Live Connected';
+      } else if (connectionState === 'connecting' || connectionState === 'reconnecting') {
+        badge.className = 'admin-badge admin-badge-reconnecting';
+        if (label !== badge) label.textContent = 'Reconnecting...';
+      } else {
+        badge.className = 'admin-badge admin-badge-offline';
+        if (label !== badge) label.textContent = 'Offline';
+      }
+    }
+
+    function scheduleOfflineFallback() {
+      if (offlineFallbackTimer) return;
+      const delay = Math.min(60000 * Math.pow(1.5, retryCount++), 120000);
+      offlineFallbackTimer = setTimeout(async () => {
+        offlineFallbackTimer = null;
+        if (connectionState === 'connected') return;
+
+        try {
+          const res = await fetch(`/api/public?type=sync_version&_t=${Date.now()}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.version && data.version > lastKnownVersion) {
+              lastKnownVersion = data.version;
+              if (data.last_event) {
+                handleSyncPayload(data.last_event);
+              }
             }
           }
-        } else {
-          retryDelay = Math.min(retryDelay * 2, MAX_RETRY_DELAY);
-        }
-      } catch (err) {
-        retryDelay = Math.min(retryDelay * 2, MAX_RETRY_DELAY);
-      } finally {
-        isSyncing = false;
+        } catch (_) {}
+
+        connect();
+      }, delay);
+    }
+
+    function stopOfflineFallback() {
+      if (offlineFallbackTimer) {
+        clearTimeout(offlineFallbackTimer);
+        offlineFallbackTimer = null;
       }
     }
 

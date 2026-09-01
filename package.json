@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "python3 -m http.server 3000",
     "start": "python3 -m http.server 3000",
-    "build": "echo 'Build complete'"
+    "build": "esbuild src/main.js --bundle --minify --sourcemap --target=es2020 --outfile=dist/app.min.js"
   },
   "keywords": [
     "music",
@@ -19,5 +19,8 @@
   "license": "MIT",
   "dependencies": {
     "@insforge/sdk": "^1.5.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }
