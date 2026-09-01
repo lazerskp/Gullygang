@@ -6,14 +6,7 @@
   'use strict';
 
   // Production-grade Environment Configuration
-  const INSFORGE_CONFIG = {
-    baseUrl: (typeof window !== 'undefined' && (window.__ENV__?.INSFORGE_BASE_URL || window.ENV?.INSFORGE_BASE_URL)) || 'https://i7i9c74c.ap-southeast.insforge.app',
-    apiKey: (typeof window !== 'undefined' && (window.__ENV__?.INSFORGE_API_KEY || window.ENV?.INSFORGE_API_KEY)) || 'ik_3394ff1ae476e1e5bbabce8593040c1e'
-  };
-
-  const API_BASE = (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'))
-    ? 'https://i7i9c74c.insforge.site'
-    : '';
+  const API_BASE = '';
 
   // --- Production Security Utilities ---
   function escapeHTML(str) {
@@ -1064,12 +1057,10 @@
     return execPromise;
   }
 
-  // --- InsForge REST Helper with Automatic Retry & Timeout ---
-  async function insforgeFetch(path, options = {}) {
-    const url = `${INSFORGE_CONFIG.baseUrl}${path}`;
+  // --- Secure Public API Fetcher with Automatic Retry & Timeout ---
+  async function publicDataFetch(endpoint, options = {}) {
+    const url = `${API_BASE}${endpoint}`;
     const headers = {
-      'apikey': INSFORGE_CONFIG.apiKey,
-      'Authorization': `Bearer ${INSFORGE_CONFIG.apiKey}`,
       'Content-Type': 'application/json',
       ...(options.headers || {})
     };
@@ -1119,9 +1110,9 @@
       } catch (e) {}
     }
 
-    // 2. Background Revalidation from InsForge
+    // 2. Background Revalidation from /api/public
     try {
-      const res = await insforgeFetch('/api/database/records/playlists?is_active=eq.true&order=display_order.asc');
+      const res = await publicDataFetch('/api/public?type=playlists');
       if (res.ok) {
         const playlists = await res.json();
         if (Array.isArray(playlists) && playlists.length > 0) {
@@ -1739,7 +1730,7 @@
         let hasMore = true;
 
         while (hasMore) {
-          const res = await insforgeFetch(`/api/database/records/playlist_songs?playlist_id=eq.${encodeURIComponent(playlist.id)}&order=display_order.asc&limit=${pageSize}&offset=${offset}`);
+          const res = await publicDataFetch(`/api/public?type=songs&playlist_id=${encodeURIComponent(playlist.id)}&limit=${pageSize}&offset=${offset}`);
           if (res.ok) {
             const pageSongs = await res.json();
             if (Array.isArray(pageSongs) && pageSongs.length > 0) {
@@ -3318,9 +3309,9 @@
       } catch (e) {}
     }
 
-    // 2. Fetch active records from InsForge database 'visuals' table (display_order asc)
+    // 2. Fetch active records from /api/public 'visuals'
     try {
-      const res = await insforgeFetch('/api/database/records/visuals?is_active=eq.true&order=display_order.asc');
+      const res = await publicDataFetch('/api/public?type=visuals');
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -5763,20 +5754,9 @@
             if (apiErr.message === 'RATE_LIMITED') throw apiErr;
           }
 
-          // Fallback directly to InsForge REST records table if api route had network issue
-          if (!sentSuccessfully && INSFORGE_CONFIG.baseUrl && INSFORGE_CONFIG.apiKey) {
-            const restRes = await insforgeFetch('/api/database/records/contact_messages', {
-              method: 'POST',
-              body: JSON.stringify([{
-                name,
-                email,
-                message,
-                created_at: new Date().toISOString()
-              }])
-            });
-            if (restRes.ok || restRes.status === 201) {
-              sentSuccessfully = true;
-            }
+          // If initial api route attempt failed, notify user
+          if (!sentSuccessfully) {
+            throw new Error('Failed to submit contact message. Please try again.');
           }
 
           if (sentSuccessfully) {
