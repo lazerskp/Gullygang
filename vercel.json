@@ -2,25 +2,22 @@
   "outputDirectory": ".",
   "cleanUrls": true,
   "trailingSlash": false,
-  "routes": [
+  "rewrites": [
     {
-      "handle": "filesystem"
+      "source": "/blog/:slug",
+      "destination": "/article"
     },
     {
-      "src": "^/blog/(.+)$",
-      "dest": "/article.html"
+      "source": "/blog",
+      "destination": "/blog"
     },
     {
-      "src": "^/top-10-rappers-in-india$",
-      "dest": "/article.html"
+      "source": "/top-10-rappers-in-india",
+      "destination": "/article"
     },
     {
-      "src": "^/admin$",
-      "dest": "/admin.html"
-    },
-    {
-      "src": "^/blog$",
-      "dest": "/blog.html"
+      "source": "/admin",
+      "destination": "/admin"
     }
   ],
   "redirects": [
