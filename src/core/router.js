@@ -27,8 +27,22 @@ export const GullyRouter = (function () {
       return pageCache.get(norm);
     }
     
-    // Dynamic article routes (/blog/:slug and /top-10-rappers-in-india)
-    if ((norm.startsWith('/blog/') && norm !== '/blog') || norm === '/top-10-rappers-in-india') {
+    // Dynamic tag archive routes (/blog/tag/:tag) -> load blog.html
+    if (norm.startsWith('/blog/tag/')) {
+      try {
+        const blogRes = await fetch('/blog.html', {
+          headers: { 'X-Requested-With': 'GullyRouter' }
+        });
+        if (blogRes && blogRes.ok) {
+          const html = await blogRes.text();
+          pageCache.set(norm, html);
+          return html;
+        }
+      } catch (err) {}
+    }
+
+    // Dynamic article routes (/blog/:slug and /top-10-rappers-in-india) -> load article.html
+    if ((norm.startsWith('/blog/') && norm !== '/blog' && !norm.startsWith('/blog/tag/')) || norm === '/top-10-rappers-in-india') {
       try {
         const articleRes = await fetch('/article.html', {
           headers: { 'X-Requested-With': 'GullyRouter' }

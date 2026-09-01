@@ -3,7 +3,7 @@
 // Hydrates /blog/:slug articles with sanitized markdown, SEO, & related stories
 // ============================================================
 
-import { escapeHtml } from '../core/state.js';
+import { escapeHtml, normalizeTagSlug } from '../core/state.js';
 import { renderSafeMarkdown } from './markdown.js';
 import { RealtimeManager } from '../realtime/realtime-manager.js';
 
@@ -85,7 +85,7 @@ export const ArticleEngine = (function () {
     const tagsWrap = document.getElementById('article-tags-wrap');
     if (tagsWrap) {
       if (Array.isArray(article.tags) && article.tags.length > 0) {
-        tagsWrap.innerHTML = article.tags.map(t => `<span class="article-tag-pill">${escapeHtml(t)}</span>`).join('');
+        tagsWrap.innerHTML = article.tags.map(t => `<a href="/blog/tag/${normalizeTagSlug(t)}" class="article-tag-pill" title="View all ${escapeHtml(t)} stories">${escapeHtml(t)}</a>`).join('');
         tagsWrap.classList.remove('hidden');
       } else {
         tagsWrap.innerHTML = '<span class="article-tag-pill">EDITORIAL</span>';

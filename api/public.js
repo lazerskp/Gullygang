@@ -114,13 +114,13 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // 0.6 Dynamic XML Sitemap
+    // 0.6 Dynamic XML Sitemap (Includes published posts & active tag archives)
     if (type === 'sitemap' || type === 'sitemap.xml') {
       res.setHeader('Content-Type', 'application/xml; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=1800, s-maxage=3600, stale-while-revalidate=86400');
 
       const posts = await queryInsForge(`
-        SELECT slug, title, excerpt, featured_image, updated_at, published_at
+        SELECT slug, title, excerpt, featured_image, updated_at, published_at, tags
         FROM blog_posts
         WHERE status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW())
         ORDER BY published_at DESC;
@@ -135,10 +135,26 @@ module.exports = async function handler(req, res) {
       xml += `  <url>\n    <loc>${baseUrl}/blog</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>\n`;
       xml += `  <url>\n    <loc>${baseUrl}/top-10-rappers-in-india</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.9</priority>\n  </url>\n`;
 
+      const seenTags = new Set();
+
       for (const p of posts) {
         const lastMod = (p.updated_at || p.published_at || new Date().toISOString()).slice(0, 10);
         const imgTag = p.featured_image ? `\n    <image:image>\n      <image:loc>${p.featured_image.replace(/&/g, '&amp;')}</image:loc>\n      <image:title>${(p.title || '').replace(/&/g, '&amp;')}</image:title>\n    </image:image>` : '';
         xml += `  <url>\n    <loc>${baseUrl}/blog/${p.slug}</loc>\n    <lastmod>${lastMod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>${imgTag}\n  </url>\n`;
+
+        if (Array.isArray(p.tags)) {
+          p.tags.forEach(t => {
+            const clean = String(t).trim().toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
+            if (clean && !seenTags.has(clean)) {
+              seenTags.add(clean);
+            }
+          });
+        }
+      }
+
+      // Active Tag Archive pages
+      for (const tagSlug of seenTags) {
+        xml += `  <url>\n    <loc>${baseUrl}/blog/tag/${tagSlug}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>\n`;
       }
 
       xml += `</urlset>`;
@@ -197,10 +213,75 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(rows);
     }
 
+    // 3.5 Public Search Endpoint
+    if (type === 'search') {
+      res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=300');
+      const q = (url.searchParams.get('q') || '').trim();
+      const page = Math.max(parseInt(url.searchParams.get('page') || 1, 10), 1);
+      const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || 10, 10), 1), 20);
+      const offset = (page - 1) * limit;
+
+      if (!q || q.length < 2) {
+        return res.status(200).json({
+          query: q,
+          results: [],
+          pagination: { page, limit, total: 0, has_more: false }
+        });
+      }
+
+      const safeQ = escapeSql(q);
+      const searchWhere = `
+        (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))
+        AND (
+          title ILIKE '%${safeQ}%'
+          OR excerpt ILIKE '%${safeQ}%'
+          OR author ILIKE '%${safeQ}%'
+          OR array_to_string(tags, ' ') ILIKE '%${safeQ}%'
+          OR content ILIKE '%${safeQ}%'
+        )
+      `;
+
+      const countRows = await queryInsForge(`SELECT COUNT(id)::int as total FROM blog_posts WHERE ${searchWhere};`);
+      const total = countRows[0]?.total || 0;
+
+      const rows = await queryInsForge(`
+        SELECT id, slug, title, excerpt, featured_image, reading_time, author, tags, is_featured, published_at, updated_at
+        FROM blog_posts
+        WHERE ${searchWhere}
+        ORDER BY (
+          CASE 
+            WHEN title ILIKE '%${safeQ}%' THEN 30
+            WHEN array_to_string(tags, ' ') ILIKE '%${safeQ}%' THEN 20
+            WHEN excerpt ILIKE '%${safeQ}%' THEN 10
+            ELSE 5
+          END
+        ) DESC, is_featured DESC, published_at DESC, created_at DESC
+        LIMIT ${limit} OFFSET ${offset};
+      `);
+
+      const responsePayload = {
+        query: q,
+        results: rows,
+        pagination: {
+          page,
+          limit,
+          total,
+          has_more: offset + rows.length < total
+        }
+      };
+
+      if (handleETag(req, res, responsePayload)) return;
+      return res.status(200).json(responsePayload);
+    }
+
     // 4. Public Blog Posts & Articles
     if (type === 'blog' || type === 'article') {
       const slug = url.searchParams.get('slug');
-      const tag = url.searchParams.get('tag');
+      const tag = url.searchParams.get('tag') || url.searchParams.get('tag_slug');
+      const format = url.searchParams.get('format');
+      const page = Math.max(parseInt(url.searchParams.get('page') || 1, 10), 1);
+      const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || 10, 10), 1), 30);
+      const offset = (page - 1) * limit;
 
       // Single Article Lookup
       if (type === 'article' || (type === 'blog' && slug)) {
@@ -227,38 +308,60 @@ module.exports = async function handler(req, res) {
 
       // Public Feed Query
       res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=1800');
+      let whereClause = `(status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))`;
+
+      if (tag && typeof tag === 'string') {
+        const cleanTag = escapeSql(tag.trim().toLowerCase().replace(/-/g, ' '));
+        const rawTag = escapeSql(tag.trim());
+        whereClause += ` AND (array_to_string(tags, ' ') ILIKE '%${cleanTag}%' OR '${rawTag}' = ANY(tags))`;
+      }
+
+      const countRows = await queryInsForge(`SELECT COUNT(id)::int as total FROM blog_posts WHERE ${whereClause};`);
+      const total = countRows[0]?.total || 0;
+
       let sql = `
         SELECT id, slug, title, excerpt, featured_image, reading_time, author,
                tags, is_featured, published_at, updated_at
         FROM blog_posts
-        WHERE (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))
+        WHERE ${whereClause}
+        ORDER BY is_featured DESC, published_at DESC, created_at DESC
+        LIMIT ${limit} OFFSET ${offset};
       `;
 
-      if (tag && typeof tag === 'string') {
-        const cleanTag = escapeSql(tag.trim().toLowerCase());
-        sql += ` AND '${cleanTag}' = ANY(tags)`;
+      const rows = await queryInsForge(sql);
+
+      if (format === 'paginated' || url.searchParams.has('page')) {
+        const payload = {
+          stories: rows,
+          pagination: {
+            page,
+            limit,
+            total,
+            has_more: offset + rows.length < total
+          }
+        };
+        if (handleETag(req, res, payload)) return;
+        return res.status(200).json(payload);
       }
 
-      sql += ` ORDER BY is_featured DESC, published_at DESC, created_at DESC;`;
-
-      const rows = await queryInsForge(sql);
       if (handleETag(req, res, rows)) return;
       return res.status(200).json(rows);
     }
 
-    // 4.5 Related Stories (More from GULLYGANG)
+    // 4.5 Related Stories (Enhanced multi-factor scoring)
     if (type === 'related_articles') {
       res.setHeader('Cache-Control', 'public, max-age=120, s-maxage=600, stale-while-revalidate=3600');
       const currentSlug = url.searchParams.get('slug');
       const limit = Math.min(parseInt(url.searchParams.get('limit') || 4, 10), 10);
 
       let currentTags = [];
+      let currentAuthor = '';
       let currentId = null;
 
       if (currentSlug) {
         const safeSlug = escapeSql(currentSlug.trim());
         const curRows = await queryInsForge(`
-          SELECT id, tags 
+          SELECT id, tags, author
           FROM blog_posts 
           WHERE slug = '${safeSlug}' AND (status = 'published' OR (status = 'scheduled' AND scheduled_at <= NOW()))
           LIMIT 1;
@@ -266,6 +369,7 @@ module.exports = async function handler(req, res) {
         if (curRows.length > 0) {
           currentId = curRows[0].id;
           currentTags = Array.isArray(curRows[0].tags) ? curRows[0].tags : [];
+          currentAuthor = curRows[0].author || '';
         }
       }
 
@@ -311,6 +415,8 @@ module.exports = async function handler(req, res) {
       if (handleETag(req, res, map)) return;
       return res.status(200).json(map);
     }
+
+    return res.status(404).json({ error: `Unknown public resource type: ${type}` });
 
     return res.status(404).json({ error: `Unknown public resource type: ${type}` });
   } catch (err) {

@@ -8,6 +8,10 @@
       "destination": "/api/public?type=sitemap"
     },
     {
+      "source": "/blog/tag/:tag",
+      "destination": "/blog"
+    },
+    {
       "source": "/blog/:slug",
       "destination": "/api/article_render?slug=:slug"
     },

@@ -53,18 +53,13 @@ export function clamp(val, min, max) {
   return Math.min(Math.max(val, min), max);
 }
 
-export async function publicDataFetch(url, options = {}) {
-  try {
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        'Accept': 'application/json',
-        ...(options.headers || {})
-      }
-    });
-    return res;
-  } catch (err) {
-    console.warn('[PublicData] Network request notice:', err.message);
-    throw err;
-  }
+export function normalizeTagSlug(tag) {
+  if (!tag || typeof tag !== 'string') return '';
+  return tag
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
+
