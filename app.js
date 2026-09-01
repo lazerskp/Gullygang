@@ -5128,6 +5128,261 @@
   })();
 
   // ============================================================
+  // GULLYGANG CENTRAL REAL-TIME SYNCHRONIZATION ENGINE
+  // Instant multi-tab & InsForge cloud sync with zero playback disruption
+  // ============================================================
+  const RealtimeSyncEngine = (function () {
+    let lastKnownVersion = 0;
+    let syncTimer = null;
+    let isSyncing = false;
+    let broadcastChannel = null;
+    let retryDelay = 2000;
+    const MAX_RETRY_DELAY = 30000;
+
+    function init() {
+      if (window.__GULLYGANG_REALTIME_INITIALIZED__) return;
+      window.__GULLYGANG_REALTIME_INITIALIZED__ = true;
+
+      // 1. Inter-tab broadcast channel for 0ms instant sync
+      if (typeof BroadcastChannel !== 'undefined') {
+        try {
+          broadcastChannel = new BroadcastChannel('gullygang_sync');
+          broadcastChannel.onmessage = (event) => {
+            if (event && event.data) {
+              handleSyncPayload(event.data);
+            }
+          };
+        } catch (e) {}
+      }
+
+      // 2. Storage event fallback for older browsers
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'gullygang_sync_event' && e.newValue) {
+          try {
+            const payload = JSON.parse(e.newValue);
+            handleSyncPayload(payload);
+          } catch (_) {}
+        }
+      });
+
+      // 3. Adaptive background heartbeat sync with InsForge
+      scheduleNextPoll(3000);
+
+      // 4. Instant sync on focus / foreground / network recovery
+      window.addEventListener('focus', () => checkCloudSync(true));
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          checkCloudSync(true);
+        }
+      });
+      window.addEventListener('online', () => checkCloudSync(true));
+    }
+
+    function scheduleNextPoll(delayMs) {
+      if (syncTimer) clearTimeout(syncTimer);
+      const interval = delayMs || (document.hidden ? 15000 : 5000);
+      syncTimer = setTimeout(async () => {
+        await checkCloudSync();
+        scheduleNextPoll();
+      }, interval);
+    }
+
+    async function checkCloudSync(force = false) {
+      if (isSyncing) return;
+      isSyncing = true;
+
+      try {
+        const res = await fetch(`/api/public?type=sync_version&_t=${Date.now()}`, {
+          cache: 'no-store'
+        });
+
+        if (res.ok) {
+          retryDelay = 2000;
+          const data = await res.json();
+          const remoteVersion = data.version || 0;
+
+          if (lastKnownVersion === 0) {
+            lastKnownVersion = remoteVersion;
+          } else if (remoteVersion > lastKnownVersion || force) {
+            lastKnownVersion = remoteVersion;
+            if (data.last_event) {
+              handleSyncPayload({ version: remoteVersion, ...data.last_event });
+            } else {
+              refreshAll(remoteVersion);
+            }
+          }
+        } else {
+          retryDelay = Math.min(retryDelay * 2, MAX_RETRY_DELAY);
+        }
+      } catch (err) {
+        retryDelay = Math.min(retryDelay * 2, MAX_RETRY_DELAY);
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    function broadcast(type, entityId = null, extra = {}) {
+      const payload = {
+        type,
+        entityId,
+        version: Date.now(),
+        timestamp: Date.now(),
+        ...extra
+      };
+      if (broadcastChannel) {
+        try { broadcastChannel.postMessage(payload); } catch (_) {}
+      }
+      try {
+        localStorage.setItem('gullygang_sync_event', JSON.stringify(payload));
+      } catch (_) {}
+      handleSyncPayload(payload);
+    }
+
+    function handleSyncPayload(payload) {
+      if (!payload || !payload.type) return;
+
+      const type = payload.type;
+      const version = payload.version || Date.now();
+
+      if (type.startsWith('playlist.')) {
+        refreshPlaylists(version, payload);
+      } else if (type.startsWith('song.')) {
+        refreshSongs(payload.entityId, version, payload);
+      } else if (type.startsWith('visual.')) {
+        refreshVisuals(version, payload);
+      } else if (type.startsWith('blog.')) {
+        refreshBlogs(version, payload);
+      } else if (type.startsWith('settings.') || type.startsWith('ads.')) {
+        refreshSettings(version, payload);
+      }
+    }
+
+    async function refreshPlaylists(version, eventData) {
+      try {
+        const res = await publicDataFetch(`/api/public?type=playlists&v=${version}`);
+        if (!res.ok) return;
+        const playlists = await res.json();
+        if (!Array.isArray(playlists) || playlists.length === 0) return;
+
+        state.playlists = playlists;
+        renderPlaylistMenus();
+
+        if (state.currentPlaylist?.id) {
+          const currentInList = playlists.find(p => String(p.id) === String(state.currentPlaylist.id));
+          if (currentInList) {
+            state.currentPlaylist = currentInList;
+            updatePlaylistLabels(currentInList.name, currentInList.icon);
+          }
+        }
+      } catch (err) {
+        console.warn('[RealtimeSync] Playlist refresh notice:', err);
+      }
+    }
+
+    async function refreshSongs(playlistId, version, eventData) {
+      const currentPlId = state.currentPlaylist?.id;
+      if (playlistId && currentPlId && String(playlistId) !== String(currentPlId)) {
+        try {
+          const cacheKey = `insforge_songs_${playlistId}`;
+          localStorage.removeItem(cacheKey);
+        } catch (_) {}
+        return;
+      }
+
+      if (!currentPlId) return;
+
+      try {
+        const res = await publicDataFetch(`/api/public?type=songs&playlist_id=${encodeURIComponent(currentPlId)}&v=${version}&limit=1000`);
+        if (!res.ok) return;
+        const songs = await res.json();
+        if (!Array.isArray(songs) || songs.length === 0) return;
+
+        const updatedTracks = songs.map((s, idx) => ({
+          id: s.youtube_id,
+          title: s.title || 'Unknown Title',
+          artist: s.artist || 'Odia Artist',
+          thumbnail: normalizeThumbnailUrl(s.thumbnail, s.youtube_id),
+          playlistId: currentPlId,
+          position: idx + 1
+        }));
+
+        // Authoritative reconciliation: preserve currently playing audio track without restart
+        const actualVideoId = getActualPlayingVideoId() || (state.tracks && state.tracks[state.currentIndex]?.id);
+        const newTrackIdx = findTrackIndexByVideoId(updatedTracks, actualVideoId);
+
+        state.tracks = updatedTracks;
+        if (newTrackIdx >= 0) {
+          state.currentIndex = newTrackIdx;
+        }
+
+        // Live update dock metadata and cards
+        setupCardsInitial();
+        updateDockUI();
+
+        // Live update Playlist Preview if open
+        if (typeof PlaylistPreviewEngine !== 'undefined' && PlaylistPreviewEngine.isOpen()) {
+          PlaylistPreviewEngine.render();
+        }
+      } catch (err) {
+        console.warn('[RealtimeSync] Song queue refresh notice:', err);
+      }
+    }
+
+    async function refreshVisuals(version, eventData) {
+      try {
+        loadInsForgeVisuals(true);
+      } catch (err) {
+        console.warn('[RealtimeSync] Visuals refresh notice:', err);
+      }
+    }
+
+    async function refreshBlogs(version, eventData) {
+      try {
+        if (typeof BlogEngine !== 'undefined' && typeof BlogEngine.init === 'function') {
+          BlogEngine.init();
+        }
+      } catch (err) {
+        console.warn('[RealtimeSync] Blog refresh notice:', err);
+      }
+    }
+
+    async function refreshSettings(version, eventData) {
+      try {
+        const res = await publicDataFetch(`/api/public?type=settings&v=${version}`);
+        if (res.ok) {
+          const settings = await res.json();
+          if (settings.general_settings?.site_name) {
+            document.title = `${settings.general_settings.site_name} — ${settings.general_settings.tagline || ''}`;
+          }
+        }
+      } catch (_) {}
+    }
+
+    function refreshAll(version) {
+      refreshPlaylists(version);
+      if (state.currentPlaylist) refreshSongs(state.currentPlaylist.id, version);
+      refreshVisuals(version);
+      refreshBlogs(version);
+      refreshSettings(version);
+    }
+
+    return {
+      init,
+      broadcast,
+      refreshPlaylists,
+      refreshSongs,
+      refreshVisuals,
+      refreshBlogs,
+      refreshSettings,
+      refreshAll
+    };
+  })();
+
+  if (typeof window !== 'undefined') {
+    window.RealtimeSyncEngine = RealtimeSyncEngine;
+  }
+
+  // ============================================================
   // CENTRALIZED CINEMATIC EDITORIAL SPA ROUTING ENGINE
   // Apple Music / Spotify Editorial Magazine Fullscreen Experience
   // ============================================================
@@ -7094,6 +7349,7 @@
       () => SupportEngine.init(),
       () => PlaylistSyncEngine.init(),
       () => PlaylistPreviewEngine.init(),
+      () => RealtimeSyncEngine.init(),
       () => ThemeEngine.init(),
       () => AdsterraEngine.init(),
       () => {

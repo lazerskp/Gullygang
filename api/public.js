@@ -25,6 +25,18 @@ module.exports = async function handler(req, res) {
   const type = url.searchParams.get('type') || 'playlists';
 
   try {
+    // 0. Public Sync Version (Real-time synchronization check)
+    if (type === 'sync_version' || type === 'events') {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      const rows = await queryInsForge(`SELECT value, updated_at FROM site_settings WHERE key = 'sync_version';`);
+      const val = rows[0]?.value || {};
+      return res.status(200).json({
+        version: val.version || 0,
+        last_event: val.last_event || null,
+        timestamp: Date.now()
+      });
+    }
+
     // 1. Public Active Playlists
     if (type === 'playlists') {
       const rows = await queryInsForge(`

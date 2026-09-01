@@ -107,6 +107,36 @@ function isValidUrl(str) {
   }
 }
 
+/**
+ * Record atomic sync change event for real-time client synchronization
+ */
+async function recordSyncEvent(type, entityId = null, extra = {}) {
+  const version = Date.now();
+  const eventPayload = {
+    version,
+    last_event: {
+      type,
+      entityId,
+      timestamp: version,
+      ...extra
+    }
+  };
+
+  try {
+    const jsonStr = escapeSql(JSON.stringify(eventPayload));
+    await queryInsForge(`
+      INSERT INTO site_settings (key, value, updated_at)
+      VALUES ('sync_version', '${jsonStr}'::jsonb, NOW())
+      ON CONFLICT (key) DO UPDATE
+      SET value = EXCLUDED.value, updated_at = NOW();
+    `);
+    return eventPayload;
+  } catch (err) {
+    console.warn('[SyncTracker] Failed to record sync event:', err.message);
+    return eventPayload;
+  }
+}
+
 module.exports = {
   getInsForgeHost,
   getInsForgeApiKey,
@@ -115,5 +145,7 @@ module.exports = {
   isValidUUID,
   isValidInteger,
   isValidSlug,
-  isValidUrl
+  isValidUrl,
+  recordSyncEvent
 };
+

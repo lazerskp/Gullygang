@@ -11,7 +11,8 @@ const {
   isValidUUID,
   isValidInteger,
   isValidSlug,
-  isValidUrl
+  isValidUrl,
+  recordSyncEvent
 } = require('./_db.js');
 
 // Dynamically load @insforge/sdk
@@ -369,7 +370,9 @@ module.exports = async function handler(req, res) {
           VALUES ('${escapeSql(name)}', '${escapeSql(slug)}', '${escapeSql(icon)}', '${escapeSql(ytUrl)}', '${escapeSql(bgImage)}', ${displayOrder}, ${isActive}, NOW(), NOW())
           RETURNING *;
         `);
-        return res.status(201).json({ playlist: inserted[0] });
+        const newPlaylist = inserted[0];
+        await recordSyncEvent('playlist.created', newPlaylist?.id, { slug });
+        return res.status(201).json({ playlist: newPlaylist });
       }
 
       if (req.method === 'PUT') {
@@ -400,7 +403,9 @@ module.exports = async function handler(req, res) {
           WHERE id = '${escapeSql(id)}'
           RETURNING *;
         `);
-        return res.status(200).json({ playlist: updated[0] });
+        const updatedPlaylist = updated[0];
+        await recordSyncEvent('playlist.updated', id, { slug, is_active: isActive });
+        return res.status(200).json({ playlist: updatedPlaylist });
       }
 
       if (req.method === 'DELETE') {
@@ -410,6 +415,7 @@ module.exports = async function handler(req, res) {
         // Cascading song deletion and playlist removal
         await queryInsForge(`DELETE FROM playlist_songs WHERE playlist_id = '${escapeSql(id)}';`);
         await queryInsForge(`DELETE FROM playlists WHERE id = '${escapeSql(id)}';`);
+        await recordSyncEvent('playlist.deleted', id);
         return res.status(200).json({ success: true });
       }
     }
@@ -456,6 +462,7 @@ module.exports = async function handler(req, res) {
               `);
             }
           }
+          await recordSyncEvent('song.reordered', null);
           return res.status(200).json({ success: true });
         }
 
@@ -475,7 +482,9 @@ module.exports = async function handler(req, res) {
           VALUES (${playlistId ? `'${escapeSql(playlistId)}'` : 'NULL'}, '${escapeSql(ytId)}', '${escapeSql(title)}', '${escapeSql(artist)}', '${escapeSql(thumbnail)}', ${displayOrder}, ${isActive}, NOW())
           RETURNING *;
         `);
-        return res.status(201).json({ song: inserted[0] });
+        const newSong = inserted[0];
+        await recordSyncEvent('song.created', playlistId, { songId: newSong?.id, title, artist });
+        return res.status(201).json({ song: newSong });
       }
 
       if (req.method === 'PUT') {
@@ -506,7 +515,9 @@ module.exports = async function handler(req, res) {
           WHERE id = '${escapeSql(id)}'
           RETURNING *;
         `);
-        return res.status(200).json({ song: updated[0] });
+        const updatedSong = updated[0];
+        await recordSyncEvent('song.updated', playlistId, { songId: id, title, artist, youtube_id: ytId, is_active: isActive });
+        return res.status(200).json({ song: updatedSong });
       }
 
       if (req.method === 'DELETE') {
@@ -514,6 +525,7 @@ module.exports = async function handler(req, res) {
         if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Song UUID is required' });
 
         await queryInsForge(`DELETE FROM playlist_songs WHERE id = '${escapeSql(id)}';`);
+        await recordSyncEvent('song.deleted', null, { songId: id });
         return res.status(200).json({ success: true });
       }
     }
@@ -544,7 +556,9 @@ module.exports = async function handler(req, res) {
           VALUES ('${escapeSql(name)}', '${escapeSql(videoUrl)}', ${displayOrder}, ${isActive}, NOW(), NOW())
           RETURNING *;
         `);
-        return res.status(201).json({ visual: inserted[0] });
+        const newVisual = inserted[0];
+        await recordSyncEvent('visual.created', newVisual?.id);
+        return res.status(201).json({ visual: newVisual });
       }
 
       if (req.method === 'PUT') {
@@ -570,7 +584,9 @@ module.exports = async function handler(req, res) {
           WHERE id = '${escapeSql(id)}'
           RETURNING *;
         `);
-        return res.status(200).json({ visual: updated[0] });
+        const updatedVisual = updated[0];
+        await recordSyncEvent('visual.updated', id, { is_active: isActive });
+        return res.status(200).json({ visual: updatedVisual });
       }
 
       if (req.method === 'DELETE') {
@@ -578,6 +594,7 @@ module.exports = async function handler(req, res) {
         if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Visual UUID is required' });
 
         await queryInsForge(`DELETE FROM visuals WHERE id = '${escapeSql(id)}';`);
+        await recordSyncEvent('visual.deleted', id);
         return res.status(200).json({ success: true });
       }
     }
@@ -628,7 +645,9 @@ module.exports = async function handler(req, res) {
           VALUES ('${escapeSql(slug)}', '${escapeSql(title)}', '${escapeSql(excerpt)}', '${escapeSql(content)}', '${escapeSql(featuredImage)}', '${escapeSql(readingTime)}', '${escapeSql(author)}', '${escapeSql(seoTitle)}', '${escapeSql(seoDesc)}', '${escapeSql(status)}', NOW(), NOW(), NOW())
           RETURNING *;
         `);
-        return res.status(201).json({ post: inserted[0] });
+        const newPost = inserted[0];
+        await recordSyncEvent('blog.created', newPost?.id, { slug, status });
+        return res.status(201).json({ post: newPost });
       }
 
       if (req.method === 'PUT') {
@@ -666,7 +685,9 @@ module.exports = async function handler(req, res) {
           WHERE id = '${escapeSql(id)}'
           RETURNING *;
         `);
-        return res.status(200).json({ post: updated[0] });
+        const updatedPost = updated[0];
+        await recordSyncEvent('blog.updated', id, { slug, status });
+        return res.status(200).json({ post: updatedPost });
       }
 
       if (req.method === 'DELETE') {
@@ -674,6 +695,7 @@ module.exports = async function handler(req, res) {
         if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Blog Post UUID is required' });
 
         await queryInsForge(`DELETE FROM blog_posts WHERE id = '${escapeSql(id)}';`);
+        await recordSyncEvent('blog.deleted', id);
         return res.status(200).json({ success: true });
       }
     }
@@ -705,6 +727,7 @@ module.exports = async function handler(req, res) {
           ON CONFLICT (key) DO UPDATE
           SET value = EXCLUDED.value, updated_at = NOW();
         `);
+        await recordSyncEvent('ads.updated');
         return res.status(200).json({ success: true, ads: body });
       }
     }
@@ -737,6 +760,7 @@ module.exports = async function handler(req, res) {
           ON CONFLICT (key) DO UPDATE
           SET value = EXCLUDED.value, updated_at = NOW();
         `);
+        await recordSyncEvent('settings.updated');
         return res.status(200).json({ success: true, settings: body });
       }
     }

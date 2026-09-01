@@ -497,21 +497,118 @@
       let currentTab = 'overview';
       let songDebounceTimer = null;
 
-      function updateConnectionStatus(isConnected) {
+      let syncChannel = null;
+      let lastKnownSyncVersion = 0;
+      let adminSyncTimer = null;
+
+      function updateConnectionStatus(status) {
         const badge = document.getElementById('insforge-conn-badge');
         const dot = document.getElementById('insforge-conn-dot');
         const label = document.getElementById('insforge-conn-label');
         if (!badge || !dot || !label) return;
 
-        if (isConnected) {
+        if (status === true || status === 'connected') {
           badge.className = 'admin-conn-badge flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
           dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
-          label.textContent = 'Connected to InsForge';
+          label.textContent = 'Live: Connected to InsForge';
+        } else if (status === 'reconnecting') {
+          badge.className = 'admin-conn-badge flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20';
+          dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse';
+          label.textContent = 'Reconnecting...';
         } else {
           badge.className = 'admin-conn-badge flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20';
           dot.className = 'w-1.5 h-1.5 rounded-full bg-red-400';
           label.textContent = 'Connection Unavailable';
         }
+      }
+
+      function initSyncEngine() {
+        if (typeof BroadcastChannel !== 'undefined') {
+          try {
+            syncChannel = new BroadcastChannel('gullygang_sync');
+            syncChannel.onmessage = (event) => {
+              if (event && event.data) {
+                handleIncomingSync(event.data);
+              }
+            };
+          } catch (e) {}
+        }
+
+        window.addEventListener('storage', (e) => {
+          if (e.key === 'gullygang_sync_event' && e.newValue) {
+            try {
+              const payload = JSON.parse(e.newValue);
+              handleIncomingSync(payload);
+            } catch (_) {}
+          }
+        });
+
+        startAdminHeartbeat();
+      }
+
+      function broadcastSyncEvent(type, entityId = null, extra = {}) {
+        const payload = {
+          type,
+          entityId,
+          version: Date.now(),
+          timestamp: Date.now(),
+          ...extra
+        };
+        if (syncChannel) {
+          try { syncChannel.postMessage(payload); } catch (_) {}
+        }
+        try {
+          localStorage.setItem('gullygang_sync_event', JSON.stringify(payload));
+        } catch (_) {}
+      }
+
+      function handleIncomingSync(payload) {
+        if (!payload || !payload.type) return;
+        loadOverview(true);
+
+        if (currentTab === 'playlists' && payload.type.startsWith('playlist.')) {
+          loadPlaylists(true);
+        } else if (currentTab === 'songs' && payload.type.startsWith('song.')) {
+          loadSongs(true);
+        } else if (currentTab === 'visuals' && payload.type.startsWith('visual.')) {
+          loadVisuals(true);
+        } else if (currentTab === 'blog' && payload.type.startsWith('blog.')) {
+          loadBlog(true);
+        } else if (currentTab === 'ads' && payload.type.startsWith('ads.')) {
+          loadAds(true);
+        } else if (currentTab === 'settings' && payload.type.startsWith('settings.')) {
+          loadSettings(true);
+        }
+      }
+
+      function startAdminHeartbeat() {
+        if (adminSyncTimer) clearTimeout(adminSyncTimer);
+        adminSyncTimer = setTimeout(async () => {
+          try {
+            const res = await fetch(`/api/public?type=sync_version&_t=${Date.now()}`, { cache: 'no-store' });
+            if (res.ok) {
+              updateConnectionStatus('connected');
+              const data = await res.json();
+              const remoteVersion = data.version || 0;
+              if (lastKnownSyncVersion === 0) {
+                lastKnownSyncVersion = remoteVersion;
+              } else if (remoteVersion > lastKnownSyncVersion) {
+                lastKnownSyncVersion = remoteVersion;
+                if (data.last_event) {
+                  handleIncomingSync(data.last_event);
+                } else {
+                  loadOverview(true);
+                  loadTabData(currentTab);
+                }
+              }
+            } else {
+              updateConnectionStatus('reconnecting');
+            }
+          } catch (e) {
+            updateConnectionStatus('offline');
+          }
+          startAdminHeartbeat();
+        }, 5000);
       }
 
       async function apiRequest(action, options = {}) {
@@ -534,9 +631,9 @@
           const data = await res.json().catch(() => ({}));
 
           if (res.status >= 500) {
-            updateConnectionStatus(false);
+            updateConnectionStatus('offline');
           } else {
-            updateConnectionStatus(true);
+            updateConnectionStatus('connected');
           }
 
           if (res.status === 401 || res.status === 403) {
@@ -548,7 +645,7 @@
           return { ok: res.ok, status: res.status, data };
         } catch (err) {
           console.error('[AdminApp] Request error:', err);
-          updateConnectionStatus(false);
+          updateConnectionStatus('offline');
           return { ok: false, status: 500, data: { error: 'Network communication failure' } };
         }
       }
@@ -625,7 +722,7 @@
         if (tabId === 'users') loadUsers();
       }
 
-      async function loadOverview() {
+      async function loadOverview(isSilent = false) {
         const res = await apiRequest('overview');
         if (res.ok && res.data.counts) {
           const c = res.data.counts;
@@ -639,9 +736,11 @@
         }
       }
 
-      async function loadPlaylists() {
+      async function loadPlaylists(isSilent = false) {
         const tbody = document.getElementById('playlists-table-body');
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">Loading...</td></tr>';
+        if (!isSilent) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">Loading...</td></tr>';
+        }
         const res = await apiRequest('playlists');
         if (res.ok && res.data.playlists) {
           if (res.data.playlists.length === 0) {
@@ -813,6 +912,7 @@
         const res = await apiRequest('ads', { method: 'PUT', body: payload });
         if (res.ok) {
           showToast('Advertisement settings updated successfully');
+          broadcastSyncEvent('ads.updated');
         } else {
           showToast(res.data.error || 'Failed to update ads settings', 'error');
         }
@@ -844,6 +944,7 @@
         const res = await apiRequest('settings', { method: 'PUT', body: payload });
         if (res.ok) {
           showToast('General site settings updated');
+          broadcastSyncEvent('settings.updated');
         } else {
           showToast(res.data.error || 'Failed to save settings', 'error');
         }
@@ -972,8 +1073,10 @@
 
         if (res.ok) {
           showToast(id ? 'Playlist updated' : 'Playlist created');
+          broadcastSyncEvent(id ? 'playlist.updated' : 'playlist.created', id || res.data?.playlist?.id, { slug: payload.slug });
           closeModal();
           loadPlaylists();
+          loadOverview(true);
         } else {
           showToast(res.data.error || 'Failed to save playlist', 'error');
         }
@@ -995,8 +1098,10 @@
         const res = await apiRequest('playlists', { method: 'DELETE', params: { id } });
         if (res.ok) {
           showToast('Playlist deleted');
+          broadcastSyncEvent('playlist.deleted', id);
           closeModal();
           loadPlaylists();
+          loadOverview(true);
         } else {
           showToast(res.data.error || 'Delete failed', 'error');
         }
@@ -1104,8 +1209,14 @@
 
         if (res.ok) {
           showToast(id ? 'Song updated' : 'Song added to rotation');
+          broadcastSyncEvent(id ? 'song.updated' : 'song.created', payload.playlist_id, {
+            songId: id || res.data?.song?.id,
+            title: payload.title,
+            artist: payload.artist
+          });
           closeModal();
           loadSongs();
+          loadOverview(true);
         } else {
           showToast(res.data.error || 'Failed to save song', 'error');
         }
@@ -1127,8 +1238,10 @@
         const res = await apiRequest('songs', { method: 'DELETE', params: { id } });
         if (res.ok) {
           showToast('Song removed');
+          broadcastSyncEvent('song.deleted', null, { songId: id });
           closeModal();
           loadSongs();
+          loadOverview(true);
         } else {
           showToast(res.data.error || 'Delete failed', 'error');
         }
@@ -1207,8 +1320,10 @@
 
         if (res.ok) {
           showToast(id ? 'Visual updated' : 'Visual added');
+          broadcastSyncEvent(id ? 'visual.updated' : 'visual.created', id || res.data?.visual?.id);
           closeModal();
           loadVisuals();
+          loadOverview(true);
         } else {
           showToast(res.data.error || 'Failed to save visual', 'error');
         }
@@ -1230,8 +1345,10 @@
         const res = await apiRequest('visuals', { method: 'DELETE', params: { id } });
         if (res.ok) {
           showToast('Visual removed');
+          broadcastSyncEvent('visual.deleted', id);
           closeModal();
           loadVisuals();
+          loadOverview(true);
         } else {
           showToast(res.data.error || 'Delete failed', 'error');
         }
@@ -1364,8 +1481,10 @@
 
         if (res.ok) {
           showToast(id ? 'Article updated' : 'Article published');
+          broadcastSyncEvent(id ? 'blog.updated' : 'blog.created', id || res.data?.post?.id, { slug: payload.slug, status: payload.status });
           closeModal();
           loadBlog();
+          loadOverview(true);
         } else {
           showToast(res.data.error || 'Failed to save article', 'error');
         }
@@ -1387,8 +1506,10 @@
         const res = await apiRequest('blog', { method: 'DELETE', params: { id } });
         if (res.ok) {
           showToast('Article deleted');
+          broadcastSyncEvent('blog.deleted', id);
           closeModal();
           loadBlog();
+          loadOverview(true);
         } else {
           showToast(res.data.error || 'Delete failed', 'error');
         }
@@ -1451,6 +1572,9 @@
         document.querySelectorAll('.admin-nav-item').forEach(btn => {
           btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
         });
+
+        // Initialize Real-time multi-tab & heartbeat sync engine
+        initSyncEngine();
 
         // Mobile Nav Drawer (off-canvas with backdrop, Escape + backdrop close)
         const adminSidebar = document.getElementById('admin-sidebar');
