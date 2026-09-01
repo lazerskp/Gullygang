@@ -78,6 +78,36 @@ function getAuthToken(req) {
 }
 
 /**
+ * Safe server-side bootstrap mechanism for initial admin setup.
+ * Evaluates INITIAL_ADMIN_EMAIL or ADMIN_BOOTSTRAP_EMAILS environment variable.
+ */
+async function checkAndApplyAdminBootstrap(userEmail, userId) {
+  const bootstrapEnv = process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_BOOTSTRAP_EMAILS || '';
+  if (!bootstrapEnv || !userEmail || !userId) return false;
+
+  const allowedEmails = bootstrapEnv
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowedEmails.includes(userEmail.toLowerCase())) {
+    try {
+      const safeId = escapeSql(userId);
+      await queryInsForge(`
+        UPDATE auth.users 
+        SET is_project_admin = true, email_verified = true 
+        WHERE id = '${safeId}';
+      `);
+      return true;
+    } catch (err) {
+      console.warn('[AdminBootstrap] Failed to apply admin bootstrap:', err.message);
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
  * Cryptographically verify incoming request with InsForge Auth and check database role.
  * NEVER trusts unverified client JWT payloads or sub claims.
  */
@@ -111,7 +141,7 @@ async function verifyAdminAuth(req) {
 
     // Authoritative check against PostgreSQL auth.users table
     const safeUserId = escapeSql(authenticatedUserId);
-    const users = await queryInsForge(`
+    let users = await queryInsForge(`
       SELECT id, email, is_project_admin, email_verified, profile 
       FROM auth.users 
       WHERE id = '${safeUserId}'
@@ -126,7 +156,14 @@ async function verifyAdminAuth(req) {
       };
     }
 
-    const user = users[0];
+    let user = users[0];
+    if (!user.is_project_admin) {
+      const bootstrapped = await checkAndApplyAdminBootstrap(user.email, user.id);
+      if (bootstrapped) {
+        user.is_project_admin = true;
+      }
+    }
+
     if (!user.is_project_admin) {
       return {
         isAuthorized: false,
@@ -225,14 +262,25 @@ module.exports = async function handler(req, res) {
 
       // Assert project admin privilege in PostgreSQL auth.users
       const safeUserId = escapeSql(data.user.id);
-      const users = await queryInsForge(`
+      let users = await queryInsForge(`
         SELECT id, email, is_project_admin, email_verified, profile 
         FROM auth.users 
         WHERE id = '${safeUserId}'
         LIMIT 1;
       `);
 
-      if (!users || users.length === 0 || !users[0].is_project_admin) {
+      if (!users || users.length === 0) {
+        return res.status(401).json({ error: 'User account not found' });
+      }
+
+      if (!users[0].is_project_admin) {
+        const bootstrapped = await checkAndApplyAdminBootstrap(users[0].email, users[0].id);
+        if (bootstrapped) {
+          users[0].is_project_admin = true;
+        }
+      }
+
+      if (!users[0].is_project_admin) {
         return res.status(403).json({
           error: 'Access denied. Your account is not authorized for administrative access.'
         });
