@@ -3,7 +3,7 @@
 // Proxies public read requests to InsForge without exposing API keys
 // ============================================================
 
-const { queryInsForge, escapeSql } = require('./_db.js');
+const { queryInsForge, escapeSql, isValidUUID, isValidSlug } = require('./_db.js');
 
 module.exports = async function handler(req, res) {
   // CORS & Cache Headers
@@ -42,15 +42,15 @@ module.exports = async function handler(req, res) {
     // 2. Public Songs for Playlist
     if (type === 'songs') {
       const playlistId = url.searchParams.get('playlist_id');
-      const limit = Math.min(parseInt(url.searchParams.get('limit') || 100), 200);
-      const offset = parseInt(url.searchParams.get('offset') || 0);
+      const limit = Math.min(parseInt(url.searchParams.get('limit') || 100, 10), 200);
+      const offset = Math.max(parseInt(url.searchParams.get('offset') || 0, 10), 0);
 
       let sql = `
         SELECT id, playlist_id, youtube_id, title, artist, thumbnail, display_order
         FROM playlist_songs
         WHERE (is_active IS NULL OR is_active = true)
       `;
-      if (playlistId) {
+      if (playlistId && isValidUUID(playlistId)) {
         sql += ` AND playlist_id = '${escapeSql(playlistId)}'`;
       }
       sql += ` ORDER BY display_order ASC, created_at ASC LIMIT ${limit} OFFSET ${offset};`;
@@ -74,10 +74,11 @@ module.exports = async function handler(req, res) {
     if (type === 'blog') {
       const slug = url.searchParams.get('slug');
       if (slug) {
+        const safeSlug = escapeSql(slug.trim());
         const rows = await queryInsForge(`
           SELECT id, slug, title, excerpt, content, featured_image, reading_time, author, seo_title, seo_description, published_at
           FROM blog_posts
-          WHERE slug = '${escapeSql(slug)}' AND status = 'published';
+          WHERE slug = '${safeSlug}' AND status = 'published';
         `);
         return res.status(200).json(rows[0] || null);
       }

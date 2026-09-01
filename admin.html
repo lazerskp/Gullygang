@@ -161,6 +161,10 @@
         </div>
 
         <div class="flex items-center gap-3">
+          <div id="insforge-conn-badge" class="admin-conn-badge flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" title="Live InsForge BaaS Connection Status">
+            <span id="insforge-conn-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="insforge-conn-label">Connected to InsForge</span>
+          </div>
           <a href="/" target="_blank" class="admin-subtle-btn flex items-center gap-1 text-xs">
             <span>View Public Site</span>
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></svg>
@@ -490,32 +494,29 @@
   <!-- Admin Application Client Controller -->
   <script>
     const AdminApp = (function() {
-      const TOKEN_KEY = 'gullygang_admin_token';
-      const USER_KEY = 'gullygang_admin_user';
-
       let currentTab = 'overview';
       let songDebounceTimer = null;
 
-      function getToken() {
-        return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
-      }
+      function updateConnectionStatus(isConnected) {
+        const badge = document.getElementById('insforge-conn-badge');
+        const dot = document.getElementById('insforge-conn-dot');
+        const label = document.getElementById('insforge-conn-label');
+        if (!badge || !dot || !label) return;
 
-      function setSession(token, user) {
-        sessionStorage.setItem(TOKEN_KEY, token);
-        sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-      }
-
-      function clearSession() {
-        sessionStorage.removeItem(TOKEN_KEY);
-        sessionStorage.removeItem(USER_KEY);
-        localStorage.removeItem(TOKEN_KEY);
+        if (isConnected) {
+          badge.className = 'admin-conn-badge flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+          dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
+          label.textContent = 'Connected to InsForge';
+        } else {
+          badge.className = 'admin-conn-badge flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+          dot.className = 'w-1.5 h-1.5 rounded-full bg-red-400';
+          label.textContent = 'Connection Unavailable';
+        }
       }
 
       async function apiRequest(action, options = {}) {
-        const token = getToken();
         const headers = {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           ...(options.headers || {})
         };
 
@@ -526,20 +527,28 @@
           const res = await fetch(url, {
             method,
             headers,
+            credentials: 'same-origin',
             body: options.body ? JSON.stringify(options.body) : undefined
           });
 
           const data = await res.json().catch(() => ({}));
+
+          if (res.status >= 500) {
+            updateConnectionStatus(false);
+          } else {
+            updateConnectionStatus(true);
+          }
+
           if (res.status === 401 || res.status === 403) {
-            if (action !== 'login') {
-              showToast('Session expired or unauthorized. Please sign in.', 'error');
-              clearSession();
+            if (action !== 'login' && action !== 'session') {
+              showToast(data.error || 'Session expired or unauthorized. Please sign in.', 'error');
               showLoginView();
             }
           }
           return { ok: res.ok, status: res.status, data };
         } catch (err) {
           console.error('[AdminApp] Request error:', err);
+          updateConnectionStatus(false);
           return { ok: false, status: 500, data: { error: 'Network communication failure' } };
         }
       }
@@ -570,17 +579,10 @@
       }
 
       async function checkAuth() {
-        const token = getToken();
-        if (!token) {
-          showLoginView();
-          return;
-        }
-
         const res = await apiRequest('session');
         if (res.ok && res.data.user) {
           showDashboardView(res.data.user);
         } else {
-          clearSession();
           showLoginView();
         }
       }
@@ -1497,8 +1499,7 @@
           submitBtn.querySelector('.btn-text').classList.remove('hidden');
           submitBtn.querySelector('.btn-loader').classList.add('hidden');
 
-          if (res.ok && res.data.accessToken) {
-            setSession(res.data.accessToken, res.data.user);
+          if (res.ok && res.data.user) {
             showDashboardView(res.data.user);
             showToast('Welcome to GULLYGANG Admin Control Center');
           } else {
@@ -1520,8 +1521,8 @@
         });
 
         // Logout
-        document.getElementById('btn-admin-logout')?.addEventListener('click', () => {
-          clearSession();
+        document.getElementById('btn-admin-logout')?.addEventListener('click', async () => {
+          await apiRequest('logout', { method: 'POST' });
           showLoginView();
           showToast('Signed out of Admin');
         });

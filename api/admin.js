@@ -1,18 +1,43 @@
 // ============================================================
 // GULLYGANG — PRODUCTION SECURE ADMIN API ROUTER
-// Protected by InsForge Auth & Project Admin Role Verification
+// Cryptographically verified by InsForge Auth & auth.users.is_project_admin
 // ============================================================
 
-const { queryInsForge, escapeSql, INSFORGE_HOST, INSFORGE_API_KEY } = require('./_db.js');
+const {
+  getInsForgeHost,
+  getInsForgeApiKey,
+  queryInsForge,
+  escapeSql,
+  isValidUUID,
+  isValidInteger,
+  isValidSlug,
+  isValidUrl
+} = require('./_db.js');
 
-// Simple helper to parse request body
+// Dynamically load @insforge/sdk
+let sdkModule = null;
+async function getSdk() {
+  if (!sdkModule) {
+    sdkModule = await import('@insforge/sdk');
+  }
+  return sdkModule;
+}
+
+// Helper to parse request JSON body safely
 function parseBody(req) {
   return new Promise((resolve) => {
     if (req.body && typeof req.body === 'object') {
       return resolve(req.body);
     }
     let data = '';
-    req.on('data', chunk => data += chunk);
+    req.on('data', chunk => {
+      data += chunk;
+      // Guard against oversized payload attacks (max 2MB)
+      if (data.length > 2 * 1024 * 1024) {
+        req.destroy();
+        resolve({});
+      }
+    });
     req.on('end', () => {
       try {
         resolve(data ? JSON.parse(data) : {});
@@ -23,87 +48,116 @@ function parseBody(req) {
   });
 }
 
-// Extract Bearer token from Authorization header
-function getBearerToken(req) {
-  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
-  if (!authHeader || typeof authHeader !== 'string') return null;
-  const parts = authHeader.split(' ');
-  if (parts.length === 2 && /^Bearer$/i.test(parts[0])) {
-    return parts[1].trim();
+// Parse named cookie from request header
+function getCookie(req, name) {
+  const cookieHeader = req.headers['cookie'];
+  if (!cookieHeader || typeof cookieHeader !== 'string') return null;
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Extract authentication token from HttpOnly cookie or Authorization header
+function getAuthToken(req) {
+  // 1. Primary: HttpOnly Session Cookie
+  const cookieToken = getCookie(req, 'gullygang_admin_session');
+  if (cookieToken && cookieToken.trim()) {
+    return cookieToken.trim();
   }
+
+  // 2. Fallback: Bearer Token in Authorization header
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  if (authHeader && typeof authHeader === 'string') {
+    const parts = authHeader.split(' ');
+    if (parts.length === 2 && /^Bearer$/i.test(parts[0])) {
+      return parts[1].trim();
+    }
+  }
+
   return null;
 }
 
-// Decode JWT payload safely without external dependencies
-function decodeJwtPayload(token) {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
-    return JSON.parse(payload);
-  } catch (e) {
-    return null;
-  }
-}
-
-// Authenticate caller: Verify token & assert is_project_admin = true
+/**
+ * Cryptographically verify incoming request with InsForge Auth and check database role.
+ * NEVER trusts unverified client JWT payloads or sub claims.
+ */
 async function verifyAdminAuth(req) {
-  const token = getBearerToken(req);
-  if (!token) return { isAuthorized: false, error: 'Missing authorization token', statusCode: 401 };
-
-  const payload = decodeJwtPayload(token);
-  const userId = payload?.sub || payload?.id || payload?.user_id;
-
-  if (!userId) {
-    return { isAuthorized: false, error: 'Invalid token structure', statusCode: 401 };
+  const token = getAuthToken(req);
+  if (!token) {
+    return {
+      isAuthorized: false,
+      error: 'Authentication required. Please sign in.',
+      statusCode: 401
+    };
   }
 
-  // Verify user existence and project admin privilege in Postgres
   try {
-    const safeUserId = escapeSql(userId);
+    const { createClient } = await getSdk();
+    const host = getInsForgeHost();
+
+    // Create user-scoped InsForge client with token for cryptographic session verification
+    const userClient = createClient({ baseUrl: host, accessToken: token });
+    const { data, error } = await userClient.auth.getCurrentUser();
+
+    if (error || !data?.user?.id) {
+      return {
+        isAuthorized: false,
+        error: 'Invalid or expired session. Please sign in again.',
+        statusCode: 401
+      };
+    }
+
+    const authenticatedUserId = data.user.id;
+
+    // Authoritative check against PostgreSQL auth.users table
+    const safeUserId = escapeSql(authenticatedUserId);
     const users = await queryInsForge(`
       SELECT id, email, is_project_admin, email_verified, profile 
       FROM auth.users 
-      WHERE id = '${safeUserId}';
+      WHERE id = '${safeUserId}'
+      LIMIT 1;
     `);
 
-    if (users.length === 0) {
-      return { isAuthorized: false, error: 'User not found', statusCode: 401 };
+    if (!users || users.length === 0) {
+      return {
+        isAuthorized: false,
+        error: 'Authenticated user account not found.',
+        statusCode: 401
+      };
     }
 
     const user = users[0];
     if (!user.is_project_admin) {
-      return { isAuthorized: false, error: 'Forbidden: Insufficient privileges. Project Admin required.', statusCode: 403 };
+      return {
+        isAuthorized: false,
+        error: 'Access denied. Your account is not authorized for administrative access.',
+        statusCode: 403
+      };
     }
 
     return { isAuthorized: true, user };
   } catch (err) {
-    console.error('[AdminAPI] Auth verification error:', err);
-    return { isAuthorized: false, error: 'Authentication verification failure', statusCode: 500 };
+    console.error('[AdminAPI] Verification exception:', err);
+    return {
+      isAuthorized: false,
+      error: 'Authentication verification failure: ' + (err.message || 'Server error'),
+      statusCode: 500
+    };
   }
 }
 
-// Sanitize HTML string to prevent XSS in blog content
+// Sanitize HTML string to prevent stored XSS in editorial content
 function sanitizeHtml(dirty) {
   if (!dirty || typeof dirty !== 'string') return '';
-  
-  // 1. Remove dangerous script and iframe elements
-  let clean = dirty
+  return dirty
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
     .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '');
-
-  // 2. Remove inline event handlers (onerror, onload, onclick, onmouseover, etc.)
-  clean = clean.replace(/(\s)on[a-z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '$1');
-
-  // 3. Remove javascript: pseudo-protocols in links and src
-  clean = clean.replace(/(href|src)\s*=\s*['"]\s*javascript:[^'"]*['"]/gi, '$1="#"');
-
-  return clean;
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/(\s)on[a-z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '$1')
+    .replace(/(href|src)\s*=\s*['"]\s*javascript:[^'"]*['"]/gi, '$1="#"');
 }
 
-// Validate & clean URL slug (lowercase, hyphen-separated, alphanumeric)
+// Clean and validate URL slug
 function sanitizeSlug(slug, fallbackTitle = '') {
   let s = (slug || fallbackTitle)
     .toLowerCase()
@@ -111,24 +165,29 @@ function sanitizeSlug(slug, fallbackTitle = '') {
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return s || 'article-' + Date.now();
+  return s || 'item-' + Date.now();
 }
 
-// Extract YouTube ID from URL or return raw ID
+// Extract standard 11-char YouTube ID
 function extractYouTubeId(urlOrId) {
   if (!urlOrId || typeof urlOrId !== 'string') return '';
   const trimmed = urlOrId.trim();
   if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
-
   const match = trimmed.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-  return match ? match[1] : trimmed;
+  return match ? match[1] : '';
 }
 
 module.exports = async function handler(req, res) {
-  // CORS & Standard Security Headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS & Security Headers
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
   if (req.method === 'OPTIONS') {
@@ -151,50 +210,81 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'Email and password are required' });
       }
 
-      // Authenticate against InsForge Auth endpoint
-      const authRes = await fetch(`${INSFORGE_HOST}/api/auth/sessions?client_type=mobile`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${INSFORGE_API_KEY}`
-        },
-        body: JSON.stringify({ email, password })
-      });
+      const { createClient } = await getSdk();
+      const host = getInsForgeHost();
+      const anonKey = process.env.INSFORGE_ANON_KEY;
 
-      if (!authRes.ok) {
-        // Safe generic message — zero account enumeration
+      // Authenticate against official InsForge Auth service
+      const authClient = createClient({ baseUrl: host, anonKey });
+      const { data, error } = await authClient.auth.signInWithPassword({ email, password });
+
+      if (error || !data?.accessToken || !data?.user?.id) {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
-      const authData = await authRes.json();
-      const userId = authData.user?.id;
-
-      // Verify if user is an approved project administrator
-      const checkAdmin = await queryInsForge(`
-        SELECT id, email, is_project_admin, profile 
+      // Assert project admin privilege in PostgreSQL auth.users
+      const safeUserId = escapeSql(data.user.id);
+      const users = await queryInsForge(`
+        SELECT id, email, is_project_admin, email_verified, profile 
         FROM auth.users 
-        WHERE id = '${escapeSql(userId)}';
+        WHERE id = '${safeUserId}'
+        LIMIT 1;
       `);
 
-      if (checkAdmin.length === 0 || !checkAdmin[0].is_project_admin) {
+      if (!users || users.length === 0 || !users[0].is_project_admin) {
         return res.status(403).json({
           error: 'Access denied. Your account is not authorized for administrative access.'
         });
       }
 
+      // Set secure HttpOnly session cookie
+      const isProd = process.env.NODE_ENV === 'production';
+      const cookieHeader = [
+        `gullygang_admin_session=${data.accessToken}`,
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Lax',
+        `Max-Age=${60 * 60 * 24 * 7}`, // 7 days
+        ...(isProd ? ['Secure'] : [])
+      ].join('; ');
+
+      res.setHeader('Set-Cookie', cookieHeader);
+
       return res.status(200).json({
-        accessToken: authData.accessToken,
+        success: true,
+        accessToken: data.accessToken,
         user: {
-          id: authData.user.id,
-          email: authData.user.email,
-          profile: authData.user.profile || {},
+          id: users[0].id,
+          email: users[0].email,
+          profile: users[0].profile || {},
           is_project_admin: true
         }
       });
     }
 
     // ==========================================================
-    // ALL SUBSEQUENT ACTIONS REQUIRE ADMIN AUTHORIZATION
+    // 2. AUTH: LOGOUT
+    // ==========================================================
+    if (action === 'logout' && req.method === 'POST') {
+      const token = getAuthToken(req);
+      if (token) {
+        try {
+          const { createClient } = await getSdk();
+          const host = getInsForgeHost();
+          const userClient = createClient({ baseUrl: host, accessToken: token });
+          await userClient.auth.signOut().catch(() => {});
+        } catch (_) {}
+      }
+
+      // Clear the HttpOnly session cookie
+      const clearCookieHeader = 'gullygang_admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0';
+      res.setHeader('Set-Cookie', clearCookieHeader);
+
+      return res.status(200).json({ success: true, message: 'Signed out successfully' });
+    }
+
+    // ==========================================================
+    // ALL SUBSEQUENT ACTIONS REQUIRE VERIFIED ADMIN AUTHORIZATION
     // ==========================================================
     const auth = await verifyAdminAuth(req);
     if (!auth.isAuthorized) {
@@ -202,10 +292,11 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 2. SESSION VALIDATION
+    // 3. SESSION VALIDATION
     // ==========================================================
-    if (action === 'session') {
+    if (action === 'session' && req.method === 'GET') {
       return res.status(200).json({
+        is_authenticated: true,
         user: {
           id: auth.user.id,
           email: auth.user.email,
@@ -216,9 +307,9 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 3. OVERVIEW / DASHBOARD STATS
+    // 4. OVERVIEW / DASHBOARD STATS
     // ==========================================================
-    if (action === 'overview') {
+    if (action === 'overview' && req.method === 'GET') {
       const [playlists, songs, visuals, blogs, messages] = await Promise.all([
         queryInsForge('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_active = true) as active FROM playlists;'),
         queryInsForge('SELECT COUNT(*) as total FROM playlist_songs;'),
@@ -233,21 +324,21 @@ module.exports = async function handler(req, res) {
 
       return res.status(200).json({
         counts: {
-          playlists_total: parseInt(playlists[0]?.total || 0),
-          playlists_active: parseInt(playlists[0]?.active || 0),
-          songs_total: parseInt(songs[0]?.total || 0),
-          visuals_total: parseInt(visuals[0]?.total || 0),
-          visuals_active: parseInt(visuals[0]?.active || 0),
-          blogs_total: parseInt(blogs[0]?.total || 0),
-          blogs_published: parseInt(blogs[0]?.published || 0),
-          messages_total: parseInt(messages[0]?.total || 0)
+          playlists_total: parseInt(playlists[0]?.total || 0, 10),
+          playlists_active: parseInt(playlists[0]?.active || 0, 10),
+          songs_total: parseInt(songs[0]?.total || 0, 10),
+          visuals_total: parseInt(visuals[0]?.total || 0, 10),
+          visuals_active: parseInt(visuals[0]?.active || 0, 10),
+          blogs_total: parseInt(blogs[0]?.total || 0, 10),
+          blogs_published: parseInt(blogs[0]?.published || 0, 10),
+          messages_total: parseInt(messages[0]?.total || 0, 10)
         },
         recentActivity
       });
     }
 
     // ==========================================================
-    // 4. PLAYLISTS CRUD
+    // 5. PLAYLISTS CRUD
     // ==========================================================
     if (action === 'playlists') {
       if (req.method === 'GET') {
@@ -268,7 +359,7 @@ module.exports = async function handler(req, res) {
         const icon = (body.icon || '🎵').trim();
         const ytUrl = (body.youtube_playlist_url || '').trim();
         const bgImage = (body.bg_image || '').trim();
-        const displayOrder = parseInt(body.display_order || 0);
+        const displayOrder = isValidInteger(body.display_order) ? parseInt(body.display_order, 10) : 0;
         const isActive = body.is_active !== false;
 
         if (!name) return res.status(400).json({ error: 'Playlist name is required' });
@@ -284,15 +375,17 @@ module.exports = async function handler(req, res) {
       if (req.method === 'PUT') {
         const body = await parseBody(req);
         const id = body.id;
-        if (!id) return res.status(400).json({ error: 'Playlist ID is required' });
+        if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Playlist UUID is required' });
 
         const name = (body.name || '').trim();
         const slug = sanitizeSlug(body.slug, name);
         const icon = (body.icon || '🎵').trim();
         const ytUrl = (body.youtube_playlist_url || '').trim();
         const bgImage = (body.bg_image || '').trim();
-        const displayOrder = parseInt(body.display_order || 0);
+        const displayOrder = isValidInteger(body.display_order) ? parseInt(body.display_order, 10) : 0;
         const isActive = body.is_active !== false;
+
+        if (!name) return res.status(400).json({ error: 'Playlist name is required' });
 
         const updated = await queryInsForge(`
           UPDATE playlists
@@ -312,9 +405,9 @@ module.exports = async function handler(req, res) {
 
       if (req.method === 'DELETE') {
         const id = url.searchParams.get('id') || (await parseBody(req)).id;
-        if (!id) return res.status(400).json({ error: 'Playlist ID is required' });
+        if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Playlist UUID is required' });
 
-        // Clean up songs and delete playlist
+        // Cascading song deletion and playlist removal
         await queryInsForge(`DELETE FROM playlist_songs WHERE playlist_id = '${escapeSql(id)}';`);
         await queryInsForge(`DELETE FROM playlists WHERE id = '${escapeSql(id)}';`);
         return res.status(200).json({ success: true });
@@ -322,7 +415,7 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 5. SONGS CRUD
+    // 6. SONGS CRUD
     // ==========================================================
     if (action === 'songs') {
       if (req.method === 'GET') {
@@ -334,8 +427,13 @@ module.exports = async function handler(req, res) {
           LEFT JOIN playlists p ON s.playlist_id = p.id
         `;
         const conditions = [];
-        if (playlistId) conditions.push(`s.playlist_id = '${escapeSql(playlistId)}'`);
-        if (q) conditions.push(`(s.title ILIKE '%${escapeSql(q)}%' OR s.artist ILIKE '%${escapeSql(q)}%')`);
+        if (playlistId && isValidUUID(playlistId)) {
+          conditions.push(`s.playlist_id = '${escapeSql(playlistId)}'`);
+        }
+        if (q && q.trim()) {
+          const safeQ = escapeSql(q.trim());
+          conditions.push(`(s.title ILIKE '%${safeQ}%' OR s.artist ILIKE '%${safeQ}%')`);
+        }
 
         if (conditions.length > 0) sql += ` WHERE ` + conditions.join(' AND ');
         sql += ` ORDER BY s.display_order ASC, s.created_at ASC;`;
@@ -346,14 +444,14 @@ module.exports = async function handler(req, res) {
 
       if (req.method === 'POST') {
         const body = await parseBody(req);
-        
-        // Handle batch reorder
+
+        // Handle batch reorder payload
         if (body.reorder && Array.isArray(body.reorder)) {
           for (const item of body.reorder) {
-            if (item.id && typeof item.display_order === 'number') {
+            if (item.id && isValidUUID(item.id) && isValidInteger(item.display_order)) {
               await queryInsForge(`
                 UPDATE playlist_songs 
-                SET display_order = ${item.display_order} 
+                SET display_order = ${parseInt(item.display_order, 10)} 
                 WHERE id = '${escapeSql(item.id)}';
               `);
             }
@@ -361,16 +459,16 @@ module.exports = async function handler(req, res) {
           return res.status(200).json({ success: true });
         }
 
-        const playlistId = body.playlist_id;
+        const playlistId = body.playlist_id && isValidUUID(body.playlist_id) ? body.playlist_id : null;
         const ytId = extractYouTubeId(body.youtube_id || body.youtube_url);
         const title = (body.title || '').trim();
         const artist = (body.artist || 'GULLYGANG').trim();
         const thumbnail = (body.thumbnail || `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`).trim();
-        const displayOrder = parseInt(body.display_order || 0);
+        const displayOrder = isValidInteger(body.display_order) ? parseInt(body.display_order, 10) : 0;
         const isActive = body.is_active !== false;
 
         if (!title) return res.status(400).json({ error: 'Song title is required' });
-        if (!ytId) return res.status(400).json({ error: 'Valid YouTube URL or Video ID is required' });
+        if (!ytId) return res.status(400).json({ error: 'Valid YouTube URL or 11-character Video ID is required' });
 
         const inserted = await queryInsForge(`
           INSERT INTO playlist_songs (playlist_id, youtube_id, title, artist, thumbnail, display_order, is_active, created_at)
@@ -383,15 +481,18 @@ module.exports = async function handler(req, res) {
       if (req.method === 'PUT') {
         const body = await parseBody(req);
         const id = body.id;
-        if (!id) return res.status(400).json({ error: 'Song ID is required' });
+        if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Song UUID is required' });
 
-        const playlistId = body.playlist_id;
+        const playlistId = body.playlist_id && isValidUUID(body.playlist_id) ? body.playlist_id : null;
         const ytId = extractYouTubeId(body.youtube_id || body.youtube_url);
         const title = (body.title || '').trim();
         const artist = (body.artist || '').trim();
         const thumbnail = (body.thumbnail || '').trim();
-        const displayOrder = parseInt(body.display_order || 0);
+        const displayOrder = isValidInteger(body.display_order) ? parseInt(body.display_order, 10) : 0;
         const isActive = body.is_active !== false;
+
+        if (!title) return res.status(400).json({ error: 'Song title is required' });
+        if (!ytId) return res.status(400).json({ error: 'Valid YouTube Video ID is required' });
 
         const updated = await queryInsForge(`
           UPDATE playlist_songs
@@ -410,7 +511,7 @@ module.exports = async function handler(req, res) {
 
       if (req.method === 'DELETE') {
         const id = url.searchParams.get('id') || (await parseBody(req)).id;
-        if (!id) return res.status(400).json({ error: 'Song ID is required' });
+        if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Song UUID is required' });
 
         await queryInsForge(`DELETE FROM playlist_songs WHERE id = '${escapeSql(id)}';`);
         return res.status(200).json({ success: true });
@@ -418,7 +519,7 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 6. VISUALS CRUD
+    // 7. VISUALS CRUD
     // ==========================================================
     if (action === 'visuals') {
       if (req.method === 'GET') {
@@ -432,11 +533,11 @@ module.exports = async function handler(req, res) {
         const body = await parseBody(req);
         const name = (body.name || '').trim();
         const videoUrl = (body.url || '').trim();
-        const displayOrder = parseInt(body.display_order || 0);
+        const displayOrder = isValidInteger(body.display_order) ? parseInt(body.display_order, 10) : 0;
         const isActive = body.is_active !== false;
 
-        if (!name) return res.status(400).json({ error: 'Visual name is required' });
-        if (!videoUrl) return res.status(400).json({ error: 'Visual video URL is required' });
+        if (!name) return res.status(400).json({ error: 'Visual atmosphere name is required' });
+        if (!videoUrl || !isValidUrl(videoUrl)) return res.status(400).json({ error: 'A valid HTTP/HTTPS Video URL is required' });
 
         const inserted = await queryInsForge(`
           INSERT INTO visuals (name, url, display_order, is_active, created_at, updated_at)
@@ -449,12 +550,15 @@ module.exports = async function handler(req, res) {
       if (req.method === 'PUT') {
         const body = await parseBody(req);
         const id = body.id;
-        if (!id) return res.status(400).json({ error: 'Visual ID is required' });
+        if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Visual UUID is required' });
 
         const name = (body.name || '').trim();
         const videoUrl = (body.url || '').trim();
-        const displayOrder = parseInt(body.display_order || 0);
+        const displayOrder = isValidInteger(body.display_order) ? parseInt(body.display_order, 10) : 0;
         const isActive = body.is_active !== false;
+
+        if (!name) return res.status(400).json({ error: 'Visual atmosphere name is required' });
+        if (!videoUrl || !isValidUrl(videoUrl)) return res.status(400).json({ error: 'A valid Video URL is required' });
 
         const updated = await queryInsForge(`
           UPDATE visuals
@@ -471,7 +575,7 @@ module.exports = async function handler(req, res) {
 
       if (req.method === 'DELETE') {
         const id = url.searchParams.get('id') || (await parseBody(req)).id;
-        if (!id) return res.status(400).json({ error: 'Visual ID is required' });
+        if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Visual UUID is required' });
 
         await queryInsForge(`DELETE FROM visuals WHERE id = '${escapeSql(id)}';`);
         return res.status(200).json({ success: true });
@@ -479,19 +583,19 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 7. BLOG POSTS CRUD
+    // 8. BLOG POSTS CRUD
     // ==========================================================
     if (action === 'blog') {
       if (req.method === 'GET') {
         const id = url.searchParams.get('id');
         const slug = url.searchParams.get('slug');
 
-        if (id) {
+        if (id && isValidUUID(id)) {
           const post = await queryInsForge(`SELECT * FROM blog_posts WHERE id = '${escapeSql(id)}';`);
           return res.status(200).json({ post: post[0] || null });
         }
         if (slug) {
-          const post = await queryInsForge(`SELECT * FROM blog_posts WHERE slug = '${escapeSql(slug)}';`);
+          const post = await queryInsForge(`SELECT * FROM blog_posts WHERE slug = '${escapeSql(slug.trim())}';`);
           return res.status(200).json({ post: post[0] || null });
         }
 
@@ -530,7 +634,7 @@ module.exports = async function handler(req, res) {
       if (req.method === 'PUT') {
         const body = await parseBody(req);
         const id = body.id;
-        if (!id) return res.status(400).json({ error: 'Blog post ID is required' });
+        if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Blog Post UUID is required' });
 
         const title = (body.title || '').trim();
         const slug = sanitizeSlug(body.slug, title);
@@ -542,6 +646,9 @@ module.exports = async function handler(req, res) {
         const seoTitle = (body.seo_title || title).trim();
         const seoDesc = (body.seo_description || excerpt).trim();
         const status = body.status === 'draft' ? 'draft' : 'published';
+
+        if (!title) return res.status(400).json({ error: 'Article title is required' });
+        if (!content) return res.status(400).json({ error: 'Article content is required' });
 
         const updated = await queryInsForge(`
           UPDATE blog_posts
@@ -564,7 +671,7 @@ module.exports = async function handler(req, res) {
 
       if (req.method === 'DELETE') {
         const id = url.searchParams.get('id') || (await parseBody(req)).id;
-        if (!id) return res.status(400).json({ error: 'Blog post ID is required' });
+        if (!id || !isValidUUID(id)) return res.status(400).json({ error: 'A valid Blog Post UUID is required' });
 
         await queryInsForge(`DELETE FROM blog_posts WHERE id = '${escapeSql(id)}';`);
         return res.status(200).json({ success: true });
@@ -572,7 +679,7 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 8. ADVERTISEMENTS SETTINGS
+    // 9. ADVERTISEMENTS SETTINGS
     // ==========================================================
     if (action === 'ads') {
       if (req.method === 'GET') {
@@ -603,7 +710,7 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 9. SITE SETTINGS
+    // 10. SITE SETTINGS
     // ==========================================================
     if (action === 'settings') {
       if (req.method === 'GET') {
@@ -635,7 +742,7 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 10. ADMIN USERS MANAGEMENT
+    // 11. ADMIN USERS MANAGEMENT
     // ==========================================================
     if (action === 'users') {
       if (req.method === 'GET') {
@@ -657,12 +764,15 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        // Create user via InsForge Auth
-        const createRes = await fetch(`${INSFORGE_HOST}/api/auth/users`, {
+        const host = getInsForgeHost();
+        const apiKey = getInsForgeApiKey();
+
+        // Create user via InsForge Auth admin API
+        const createRes = await fetch(`${host}/api/auth/users`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${INSFORGE_API_KEY}`
+            'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({ email, password, name })
         });
@@ -672,7 +782,7 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: errData.message || 'Failed to create user account' });
         }
 
-        // Promote to project admin
+        // Elevate created user to project admin
         await queryInsForge(`
           UPDATE auth.users 
           SET email_verified = true, is_project_admin = true 
@@ -685,7 +795,7 @@ module.exports = async function handler(req, res) {
 
     return res.status(404).json({ error: `Unknown admin action: ${action}` });
   } catch (err) {
-    console.error('[AdminAPI] Server error:', err);
-    return res.status(500).json({ error: 'Internal server error: ' + err.message });
+    console.error('[AdminAPI] Execution error:', err);
+    return res.status(500).json({ error: 'Internal server error: ' + (err.message || 'Unknown error') });
   }
 };
