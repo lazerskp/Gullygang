@@ -15,6 +15,8 @@ const {
   recordSyncEvent
 } = require('./_db.js');
 
+const growthHelpers = require('./growth-helpers.js');
+
 // Dynamically load @insforge/sdk
 let sdkModule = null;
 async function getSdk() {
@@ -402,144 +404,636 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
-    // 4.5 PROTECTED FIRST-PARTY ANALYTICS & INTELLIGENCE
+    // 4.5 PROTECTED FIRST-PARTY ANALYTICS & GROWTH INTELLIGENCE
     // ==========================================================
-    if (action.startsWith('analytics_') && req.method === 'GET') {
+    function getWindowFilters(p) {
+      if (p === 'today' || p === '1d') {
+        return {
+          current: `created_at >= CURRENT_DATE`,
+          prev: `created_at >= CURRENT_DATE - INTERVAL '1 day' AND created_at < CURRENT_DATE`
+        };
+      }
+      if (p === '30d') {
+        return {
+          current: `created_at >= NOW() - INTERVAL '30 days'`,
+          prev: `created_at >= NOW() - INTERVAL '60 days' AND created_at < NOW() - INTERVAL '30 days'`
+        };
+      }
+      if (p === 'all') {
+        return {
+          current: `1=1`,
+          prev: `1=0`
+        };
+      }
+      return {
+        current: `created_at >= NOW() - INTERVAL '7 days'`,
+        prev: `created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days'`
+      };
+    }
+
+    // 1. Overview KPIs
+    if (action === 'analytics_overview' && req.method === 'GET') {
       res.setHeader('Cache-Control', 'private, no-store');
       const period = (url.searchParams.get('period') || '7d').toLowerCase();
+      const windows = getWindowFilters(period);
 
-      function getAnalyticsTimeFilter(p) {
-        if (p === 'today' || p === '1d') return `created_at >= CURRENT_DATE`;
-        if (p === '30d') return `created_at >= NOW() - INTERVAL '30 days'`;
-        if (p === 'all') return `1=1`;
-        return `created_at >= NOW() - INTERVAL '7 days'`;
-      }
+      const rows = await queryInsForge(`
+        SELECT 
+          COUNT(CASE WHEN event_type = 'page_view' THEN 1 END)::int as page_views,
+          COUNT(CASE WHEN event_type = 'article_view' THEN 1 END)::int as article_views,
+          COUNT(DISTINCT session_id)::int as unique_visitors,
+          COUNT(CASE WHEN event_type = 'search' THEN 1 END)::int as searches,
+          COUNT(CASE WHEN event_type = 'search' AND (metadata->>'result_count')::int = 0 THEN 1 END)::int as zero_result_searches,
+          COUNT(CASE WHEN event_type = 'track_play' THEN 1 END)::int as music_plays
+        FROM analytics_events
+        WHERE ${windows.current};
+      `);
 
-      const timeFilter = getAnalyticsTimeFilter(period);
+      const stats = rows[0] || {};
+      return res.status(200).json({
+        period,
+        page_views: stats.page_views || 0,
+        article_views: stats.article_views || 0,
+        unique_visitors: stats.unique_visitors || 0,
+        searches: stats.searches || 0,
+        zero_result_searches: stats.zero_result_searches || 0,
+        music_plays: stats.music_plays || 0
+      });
+    }
 
-      // 1. Overview KPIs
-      if (action === 'analytics_overview') {
-        const rows = await queryInsForge(`
+    // 2. Top Articles Performance
+    if (action === 'analytics_articles' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '7d').toLowerCase();
+      const windows = getWindowFilters(period);
+
+      const rows = await queryInsForge(`
+        SELECT 
+          p.id, p.slug, p.title, p.author, p.published_at,
+          COUNT(CASE WHEN e.event_type = 'article_view' THEN 1 END)::int as views,
+          COUNT(CASE WHEN e.event_type = 'search_result_click' THEN 1 END)::int as search_clicks
+        FROM blog_posts p
+        LEFT JOIN analytics_events e ON p.id = e.article_id AND ${windows.current.replace(/created_at/g, 'e.created_at')}
+        WHERE p.status = 'published' OR (p.status = 'scheduled' AND p.scheduled_at <= NOW())
+        GROUP BY p.id
+        ORDER BY views DESC, search_clicks DESC
+        LIMIT 20;
+      `);
+      return res.status(200).json({ articles: rows });
+    }
+
+    // 3. Search Intelligence & Zero-Result Opportunities
+    if (action === 'analytics_searches' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '7d').toLowerCase();
+      const windows = getWindowFilters(period);
+
+      const [topSearches, zeroSearches] = await Promise.all([
+        queryInsForge(`
           SELECT 
-            COUNT(CASE WHEN event_type = 'page_view' THEN 1 END)::int as page_views,
-            COUNT(CASE WHEN event_type = 'article_view' THEN 1 END)::int as article_views,
-            COUNT(DISTINCT session_id)::int as unique_visitors,
-            COUNT(CASE WHEN event_type = 'search' THEN 1 END)::int as searches,
-            COUNT(CASE WHEN event_type = 'search' AND (metadata->>'result_count')::int = 0 THEN 1 END)::int as zero_result_searches,
-            COUNT(CASE WHEN event_type = 'track_play' THEN 1 END)::int as music_plays
+            search_query,
+            COUNT(id)::int as search_count,
+            MAX(CASE WHEN (metadata->>'result_count')::int > 0 THEN 1 ELSE 0 END)::int as has_results
           FROM analytics_events
-          WHERE ${timeFilter};
-        `);
-
-        const stats = rows[0] || {};
-        return res.status(200).json({
-          period,
-          page_views: stats.page_views || 0,
-          article_views: stats.article_views || 0,
-          unique_visitors: stats.unique_visitors || 0,
-          searches: stats.searches || 0,
-          zero_result_searches: stats.zero_result_searches || 0,
-          music_plays: stats.music_plays || 0
-        });
-      }
-
-      // 2. Top Articles Performance
-      if (action === 'analytics_articles') {
-        const rows = await queryInsForge(`
-          SELECT 
-            p.id, p.slug, p.title, p.author, p.published_at,
-            COUNT(CASE WHEN e.event_type = 'article_view' THEN 1 END)::int as views,
-            COUNT(CASE WHEN e.event_type = 'search_result_click' THEN 1 END)::int as search_clicks
-          FROM blog_posts p
-          LEFT JOIN analytics_events e ON p.id = e.article_id AND ${timeFilter}
-          WHERE p.status = 'published' OR (p.status = 'scheduled' AND p.scheduled_at <= NOW())
-          GROUP BY p.id
-          ORDER BY views DESC, search_clicks DESC
-          LIMIT 20;
-        `);
-        return res.status(200).json({ articles: rows });
-      }
-
-      // 3. Search Intelligence & Zero-Result Content Opportunities
-      if (action === 'analytics_searches') {
-        const [topSearches, zeroSearches] = await Promise.all([
-          queryInsForge(`
-            SELECT 
-              search_query,
-              COUNT(id)::int as search_count,
-              MAX(CASE WHEN (metadata->>'result_count')::int > 0 THEN 1 ELSE 0 END)::int as has_results
-            FROM analytics_events
-            WHERE event_type = 'search' AND search_query IS NOT NULL AND ${timeFilter}
-            GROUP BY search_query
-            ORDER BY search_count DESC
-            LIMIT 15;
-          `),
-          queryInsForge(`
-            SELECT 
-              search_query,
-              COUNT(id)::int as zero_count
-            FROM analytics_events
-            WHERE event_type = 'search' 
-              AND search_query IS NOT NULL 
-              AND (metadata->>'result_count')::int = 0
-              AND ${timeFilter}
-            GROUP BY search_query
-            ORDER BY zero_count DESC
-            LIMIT 15;
-          `)
-        ]);
-
-        return res.status(200).json({
-          searches: topSearches,
-          content_opportunities: zeroSearches
-        });
-      }
-
-      // 4. Popular Tags Performance
-      if (action === 'analytics_tags') {
-        const rows = await queryInsForge(`
-          SELECT 
-            tag,
-            COUNT(id)::int as views
-          FROM analytics_events
-          WHERE event_type = 'tag_view' AND tag IS NOT NULL AND ${timeFilter}
-          GROUP BY tag
-          ORDER BY views DESC
+          WHERE event_type = 'search' AND search_query IS NOT NULL AND ${windows.current}
+          GROUP BY search_query
+          ORDER BY search_count DESC
           LIMIT 15;
-        `);
-        return res.status(200).json({ tags: rows });
+        `),
+        queryInsForge(`
+          SELECT 
+            search_query,
+            COUNT(id)::int as zero_count
+          FROM analytics_events
+          WHERE event_type = 'search' 
+            AND search_query IS NOT NULL 
+            AND (metadata->>'result_count')::int = 0
+            AND ${windows.current}
+          GROUP BY search_query
+          ORDER BY zero_count DESC
+          LIMIT 15;
+        `)
+      ]);
+
+      return res.status(200).json({
+        searches: topSearches,
+        content_opportunities: zeroSearches
+      });
+    }
+
+    // 4. Popular Tags Performance
+    if (action === 'analytics_tags' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '7d').toLowerCase();
+      const windows = getWindowFilters(period);
+
+      const rows = await queryInsForge(`
+        SELECT 
+          tag,
+          COUNT(id)::int as views
+        FROM analytics_events
+        WHERE event_type = 'tag_view' AND tag IS NOT NULL AND ${windows.current}
+        GROUP BY tag
+        ORDER BY views DESC
+        LIMIT 15;
+      `);
+      return res.status(200).json({ tags: rows });
+    }
+
+    // 5. Music Plays Leaderboard
+    if (action === 'analytics_music' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '7d').toLowerCase();
+      const windows = getWindowFilters(period);
+
+      const rows = await queryInsForge(`
+        SELECT 
+          COALESCE(metadata->>'title', 'Track ' || track_id) as track_title,
+          COUNT(id)::int as plays
+        FROM analytics_events
+        WHERE event_type = 'track_play' AND ${windows.current}
+        GROUP BY track_title
+        ORDER BY plays DESC
+        LIMIT 10;
+      `);
+      return res.status(200).json({ tracks: rows });
+    }
+
+    // 6. Time-Series Trends
+    if (action === 'analytics_timeseries' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '7d').toLowerCase();
+      const daysLimit = period === 'today' || period === '1d' ? 1 : (period === '30d' ? 30 : 7);
+      const rows = await queryInsForge(`
+        SELECT 
+          TO_CHAR(created_at, 'YYYY-MM-DD') as day,
+          COUNT(CASE WHEN event_type IN ('page_view', 'article_view') THEN 1 END)::int as views,
+          COUNT(CASE WHEN event_type = 'search' THEN 1 END)::int as searches
+        FROM analytics_events
+        WHERE created_at >= NOW() - INTERVAL '${daysLimit} days'
+        GROUP BY day
+        ORDER BY day ASC;
+      `);
+      return res.status(200).json({ timeseries: rows });
+    }
+
+    // ==========================================================
+    // STEP 13: GROWTH INTELLIGENCE & SEO ENGINE ENDPOINTS
+    // ==========================================================
+
+    // 7. Content Opportunity Intelligence
+    if (action === 'content_opportunities' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '7d').toLowerCase();
+      const windows = getWindowFilters(period);
+
+      const [currentSearches, prevSearches, publishedPosts, popularTags] = await Promise.all([
+        queryInsForge(`
+          SELECT 
+            search_query,
+            LOWER(TRIM(search_query)) as normalized_query,
+            COUNT(id)::int as searches,
+            COUNT(CASE WHEN (metadata->>'result_count')::int = 0 THEN 1 END)::int as zero_searches
+          FROM analytics_events
+          WHERE event_type = 'search' AND search_query IS NOT NULL AND ${windows.current}
+          GROUP BY search_query, normalized_query
+          ORDER BY searches DESC;
+        `),
+        queryInsForge(`
+          SELECT 
+            LOWER(TRIM(search_query)) as normalized_query,
+            COUNT(id)::int as prev_searches
+          FROM analytics_events
+          WHERE event_type = 'search' AND search_query IS NOT NULL AND ${windows.prev}
+          GROUP BY normalized_query;
+        `),
+        queryInsForge(`
+          SELECT id, title, slug, tags FROM blog_posts WHERE status = 'published';
+        `),
+        queryInsForge(`
+          SELECT tag, COUNT(id)::int as views 
+          FROM analytics_events 
+          WHERE event_type = 'tag_view' AND tag IS NOT NULL AND ${windows.current}
+          GROUP BY tag 
+          ORDER BY views DESC LIMIT 30;
+        `)
+      ]);
+
+      const prevMap = new Map();
+      for (const row of prevSearches) {
+        prevMap.set(row.normalized_query, row.prev_searches);
       }
 
-      // 5. Music Plays Leaderboard
-      if (action === 'analytics_music') {
-        const rows = await queryInsForge(`
+      const opportunities = currentSearches.map(curr => {
+        const q = curr.search_query;
+        const normQ = curr.normalized_query;
+        const searches = curr.searches;
+        const zeroSearches = curr.zero_searches;
+        const prevCount = prevMap.get(normQ) || 0;
+        const trendPercent = growthHelpers.calculateTrendPercent(searches, prevCount);
+
+        // Calculate existing coverage (matching published articles)
+        const keywords = normQ.split(/\s+/).filter(w => w.length >= 3);
+        const matchingPosts = publishedPosts.filter(p => {
+          const pTitle = (p.title || '').toLowerCase();
+          const pSlug = (p.slug || '').toLowerCase();
+          const pTags = Array.isArray(p.tags) ? p.tags.map(t => String(t).toLowerCase()) : [];
+          if (pTitle.includes(normQ) || pSlug.includes(normQ.replace(/\s+/g, '-'))) return true;
+          if (pTags.some(t => t.includes(normQ) || normQ.includes(t))) return true;
+          if (keywords.length > 0 && keywords.some(k => pTitle.includes(k) || pTags.includes(k))) return true;
+          return false;
+        });
+        const existingCoverage = matchingPosts.length;
+
+        // Identify related tags
+        const tagSet = new Set();
+        for (const p of matchingPosts) {
+          if (Array.isArray(p.tags)) {
+            for (const t of p.tags) tagSet.add(t.toLowerCase());
+          }
+        }
+        for (const tagRow of popularTags) {
+          const t = tagRow.tag.toLowerCase();
+          if (normQ.includes(t) || t.includes(normQ) || keywords.some(k => t.includes(k))) {
+            tagSet.add(t);
+          }
+        }
+        const relatedTags = Array.from(tagSet).slice(0, 4);
+
+        const opportunityScore = growthHelpers.calculateOpportunityScore({
+          searches,
+          previous_searches: prevCount,
+          zero_searches: zeroSearches,
+          existing_coverage: existingCoverage,
+          trend_percent: trendPercent
+        });
+
+        const recommendedAction = growthHelpers.determineRecommendedAction({
+          existing_coverage: existingCoverage,
+          searches,
+          zero_searches: zeroSearches
+        });
+
+        return {
+          query: q,
+          normalized_query: normQ,
+          searches,
+          previous_searches: prevCount,
+          trend_percent: trendPercent,
+          related_tags: relatedTags,
+          existing_coverage: existingCoverage,
+          recommended_action: recommendedAction,
+          opportunity_score: opportunityScore
+        };
+      });
+
+      opportunities.sort((a, b) => b.opportunity_score - a.opportunity_score);
+
+      return res.status(200).json({ period, opportunities });
+    }
+
+    // 8. Search-to-Article Conversion Intelligence
+    if (action === 'analytics_search_conversion' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '7d').toLowerCase();
+      const windows = getWindowFilters(period);
+
+      const [summaryRows, queryRows, clicksRows] = await Promise.all([
+        queryInsForge(`
           SELECT 
-            COALESCE(metadata->>'title', 'Track ' || track_id) as track_title,
-            COUNT(id)::int as plays
+            COUNT(CASE WHEN event_type = 'search' THEN 1 END)::int as total_searches,
+            COUNT(CASE WHEN event_type = 'search' AND (metadata->>'result_count')::int > 0 THEN 1 END)::int as searches_with_results,
+            COUNT(CASE WHEN event_type = 'search' AND (metadata->>'result_count')::int = 0 THEN 1 END)::int as zero_result_searches,
+            COUNT(CASE WHEN event_type = 'search_result_click' THEN 1 END)::int as search_result_clicks
           FROM analytics_events
-          WHERE event_type = 'track_play' AND ${timeFilter}
-          GROUP BY track_title
-          ORDER BY plays DESC
-          LIMIT 10;
-        `);
-        return res.status(200).json({ tracks: rows });
+          WHERE ${windows.current};
+        `),
+        queryInsForge(`
+          SELECT 
+            search_query,
+            COUNT(id)::int as searches,
+            AVG(COALESCE((metadata->>'result_count')::float, 0)) as result_count_avg
+          FROM analytics_events
+          WHERE event_type = 'search' AND search_query IS NOT NULL AND ${windows.current}
+          GROUP BY search_query
+          ORDER BY searches DESC
+          LIMIT 50;
+        `),
+        queryInsForge(`
+          SELECT 
+            search_query,
+            COUNT(id)::int as clicks
+          FROM analytics_events
+          WHERE event_type = 'search_result_click' AND search_query IS NOT NULL AND ${windows.current}
+          GROUP BY search_query;
+        `)
+      ]);
+
+      const clicksMap = new Map();
+      for (const r of clicksRows) {
+        if (r.search_query) {
+          clicksMap.set(r.search_query.trim().toLowerCase(), r.clicks);
+        }
       }
 
-      // 6. Time-Series Trends
-      if (action === 'analytics_timeseries') {
-        const daysLimit = period === 'today' || period === '1d' ? 1 : (period === '30d' ? 30 : 7);
-        const rows = await queryInsForge(`
-          SELECT 
-            TO_CHAR(created_at, 'YYYY-MM-DD') as day,
-            COUNT(CASE WHEN event_type IN ('page_view', 'article_view') THEN 1 END)::int as views,
-            COUNT(CASE WHEN event_type = 'search' THEN 1 END)::int as searches
-          FROM analytics_events
-          WHERE created_at >= NOW() - INTERVAL '${daysLimit} days'
-          GROUP BY day
-          ORDER BY day ASC;
-        `);
-        return res.status(200).json({ timeseries: rows });
+      const stats = summaryRows[0] || {};
+      const totalSearches = stats.total_searches || 0;
+      const searchResultClicks = stats.search_result_clicks || 0;
+      const overallCtr = totalSearches > 0 ? +((searchResultClicks / totalSearches) * 100).toFixed(2) : 0;
+
+      const queries = queryRows.map(row => {
+        const q = row.search_query;
+        const cleanQ = (q || '').trim().toLowerCase();
+        const searches = row.searches || 0;
+        const clicks = clicksMap.get(cleanQ) || 0;
+        const ctr = searches > 0 ? +((clicks / searches) * 100).toFixed(2) : 0;
+        const avgResults = Math.round((row.result_count_avg || 0) * 10) / 10;
+        const needsBetterContent = avgResults > 0 && searches >= 2 && ctr < 20;
+
+        return {
+          query: q,
+          searches,
+          result_clicks: clicks,
+          click_through_rate: ctr,
+          result_count_average: avgResults,
+          needs_better_content_match: needsBetterContent
+        };
+      });
+
+      return res.status(200).json({
+        period,
+        total_searches: totalSearches,
+        searches_with_results: stats.searches_with_results || 0,
+        zero_result_searches: stats.zero_result_searches || 0,
+        search_result_clicks: searchResultClicks,
+        search_ctr: overallCtr,
+        queries
+      });
+    }
+
+    // 9. Article Performance Intelligence
+    if (action === 'article_performance' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const id = url.searchParams.get('id');
+      if (!id || !isValidUUID(id)) {
+        return res.status(400).json({ error: 'A valid article UUID is required' });
       }
+
+      const period = (url.searchParams.get('period') || '30d').toLowerCase();
+      const windows = getWindowFilters(period);
+      const safeId = escapeSql(id);
+
+      const posts = await queryInsForge(`SELECT id, slug, title FROM blog_posts WHERE id = '${safeId}' LIMIT 1;`);
+      if (!posts || posts.length === 0) {
+        return res.status(404).json({ error: 'Article not found' });
+      }
+
+      const post = posts[0];
+      const safeSlug = escapeSql(post.slug);
+
+      const [currentMetrics, prevMetrics] = await Promise.all([
+        queryInsForge(`
+          SELECT 
+            COUNT(CASE WHEN event_type = 'article_view' AND article_id = '${safeId}' THEN 1 END)::int as views,
+            COUNT(DISTINCT session_id) FILTER (WHERE (article_id = '${safeId}' OR (page_path ILIKE '%${safeSlug}%')))::int as unique_sessions,
+            COUNT(CASE WHEN event_type = 'search_result_click' AND article_id = '${safeId}' THEN 1 END)::int as search_clicks,
+            COUNT(CASE WHEN event_type = 'related_article_click' AND article_id = '${safeId}' THEN 1 END)::int as related_clicks,
+            COUNT(CASE WHEN event_type = 'track_play' AND (page_path ILIKE '%${safeSlug}%' OR metadata->>'article_id' = '${safeId}') THEN 1 END)::int as music_plays
+          FROM analytics_events
+          WHERE (article_id = '${safeId}' OR page_path ILIKE '%${safeSlug}%') AND ${windows.current};
+        `),
+        queryInsForge(`
+          SELECT 
+            COUNT(CASE WHEN event_type = 'article_view' AND article_id = '${safeId}' THEN 1 END)::int as prev_views
+          FROM analytics_events
+          WHERE article_id = '${safeId}' AND ${windows.prev};
+        `)
+      ]);
+
+      const curr = currentMetrics[0] || {};
+      const prev = prevMetrics[0] || {};
+      const views = curr.views || 0;
+      const previousViews = prev.prev_views || 0;
+      const trendPercent = growthHelpers.calculateTrendPercent(views, previousViews);
+
+      return res.status(200).json({
+        article_id: id,
+        period,
+        views,
+        unique_sessions: curr.unique_sessions || 0,
+        search_clicks: curr.search_clicks || 0,
+        related_clicks: curr.related_clicks || 0,
+        music_plays: curr.music_plays || 0,
+        previous_views: previousViews,
+        trend_percent: trendPercent
+      });
+    }
+
+    // 10. Trending Content Detection
+    if (action === 'trending_content' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '7d').toLowerCase();
+      const windows = getWindowFilters(period);
+
+      const rows = await queryInsForge(`
+        SELECT 
+          p.id, p.slug, p.title, p.featured_image, p.author, p.published_at,
+          COUNT(CASE WHEN e_curr.id IS NOT NULL THEN 1 END)::int as current_views,
+          COUNT(CASE WHEN e_prev.id IS NOT NULL THEN 1 END)::int as previous_views
+        FROM blog_posts p
+        LEFT JOIN analytics_events e_curr 
+          ON p.id = e_curr.article_id AND e_curr.event_type = 'article_view' AND ${windows.current.replace(/created_at/g, 'e_curr.created_at')}
+        LEFT JOIN analytics_events e_prev 
+          ON p.id = e_prev.article_id AND e_prev.event_type = 'article_view' AND ${windows.prev.replace(/created_at/g, 'e_prev.created_at')}
+        WHERE p.status = 'published'
+        GROUP BY p.id;
+      `);
+
+      const trending = rows.map(r => {
+        const currViews = r.current_views || 0;
+        const prevViews = r.previous_views || 0;
+        const absGrowth = currViews - prevViews;
+        const pctGrowth = prevViews > 0 ? Math.round(((currViews - prevViews) / prevViews) * 100) : (currViews > 0 ? currViews * 100 : 0);
+        const trendScore = Math.round((absGrowth * 0.7) + (Math.min(pctGrowth, 500) * 0.3));
+
+        return {
+          article: {
+            id: r.id,
+            slug: r.slug,
+            title: r.title,
+            featured_image: r.featured_image,
+            author: r.author,
+            published_at: r.published_at
+          },
+          current_views: currViews,
+          previous_views: prevViews,
+          absolute_growth: absGrowth,
+          percentage_growth: pctGrowth,
+          trend_score: trendScore
+        };
+      })
+      .filter(item => item.current_views >= 2 && item.absolute_growth >= 0)
+      .sort((a, b) => b.trend_score - a.trend_score);
+
+      return res.status(200).json({ period, trending });
+    }
+
+    // 11. Content Decay Detection
+    if (action === 'content_decay' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '30d').toLowerCase();
+
+      const rows = await queryInsForge(`
+        SELECT 
+          p.id, p.slug, p.title, p.featured_image, p.author, p.published_at, p.updated_at, p.created_at,
+          COUNT(CASE WHEN e_curr.id IS NOT NULL THEN 1 END)::int as current_views,
+          COUNT(CASE WHEN e_prev.id IS NOT NULL THEN 1 END)::int as previous_views
+        FROM blog_posts p
+        LEFT JOIN analytics_events e_curr 
+          ON p.id = e_curr.article_id AND e_curr.event_type = 'article_view' AND e_curr.created_at >= NOW() - INTERVAL '30 days'
+        LEFT JOIN analytics_events e_prev 
+          ON p.id = e_prev.article_id AND e_prev.event_type = 'article_view' AND e_prev.created_at >= NOW() - INTERVAL '60 days' AND e_prev.created_at < NOW() - INTERVAL '30 days'
+        WHERE p.status = 'published'
+          AND (p.published_at <= NOW() - INTERVAL '30 days' OR (p.published_at IS NULL AND p.created_at <= NOW() - INTERVAL '30 days'))
+        GROUP BY p.id
+        HAVING COUNT(CASE WHEN e_prev.id IS NOT NULL THEN 1 END) >= 3;
+      `);
+
+      const decayed = rows.map(r => {
+        const currViews = r.current_views || 0;
+        const prevViews = r.previous_views || 0;
+        const declinePct = prevViews > 0 ? Math.round(((prevViews - currViews) / prevViews) * 100) : 0;
+
+        return {
+          article: {
+            id: r.id,
+            slug: r.slug,
+            title: r.title,
+            featured_image: r.featured_image,
+            author: r.author
+          },
+          current_views: currViews,
+          previous_views: prevViews,
+          decline_percent: declinePct,
+          last_published_at: r.published_at,
+          last_updated_at: r.updated_at
+        };
+      })
+      .filter(item => item.decline_percent >= 25 && item.current_views < item.previous_views)
+      .sort((a, b) => b.decline_percent - a.decline_percent || b.previous_views - a.previous_views);
+
+      return res.status(200).json({ period, decayed });
+    }
+
+    // 12. SEO Audit for Individual Article
+    if (action === 'seo_audit' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const id = url.searchParams.get('id');
+      if (!id || !isValidUUID(id)) {
+        return res.status(400).json({ error: 'A valid article UUID is required' });
+      }
+
+      const safeId = escapeSql(id);
+      const [targetPost, allPosts] = await Promise.all([
+        queryInsForge(`SELECT * FROM blog_posts WHERE id = '${safeId}' LIMIT 1;`),
+        queryInsForge(`SELECT id, slug, title, seo_title FROM blog_posts;`)
+      ]);
+
+      if (!targetPost || targetPost.length === 0) {
+        return res.status(404).json({ error: 'Article not found' });
+      }
+
+      const audit = growthHelpers.auditArticleSeo(targetPost[0], allPosts);
+      return res.status(200).json({
+        article_id: id,
+        score: audit.score,
+        checks: audit.checks
+      });
+    }
+
+    // 13. Global SEO Health Overview
+    if (action === 'seo_overview' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const posts = await queryInsForge(`
+        SELECT id, slug, title, excerpt, content, featured_image, author, seo_title, seo_description, status, tags, published_at, updated_at
+        FROM blog_posts 
+        ORDER BY published_at DESC;
+      `);
+
+      let totalScore = 0;
+      let warnCount = 0;
+      let failCount = 0;
+      let missingTitleCount = 0;
+      let missingDescCount = 0;
+      let missingImgCount = 0;
+      let missingTagsCount = 0;
+      let duplicateCount = 0;
+
+      const auditedArticles = posts.map(p => {
+        const audit = growthHelpers.auditArticleSeo(p, posts);
+        totalScore += audit.score;
+
+        if (audit.score < 60) failCount++;
+        else if (audit.score < 85) warnCount++;
+
+        if (!p.seo_title && !p.title) missingTitleCount++;
+        if (!p.seo_description && !p.excerpt) missingDescCount++;
+        if (!p.featured_image) missingImgCount++;
+        if (!p.tags || (Array.isArray(p.tags) && p.tags.length === 0)) missingTagsCount++;
+
+        const hasDupCheck = audit.checks.some(c => c.id === 'duplicate_title' && c.status === 'fail');
+        if (hasDupCheck) duplicateCount++;
+
+        return {
+          id: p.id,
+          slug: p.slug,
+          title: p.title,
+          score: audit.score,
+          status: p.status,
+          checks: audit.checks
+        };
+      });
+
+      const avgScore = posts.length > 0 ? Math.round(totalScore / posts.length) : 100;
+
+      return res.status(200).json({
+        average_seo_score: avgScore,
+        articles_with_warnings: warnCount,
+        articles_with_failures: failCount,
+        missing_metadata: {
+          missing_seo_title: missingTitleCount,
+          missing_seo_description: missingDescCount,
+          missing_featured_image: missingImgCount,
+          missing_tags: missingTagsCount
+        },
+        duplicate_issues: duplicateCount,
+        articles: auditedArticles
+      });
+    }
+
+    // 14. Internal Link Recommendations
+    if (action === 'internal_link_suggestions' && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const id = url.searchParams.get('id');
+      if (!id || !isValidUUID(id)) {
+        return res.status(400).json({ error: 'A valid article UUID is required' });
+      }
+
+      const safeId = escapeSql(id);
+      const [targetPost, candidatePosts] = await Promise.all([
+        queryInsForge(`SELECT * FROM blog_posts WHERE id = '${safeId}' LIMIT 1;`),
+        queryInsForge(`SELECT id, slug, title, excerpt, content, tags, published_at FROM blog_posts WHERE id != '${safeId}' AND status = 'published';`)
+      ]);
+
+      if (!targetPost || targetPost.length === 0) {
+        return res.status(404).json({ error: 'Article not found' });
+      }
+
+      const suggestions = growthHelpers.generateInternalLinkSuggestions(targetPost[0], candidatePosts, 6);
+      return res.status(200).json({
+        article_id: id,
+        suggestions
+      });
     }
 
     // ==========================================================

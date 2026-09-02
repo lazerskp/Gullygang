@@ -1,0 +1,20 @@
+{
+  "include": [
+    "services/ytmusic"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/dist",
+    "**/scratch",
+    "**/migrations",
+    "**/src",
+    "**/api",
+    "**/__pycache__",
+    "**/.*",
+    "__pyrefly_virtual__"
+  ],
+  "reportMissingImports": false,
+  "reportMissingTypeStubs": false,
+  "pythonVersion": "3.10",
+  "pythonPlatform": "All"
+}

@@ -7,8 +7,7 @@ export function updateLiveDateTime() {
   const clockEl = document.getElementById('weather-clock');
   if (!timeEl && !clockEl) return;
 
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString('en-US', {
+  const timeStr = new Date().toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -23,14 +22,14 @@ export function restoreCachedWeatherIfValid() {
   try {
     const cached = sessionStorage.getItem('gullygang_cached_weather');
     if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Date.now() - parsed.timestamp < 1800000) {
-        const locEl = document.getElementById('weather-location');
-        const tempEl = document.getElementById('weather-temp');
-        const descEl = document.getElementById('weather-condition');
-        if (locEl && parsed.city) locEl.textContent = parsed.city;
-        if (tempEl && parsed.temp) tempEl.textContent = parsed.temp;
-        if (descEl && parsed.desc) descEl.textContent = parsed.desc;
+      const p = JSON.parse(cached);
+      if (Date.now() - p.timestamp < 1800000) {
+        const loc = document.getElementById('weather-location');
+        const temp = document.getElementById('weather-temp');
+        const cond = document.getElementById('weather-condition');
+        if (loc && p.city) loc.textContent = p.city;
+        if (temp && p.temp) temp.textContent = p.temp;
+        if (cond && p.desc) cond.textContent = p.desc;
         return true;
       }
     }

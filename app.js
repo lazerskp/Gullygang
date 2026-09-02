@@ -2376,7 +2376,6 @@
       song_id: track.id
     });
 
-    // 4. Load & play on YouTube player
     if (state.isPlayerReady && state.ytPlayer) {
       try {
         if (typeof state.ytPlayer.loadVideoById === 'function') {
@@ -7798,6 +7797,11 @@
       () => SupportEngine.init(),
       () => PlaylistSyncEngine.init(),
       () => PlaylistPreviewEngine.init(),
+      () => {
+        if (window.MusicSearchEngine && typeof window.MusicSearchEngine.init === 'function') {
+          window.MusicSearchEngine.init();
+        }
+      },
       () => RealtimeSyncEngine.init(),
       () => ThemeEngine.init(),
       () => BlogEngine.init(),

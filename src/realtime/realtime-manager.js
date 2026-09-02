@@ -1,13 +1,11 @@
 // ============================================================
 // GULLYGANG — CENTRAL REALTIME & PUSH SYNCHRONIZATION MANAGER
-// Zero aggressive polling — Native Server-Sent Events (SSE) & BroadcastChannel
-// Idempotent processing, reconnect recovery, exponential backoff & tab optimization
 // ============================================================
 
 export const RealtimeManager = (function () {
   let eventSource = null;
   let broadcastChannel = null;
-  let connectionState = 'disconnected'; // 'connected' | 'connecting' | 'reconnecting' | 'offline' | 'disconnected'
+  let connectionState = 'disconnected';
   let listeners = new Map();
   let reconnectTimer = null;
   let offlineFallbackTimer = null;
@@ -21,37 +19,27 @@ export const RealtimeManager = (function () {
     if (isInitialized) return;
     isInitialized = true;
 
-    // 1. Inter-tab broadcast channel for 0ms instant cross-tab sync
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         broadcastChannel = new BroadcastChannel('gullygang_sync');
         broadcastChannel.onmessage = (event) => {
-          if (event && event.data) {
-            handleIncomingEvent(event.data);
-          }
+          if (event?.data) handleIncomingEvent(event.data);
         };
       } catch (_) {}
     }
 
-    // 2. Storage event fallback for older browser tabs
     window.addEventListener('storage', (e) => {
       if (e.key === 'gullygang_sync_event' && e.newValue) {
-        try {
-          const payload = JSON.parse(e.newValue);
-          handleIncomingEvent(payload);
-        } catch (_) {}
+        try { handleIncomingEvent(JSON.parse(e.newValue)); } catch (_) {}
       }
     });
 
-    // 3. Connect to native server push SSE stream
     connect();
 
-    // 4. Visibility & Foreground Reconnection Manager
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        if (connectionState !== 'connected') {
-          connect();
-        } else if (pendingVisibilityCatchup) {
+        if (connectionState !== 'connected') connect();
+        else if (pendingVisibilityCatchup) {
           pendingVisibilityCatchup = false;
           reconcileAuthoritativeVersion();
         }
@@ -59,9 +47,7 @@ export const RealtimeManager = (function () {
     });
 
     window.addEventListener('focus', () => {
-      if (connectionState !== 'connected') {
-        connect();
-      }
+      if (connectionState !== 'connected') connect();
     });
 
     window.addEventListener('online', () => {
@@ -70,14 +56,11 @@ export const RealtimeManager = (function () {
       connect();
     });
 
-    window.addEventListener('offline', () => {
-      setConnectionState('offline');
-    });
+    window.addEventListener('offline', () => setConnectionState('offline'));
   }
 
   function connect() {
     if (typeof EventSource === 'undefined') {
-      console.warn('[RealtimeManager] EventSource not supported by browser, using fallback');
       scheduleOfflineFallback();
       return;
     }
@@ -116,12 +99,7 @@ export const RealtimeManager = (function () {
       });
 
       eventSource.addEventListener('sync', (e) => {
-        try {
-          const payload = JSON.parse(e.data);
-          handleIncomingEvent(payload);
-        } catch (err) {
-          console.warn('[RealtimeManager] Parse sync event error:', err);
-        }
+        try { handleIncomingEvent(JSON.parse(e.data)); } catch (_) {}
       });
 
       eventSource.addEventListener('ping', () => {
@@ -139,15 +117,10 @@ export const RealtimeManager = (function () {
       };
 
       eventSource.onerror = () => {
-        if (eventSource?.readyState === EventSource.CLOSED) {
-          setConnectionState('reconnecting');
-        } else {
-          setConnectionState('offline');
-        }
+        setConnectionState(eventSource?.readyState === EventSource.CLOSED ? 'reconnecting' : 'offline');
         scheduleReconnectWithBackoff();
       };
-    } catch (err) {
-      console.warn('[RealtimeManager] Failed to create EventSource:', err);
+    } catch (_) {
       setConnectionState('offline');
       scheduleReconnectWithBackoff();
     }
@@ -155,16 +128,12 @@ export const RealtimeManager = (function () {
 
   function scheduleReconnectWithBackoff() {
     if (reconnectTimer) return;
-    // Exponential backoff with jitter: 1s, 2s, 4s, 8s, 16s, max 30s
     const baseDelay = Math.min(1000 * Math.pow(2, retryCount++), 30000);
-    const jitter = Math.random() * 800;
-    const delay = Math.round(baseDelay + jitter);
+    const delay = Math.round(baseDelay + Math.random() * 800);
 
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
-      if (connectionState !== 'connected') {
-        connect();
-      }
+      if (connectionState !== 'connected') connect();
     }, delay);
 
     scheduleOfflineFallback();
@@ -173,7 +142,6 @@ export const RealtimeManager = (function () {
   function setConnectionState(newState) {
     if (connectionState === newState) return;
     connectionState = newState;
-
     notifyListeners('connection:state', { state: connectionState });
 
     const badge = document.getElementById('admin-realtime-badge') || document.querySelector('.admin-realtime-badge');
@@ -193,149 +161,85 @@ export const RealtimeManager = (function () {
     }
   }
 
-  // Idempotent incoming event handler
   function handleIncomingEvent(payload) {
     if (!payload) return;
     const type = payload.type || payload.last_event?.type;
     if (!type) return;
 
-    const ver = payload.version || payload.last_event?.timestamp || 0;
+    const version = payload.version || payload.last_event?.version || 0;
+    if (version > 0 && version <= lastProcessedVersion && type !== 'ping') return;
 
-    // Idempotency: ignore duplicate or out-of-order versions from dual delivery (SSE + BroadcastChannel)
-    if (ver && ver <= lastProcessedVersion) {
-      return;
+    if (version > lastProcessedVersion) {
+      lastProcessedVersion = version;
+      lastKnownVersion = Math.max(lastKnownVersion, version);
     }
 
-    if (ver > lastProcessedVersion) {
-      lastProcessedVersion = ver;
-      lastKnownVersion = ver;
-    }
-
-    // If tab is currently hidden in background, mark for catchup when visible
-    if (document.hidden) {
-      pendingVisibilityCatchup = true;
-    }
-
-    // 1. Specific topic listeners (e.g. 'blog.*', 'playlist.*')
     notifyListeners(type, payload);
-
-    // 2. Wildcard category listeners (e.g. 'blog', 'playlist')
-    const prefix = type.split('.')[0];
-    if (prefix && prefix !== type) {
-      notifyListeners(`${prefix}.*`, payload);
-      notifyListeners(prefix, payload);
-    }
-
-    // 3. Global wildcard listener
     notifyListeners('*', payload);
+
+    if (type.startsWith('blog.')) notifyListeners('blog.*', payload);
+    if (type.startsWith('music.') || type.startsWith('playlist.')) notifyListeners('music.*', payload);
   }
 
   async function reconcileAuthoritativeVersion() {
     try {
-      const res = await fetch(`/api/public?type=sync_version&_t=${Date.now()}`);
+      const res = await fetch('/api/public?type=events&poll=1');
       if (res.ok) {
         const data = await res.json();
-        if (data.version && data.version > lastProcessedVersion) {
-          lastKnownVersion = data.version;
-          if (data.last_event) {
-            handleIncomingEvent(data.last_event);
-          }
+        if (data && data.version > lastKnownVersion) {
+          handleIncomingEvent(data);
         }
       }
     } catch (_) {}
-  }
-
-  function on(topic, callback) {
-    if (!listeners.has(topic)) {
-      listeners.set(topic, new Set());
-    }
-    listeners.get(topic).add(callback);
-    return () => off(topic, callback);
-  }
-
-  function off(topic, callback) {
-    if (listeners.has(topic)) {
-      listeners.get(topic).delete(callback);
-    }
-  }
-
-  function notifyListeners(topic, payload) {
-    if (listeners.has(topic)) {
-      for (const cb of listeners.get(topic)) {
-        try {
-          cb(payload);
-        } catch (err) {
-          console.error(`[RealtimeManager] Error in listener callback for "${topic}":`, err);
-        }
-      }
-    }
-  }
-
-  function broadcast(type, entityId = null, extra = {}) {
-    const payload = {
-      type,
-      entityId,
-      version: Date.now(),
-      timestamp: Date.now(),
-      ...extra
-    };
-
-    if (broadcastChannel) {
-      try { broadcastChannel.postMessage(payload); } catch (_) {}
-    }
-    try {
-      localStorage.setItem('gullygang_sync_event', JSON.stringify(payload));
-    } catch (_) {}
-
-    handleIncomingEvent(payload);
   }
 
   function scheduleOfflineFallback() {
     if (offlineFallbackTimer) return;
-    const delay = Math.min(60000 * Math.pow(1.5, Math.min(retryCount, 4)), 120000);
-    offlineFallbackTimer = setTimeout(async () => {
-      offlineFallbackTimer = null;
-      if (connectionState === 'connected') return;
-
-      await reconcileAuthoritativeVersion();
-      connect();
-    }, delay);
+    offlineFallbackTimer = setInterval(() => {
+      if (connectionState !== 'connected') reconcileAuthoritativeVersion();
+    }, 60000);
   }
 
   function stopOfflineFallback() {
     if (offlineFallbackTimer) {
-      clearTimeout(offlineFallbackTimer);
+      clearInterval(offlineFallbackTimer);
       offlineFallbackTimer = null;
     }
   }
 
-  function disconnect() {
-    stopOfflineFallback();
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
+  function on(pattern, callback) {
+    if (typeof callback !== 'function') return () => {};
+    if (!listeners.has(pattern)) listeners.set(pattern, new Set());
+    listeners.get(pattern).add(callback);
+    return () => off(pattern, callback);
+  }
+
+  function off(pattern, callback) {
+    if (listeners.has(pattern)) {
+      listeners.get(pattern).delete(callback);
+      if (listeners.get(pattern).size === 0) listeners.delete(pattern);
     }
-    if (eventSource) {
-      try { eventSource.close(); } catch (_) {}
-      eventSource = null;
+  }
+
+  function notifyListeners(pattern, payload) {
+    if (listeners.has(pattern)) {
+      listeners.get(pattern).forEach(cb => {
+        try { cb(payload); } catch (_) {}
+      });
     }
-    setConnectionState('disconnected');
   }
 
   const manager = {
     init,
-    connect,
-    disconnect,
     on,
     off,
-    broadcast,
-    getState: () => connectionState,
-    getVersion: () => lastKnownVersion
+    connect,
+    reconcileAuthoritativeVersion,
+    getConnectionState: () => connectionState,
+    getLastKnownVersion: () => lastKnownVersion,
+    isOnline: () => connectionState === 'connected'
   };
 
-  if (typeof window !== 'undefined') {
-    window.RealtimeManager = manager;
-  }
-
+  if (typeof window !== 'undefined') window.RealtimeManager = manager;
   return manager;
 })();

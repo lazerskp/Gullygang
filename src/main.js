@@ -2,7 +2,7 @@
 // GULLYGANG — MAIN ENTRY POINT & APPLICATION BOOTSTRAP
 // ============================================================
 
-import { state, DOM, escapeHtml, formatTime, normalizeThumbnailUrl } from './core/state.js';
+import { state } from './core/state.js';
 import { GullyRouter } from './core/router.js';
 import { RealtimeManager } from './realtime/realtime-manager.js';
 import { Analytics } from './analytics/analytics.js';
@@ -13,42 +13,12 @@ import { ThemeEngine, LegalPagesEngine, SupportEngine, initFaqAccordion, initEdi
 import { updateLiveDateTime, restoreCachedWeatherIfValid } from './features/weather.js';
 import { loadInsForgePlaylists, UserPlaylistEngine } from './music/playlists.js';
 import { loadInsForgeVisuals, AmbientAtmosphereEngine } from './music/visuals.js';
+import { MusicSearchEngine } from './music/search.js';
 
-export function bootstrap() {
-  let clockTimer = null;
-  function startClockTimer() {
-    if (clockTimer) clearInterval(clockTimer);
-    updateLiveDateTime();
-    clockTimer = setInterval(() => {
-      if (!document.hidden) updateLiveDateTime();
-    }, 1000);
-  }
-  startClockTimer();
+export { MusicSearchEngine };
 
-  restoreCachedWeatherIfValid();
-
-  // Initialize First-Party Analytics Engine & Track Initial Page View
-  Analytics.init();
+function initPageModules() {
   Analytics.trackPageView();
-
-  // Initialize Router and persistent engines
-  GullyRouter.init(() => {
-    Analytics.trackPageView();
-    ThemeEngine.init();
-    BlogEngine.init();
-    ArticleEngine.init();
-    LegalPagesEngine.init();
-    UserPlaylistEngine.init();
-    SupportEngine.init();
-    PlaylistPreviewEngine.init();
-    initEditorialExperienceAccordion();
-    initFaqAccordion();
-  });
-
-  // Native Push Realtime Manager (Zero 3s/5s polling loops!)
-  RealtimeManager.init();
-
-  // Modular engines initialization
   ThemeEngine.init();
   BlogEngine.init();
   ArticleEngine.init();
@@ -56,11 +26,38 @@ export function bootstrap() {
   UserPlaylistEngine.init();
   SupportEngine.init();
   PlaylistPreviewEngine.init();
+  MusicSearchEngine.init();
+  initEditorialExperienceAccordion();
+  initFaqAccordion();
+
+  if (document.getElementById('artist-page-container')) {
+    if (window.ArtistPageEngine) window.ArtistPageEngine.init();
+    else {
+      import('./music/artist.js').then(m => m.ArtistPageEngine?.init());
+    }
+  }
+
+  if (document.getElementById('album-page-container')) {
+    if (window.AlbumPageEngine) window.AlbumPageEngine.init();
+    else {
+      import('./music/album.js').then(m => m.AlbumPageEngine?.init());
+    }
+  }
+}
+
+export function bootstrap() {
+  updateLiveDateTime();
+  setInterval(() => { if (!document.hidden) updateLiveDateTime(); }, 1000);
+  restoreCachedWeatherIfValid();
+
+  Analytics.init();
+  GullyRouter.init(initPageModules);
+  RealtimeManager.init();
+
+  initPageModules();
   AmbientAtmosphereEngine.init();
   loadInsForgePlaylists();
   loadInsForgeVisuals();
-  initEditorialExperienceAccordion();
-  initFaqAccordion();
 }
 
 if (typeof window !== 'undefined') {
@@ -71,6 +68,7 @@ if (typeof window !== 'undefined') {
     BlogEngine,
     ArticleEngine,
     PlaylistPreviewEngine,
+    MusicSearchEngine,
     ThemeEngine
   };
 

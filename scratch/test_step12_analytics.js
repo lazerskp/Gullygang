@@ -3,7 +3,27 @@
 // ============================================================
 
 const fs = require('fs');
+const path = require('path');
 const http = require('http');
+
+function loadEnv() {
+  try {
+    const envFile = path.join(__dirname, '../.env.local');
+    if (fs.existsSync(envFile)) {
+      const lines = fs.readFileSync(envFile, 'utf8').split('\n');
+      for (const line of lines) {
+        const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+        if (m) {
+          let v = (m[2] || '').trim();
+          if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+          process.env[m[1]] = v;
+        }
+      }
+    }
+  } catch (_) {}
+}
+loadEnv();
+
 const { queryInsForge, escapeSql } = require('../api/_db.js');
 const analyticsHandler = require('../api/analytics.js');
 const adminHandler = require('../api/admin.js');

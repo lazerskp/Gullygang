@@ -20,8 +20,6 @@ export const state = {
   currentStationId: 'station-1'
 };
 
-export const DOM = {};
-
 export function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -30,13 +28,6 @@ export function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-export function formatTime(seconds) {
-  if (isNaN(seconds) || seconds < 0) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
 export function normalizeThumbnailUrl(url, videoId) {
@@ -49,10 +40,6 @@ export function normalizeThumbnailUrl(url, videoId) {
   return 'https://gullygang.in/brand-cover.png';
 }
 
-export function clamp(val, min, max) {
-  return Math.min(Math.max(val, min), max);
-}
-
 export function normalizeTagSlug(tag) {
   if (!tag || typeof tag !== 'string') return '';
   return tag
@@ -62,4 +49,3 @@ export function normalizeTagSlug(tag) {
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 }
-

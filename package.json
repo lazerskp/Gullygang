@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "python3 -m http.server 3000",
     "start": "python3 -m http.server 3000",
-    "build": "esbuild src/main.js --bundle --minify --sourcemap --target=es2020 --outfile=dist/app.min.js"
+    "build": "esbuild src/main.js --bundle --minify --legal-comments=none --sourcemap --target=es2020 --outfile=dist/app.min.js --external:./music/artist.js --external:./music/album.js --external:./music/discovery.js --external:./discovery.js && esbuild src/music/artist.js --bundle --minify --legal-comments=none --target=es2020 --outfile=dist/artist.min.js && esbuild src/music/album.js --bundle --minify --legal-comments=none --target=es2020 --outfile=dist/album.min.js && esbuild src/music/discovery.js --bundle --minify --legal-comments=none --target=es2020 --outfile=dist/discovery.min.js"
   },
   "keywords": [
     "music",

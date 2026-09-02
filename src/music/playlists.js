@@ -15,36 +15,23 @@ export async function loadInsForgePlaylists() {
         return data;
       }
     }
-  } catch (err) {
-    console.warn('[Playlists] Failed to load playlists from InsForge:', err.message);
-  }
+  } catch (_) {}
   return [];
 }
 
-export const UserPlaylistEngine = (function () {
-  const STORAGE_KEY = 'gullygang_user_playlists';
-
-  function getPlaylists() {
+export const UserPlaylistEngine = {
+  getPlaylists() {
     try {
-      const val = localStorage.getItem(STORAGE_KEY);
+      const val = localStorage.getItem('gullygang_user_playlists');
       return val ? JSON.parse(val) : [];
     } catch (_) {
       return [];
     }
+  },
+  savePlaylists(p) {
+    try { localStorage.setItem('gullygang_user_playlists', JSON.stringify(p)); } catch (_) {}
+  },
+  init() {
+    RealtimeManager.on('playlist.*', loadInsForgePlaylists);
   }
-
-  function savePlaylists(playlists) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(playlists));
-    } catch (_) {}
-  }
-
-  function init() {
-    // Attach realtime listeners
-    RealtimeManager.on('playlist.*', () => {
-      loadInsForgePlaylists();
-    });
-  }
-
-  return { init, getPlaylists, savePlaylists };
-})();
+};

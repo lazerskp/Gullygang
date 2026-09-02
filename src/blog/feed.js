@@ -1,3 +1,7 @@
+// ============================================================
+// GULLYGANG — BLOG ENGINE (FEED, SEARCH & TAG ARCHIVES)
+// ============================================================
+
 import { escapeHtml, normalizeTagSlug } from '../core/state.js';
 import { RealtimeManager } from '../realtime/realtime-manager.js';
 import { Analytics } from '../analytics/analytics.js';
@@ -9,35 +13,26 @@ export const BlogEngine = (function () {
   let currentPage = 1;
   let hasMore = false;
   let isLoadingMore = false;
-  let currentMode = 'feed'; // 'feed' | 'search' | 'tag'
+  let currentMode = 'feed';
   let currentQuery = '';
   let currentTag = '';
 
   async function init() {
     const feed = document.getElementById('blog-stories-feed');
-    const featuredContainer = document.getElementById('blog-featured-container');
-    if (!feed && !featuredContainer) return;
+    const feat = document.getElementById('blog-featured-container');
+    if (!feed && !feat) return;
 
-    // Reset pagination state on fresh init
     currentPage = 1;
     hasMore = false;
     isLoadingMore = false;
 
-    // Attach search input listeners
     setupSearchUI();
-
-    // Attach load more listener
     setupLoadMoreUI();
 
-    // Attach native realtime subscription
     if (!isListening) {
       isListening = true;
       RealtimeManager.on('blog.*', () => {
-        const curFeed = document.getElementById('blog-stories-feed');
-        if (curFeed) {
-          // Re-evaluate feed or search if on the journal page
-          loadContentByRoute();
-        }
+        if (document.getElementById('blog-stories-feed')) loadContentByRoute();
       });
     }
 
@@ -45,170 +40,121 @@ export const BlogEngine = (function () {
   }
 
   function setupSearchUI() {
-    const searchInput = document.getElementById('blog-search-input');
+    const input = document.getElementById('blog-search-input');
     const clearBtn = document.getElementById('blog-search-clear');
-    if (!searchInput) return;
+    if (!input) return;
 
-    // Sync input with URL param if present
-    const urlParams = new URLSearchParams(window.location.search);
-    const qParam = urlParams.get('q') || '';
-    if (qParam && searchInput.value !== qParam) {
-      searchInput.value = qParam;
-    }
-    if (clearBtn) {
-      if (searchInput.value.trim().length > 0) {
-        clearBtn.classList.remove('hidden');
-      } else {
-        clearBtn.classList.add('hidden');
-      }
-    }
+    const qParam = new URLSearchParams(window.location.search).get('q') || '';
+    if (qParam && input.value !== qParam) input.value = qParam;
+    clearBtn?.classList.toggle('hidden', !input.value.trim());
 
-    // Debounced input handler (300ms)
-    searchInput.oninput = () => {
-      const q = searchInput.value.trim();
-      if (clearBtn) {
-        if (q.length > 0) clearBtn.classList.remove('hidden');
-        else clearBtn.classList.add('hidden');
-      }
-
+    input.oninput = () => {
+      const q = input.value.trim();
+      clearBtn?.classList.toggle('hidden', !q);
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
       searchDebounceTimer = setTimeout(() => {
-        if (q.length >= 2) {
-          performSearch(q, true);
-        } else if (q.length === 0) {
-          resetSearch();
-        }
+        if (q.length >= 2) performSearch(q, true);
+        else if (q.length === 0) resetSearch();
       }, 300);
     };
 
-    // Escape key clears search
-    searchInput.onkeydown = (e) => {
+    input.onkeydown = (e) => {
       if (e.key === 'Escape') {
-        searchInput.value = '';
-        if (clearBtn) clearBtn.classList.add('hidden');
+        input.value = '';
+        clearBtn?.classList.add('hidden');
         resetSearch();
       }
     };
 
     if (clearBtn) {
       clearBtn.onclick = () => {
-        searchInput.value = '';
+        input.value = '';
         clearBtn.classList.add('hidden');
-        searchInput.focus();
+        input.focus();
         resetSearch();
       };
     }
   }
 
   function setupLoadMoreUI() {
-    const btnLoadMore = document.getElementById('btn-load-more');
-    if (!btnLoadMore) return;
-
-    btnLoadMore.onclick = async () => {
-      if (isLoadingMore || !hasMore) return;
-      await loadMoreStories();
-    };
+    const btn = document.getElementById('btn-load-more');
+    if (btn) {
+      btn.onclick = async () => {
+        if (!isLoadingMore && hasMore) await loadMoreStories();
+      };
+    }
   }
 
   async function loadContentByRoute() {
     const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
-    const urlParams = new URLSearchParams(window.location.search);
-    const qParam = urlParams.get('q');
-    const tagParam = urlParams.get('tag');
+    const params = new URLSearchParams(window.location.search);
+    const qParam = params.get('q');
+    const tagParam = params.get('tag');
 
-    // 1. Tag Archive Path (/blog/tag/:tag)
     if (pathname.startsWith('/blog/tag/')) {
-      const rawTag = pathname.slice('/blog/tag/'.length).trim();
+      const tag = pathname.slice('/blog/tag/'.length).trim();
       currentMode = 'tag';
-      currentTag = rawTag;
+      currentTag = tag;
       currentQuery = '';
-      await loadTagArchive(rawTag);
-      return;
-    }
-
-    // 2. Query Tag Param (/blog?tag=...)
-    if (tagParam) {
+      await loadTagArchive(tag);
+    } else if (tagParam) {
       currentMode = 'tag';
       currentTag = tagParam;
       currentQuery = '';
       await loadTagArchive(tagParam);
-      return;
-    }
-
-    // 3. Search Query Param (/blog?q=...)
-    if (qParam && qParam.trim().length >= 2) {
+    } else if (qParam && qParam.trim().length >= 2) {
       currentMode = 'search';
       currentQuery = qParam.trim();
       currentTag = '';
       await performSearch(currentQuery, false);
-      return;
+    } else {
+      currentMode = 'feed';
+      currentQuery = '';
+      currentTag = '';
+      await loadStandardFeed();
     }
-
-    // 4. Standard Editorial Feed
-    currentMode = 'feed';
-    currentQuery = '';
-    currentTag = '';
-    await loadStandardFeed();
   }
 
   async function loadStandardFeed() {
     const feed = document.getElementById('blog-stories-feed');
-    const featuredContainer = document.getElementById('blog-featured-container');
-    const tagHeader = document.getElementById('blog-tag-header');
-    const searchStatus = document.getElementById('blog-search-status');
-    const sectionTitle = document.getElementById('blog-section-title');
-    const loadMoreContainer = document.getElementById('blog-load-more-container');
-
-    if (tagHeader) tagHeader.classList.add('hidden');
-    if (searchStatus) searchStatus.textContent = '';
-    if (sectionTitle) sectionTitle.textContent = 'RECENT STORIES';
-    if (featuredContainer) featuredContainer.classList.remove('hidden');
-
-    // Reset SEO Robots tag to index, follow
+    const feat = document.getElementById('blog-featured-container');
+    document.getElementById('blog-tag-header')?.classList.add('hidden');
+    const status = document.getElementById('blog-search-status');
+    if (status) status.textContent = '';
+    const title = document.getElementById('blog-section-title');
+    if (title) title.textContent = 'RECENT STORIES';
+    feat?.classList.remove('hidden');
     updateRobotsMeta('index, follow');
 
     try {
       currentPage = 1;
-      const res = await fetch(`/api/public?type=blog&page=1&limit=10&format=paginated`);
+      const res = await fetch('/api/public?type=blog&page=1&limit=10&format=paginated');
       if (res.ok) {
         const data = await res.json();
         const posts = data.stories || data;
         hasMore = data.pagination?.has_more || false;
-
         if (Array.isArray(posts) && posts.length > 0) {
-          renderFeatured(posts, featuredContainer);
+          renderFeatured(posts, feat);
           renderRecentStories(posts, feed, false);
           updateLoadMoreButton();
           return;
         }
       }
-      if (feed) {
-        feed.innerHTML = '<div class="py-12 text-center text-[var(--blog-text-muted)] text-sm">No published stories at this time.</div>';
-      }
-      if (loadMoreContainer) loadMoreContainer.classList.add('hidden');
-    } catch (err) {
-      console.warn('[BlogEngine] Load feed error:', err);
-    }
+      if (feed) feed.innerHTML = '<div class="py-12 text-center text-[var(--blog-text-muted)] text-sm">No published stories at this time.</div>';
+      document.getElementById('blog-load-more-container')?.classList.add('hidden');
+    } catch (_) {}
   }
 
   async function performSearch(query, updateUrl = true) {
     const feed = document.getElementById('blog-stories-feed');
-    const featuredContainer = document.getElementById('blog-featured-container');
-    const tagHeader = document.getElementById('blog-tag-header');
-    const searchStatus = document.getElementById('blog-search-status');
-    const sectionTitle = document.getElementById('blog-section-title');
-    const loadMoreContainer = document.getElementById('blog-load-more-container');
-
-    if (tagHeader) tagHeader.classList.add('hidden');
-    if (featuredContainer) featuredContainer.classList.add('hidden');
-    if (sectionTitle) sectionTitle.textContent = 'SEARCH RESULTS';
-
-    // Search query pages use noindex, follow to avoid duplicate content indexing
+    document.getElementById('blog-tag-header')?.classList.add('hidden');
+    document.getElementById('blog-featured-container')?.classList.add('hidden');
+    const title = document.getElementById('blog-section-title');
+    if (title) title.textContent = 'SEARCH RESULTS';
     updateRobotsMeta('noindex, follow');
 
-    if (searchStatus) {
-      searchStatus.textContent = `Searching for "${query}"...`;
-    }
+    const status = document.getElementById('blog-search-status');
+    if (status) status.textContent = `Searching for "${query}"...`;
 
     if (updateUrl && window.history) {
       const newUrl = `/blog?q=${encodeURIComponent(query)}`;
@@ -217,9 +163,7 @@ export const BlogEngine = (function () {
       }
     }
 
-    if (activeAbortController) {
-      activeAbortController.abort();
-    }
+    if (activeAbortController) activeAbortController.abort();
     activeAbortController = new AbortController();
 
     try {
@@ -237,60 +181,46 @@ export const BlogEngine = (function () {
         const total = data.pagination?.total || results.length;
         hasMore = data.pagination?.has_more || false;
 
-        if (searchStatus) {
-          if (total > 0) {
-            searchStatus.textContent = `${total} ${total === 1 ? 'story' : 'stories'} found for "${query}"`;
-          } else {
-            searchStatus.textContent = `No stories found for "${query}". Try another artist, topic, or tag.`;
-          }
+        if (status) {
+          status.textContent = total > 0 ? `${total} ${total === 1 ? 'story' : 'stories'} found for "${query}"` : `No stories found for "${query}". Try another artist, topic, or tag.`;
         }
 
-        // Track search analytics with result count
         Analytics.trackSearch(query, total);
 
         if (results.length > 0) {
           renderRecentStories(results, feed, false);
           updateLoadMoreButton();
-        } else if (feed) {
-          feed.innerHTML = `
-            <div class="py-16 text-center">
-              <p class="text-sm font-semibold text-[var(--blog-text-secondary)] mb-2">No matching stories found</p>
-              <p class="text-xs text-[var(--blog-text-muted)]">Check your spelling or explore our recent editorial stories.</p>
-            </div>
-          `;
-          if (loadMoreContainer) loadMoreContainer.classList.add('hidden');
+          return;
         }
       }
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.warn('[BlogEngine] Search failed:', err);
-        if (searchStatus) searchStatus.textContent = 'Unable to complete search at this time.';
+      if (feed) {
+        feed.innerHTML = `
+          <div class="py-16 text-center">
+            <p class="text-sm font-semibold text-[var(--blog-text-secondary)] mb-2">No editorial stories matched your search.</p>
+            <button type="button" class="btn-subtle text-xs px-3 py-1.5" onclick="document.getElementById('blog-search-input').value='';document.getElementById('blog-search-clear').classList.add('hidden');BlogEngine.resetSearch();">Clear Search</button>
+          </div>
+        `;
       }
+      document.getElementById('blog-load-more-container')?.classList.add('hidden');
+    } catch (err) {
+      if (err.name !== 'AbortError') console.warn('[BlogEngine] Search notice:', err);
     }
   }
 
   async function loadTagArchive(tagSlug) {
     const feed = document.getElementById('blog-stories-feed');
-    const featuredContainer = document.getElementById('blog-featured-container');
-    const tagHeader = document.getElementById('blog-tag-header');
-    const tagTitle = document.getElementById('blog-tag-title');
-    const searchStatus = document.getElementById('blog-search-status');
+    document.getElementById('blog-featured-container')?.classList.add('hidden');
+    const status = document.getElementById('blog-search-status');
+    if (status) status.textContent = '';
     const sectionTitle = document.getElementById('blog-section-title');
-    const loadMoreContainer = document.getElementById('blog-load-more-container');
-
-    if (featuredContainer) featuredContainer.classList.add('hidden');
-    if (searchStatus) searchStatus.textContent = '';
     if (sectionTitle) sectionTitle.textContent = 'TAG STORIES';
 
-    // Format human readable tag headline
     const humanTag = tagSlug.replace(/-/g, ' ').toUpperCase();
+    const tagTitle = document.getElementById('blog-tag-title');
     if (tagTitle) tagTitle.textContent = humanTag;
-    if (tagHeader) tagHeader.classList.remove('hidden');
+    document.getElementById('blog-tag-header')?.classList.remove('hidden');
 
-    // Track tag view
     Analytics.trackTagView(tagSlug, `/blog/tag/${tagSlug}`);
-
-    // Update document title and metadata for SEO
     document.title = `${humanTag} Articles | GULLYGANG Journal`;
     updateRobotsMeta('index, follow');
 
@@ -301,7 +231,6 @@ export const BlogEngine = (function () {
         const data = await res.json();
         const posts = data.stories || data;
         hasMore = data.pagination?.has_more || false;
-
         if (Array.isArray(posts) && posts.length > 0) {
           renderRecentStories(posts, feed, false);
           updateLoadMoreButton();
@@ -316,35 +245,23 @@ export const BlogEngine = (function () {
           </div>
         `;
       }
-      if (loadMoreContainer) loadMoreContainer.classList.add('hidden');
-    } catch (err) {
-      console.warn('[BlogEngine] Load tag error:', err);
-    }
+      document.getElementById('blog-load-more-container')?.classList.add('hidden');
+    } catch (_) {}
   }
 
   async function loadMoreStories() {
-    const btnLoadMore = document.getElementById('btn-load-more');
+    const btn = document.getElementById('btn-load-more');
     const feed = document.getElementById('blog-stories-feed');
-    if (!feed || !btnLoadMore || isLoadingMore) return;
+    if (!feed || !btn || isLoadingMore) return;
 
     isLoadingMore = true;
-    btnLoadMore.disabled = true;
-    const btnText = btnLoadMore.querySelector('.btn-text');
-    const btnSpinner = btnLoadMore.querySelector('.btn-spinner');
-    if (btnText) btnText.classList.add('hidden');
-    if (btnSpinner) btnSpinner.classList.remove('hidden');
+    btn.disabled = true;
 
     try {
       const nextPage = currentPage + 1;
-      let url = '';
-
-      if (currentMode === 'search') {
-        url = `/api/public?type=search&q=${encodeURIComponent(currentQuery)}&page=${nextPage}&limit=10`;
-      } else if (currentMode === 'tag') {
-        url = `/api/public?type=blog&tag=${encodeURIComponent(currentTag)}&page=${nextPage}&limit=10&format=paginated`;
-      } else {
-        url = `/api/public?type=blog&page=${nextPage}&limit=10&format=paginated`;
-      }
+      let url = currentMode === 'search'
+        ? `/api/public?type=search&q=${encodeURIComponent(currentQuery)}&page=${nextPage}&limit=10`
+        : (currentMode === 'tag' ? `/api/public?type=blog&tag=${encodeURIComponent(currentTag)}&page=${nextPage}&limit=10&format=paginated` : `/api/public?type=blog&page=${nextPage}&limit=10&format=paginated`);
 
       const res = await fetch(url);
       if (res.ok) {
@@ -352,32 +269,19 @@ export const BlogEngine = (function () {
         const newPosts = data.results || data.stories || (Array.isArray(data) ? data : []);
         hasMore = data.pagination?.has_more || false;
         currentPage = nextPage;
-
         Analytics.trackLoadMore(nextPage, currentQuery, currentTag);
-
-        if (newPosts.length > 0) {
-          renderRecentStories(newPosts, feed, true);
-        }
+        if (newPosts.length > 0) renderRecentStories(newPosts, feed, true);
       }
-    } catch (err) {
-      console.warn('[BlogEngine] Failed to load more stories:', err);
+    } catch (_) {
     } finally {
       isLoadingMore = false;
-      btnLoadMore.disabled = false;
-      if (btnText) btnText.classList.remove('hidden');
-      if (btnSpinner) btnSpinner.classList.add('hidden');
+      btn.disabled = false;
       updateLoadMoreButton();
     }
   }
 
   function updateLoadMoreButton() {
-    const container = document.getElementById('blog-load-more-container');
-    if (!container) return;
-    if (hasMore) {
-      container.classList.remove('hidden');
-    } else {
-      container.classList.add('hidden');
-    }
+    document.getElementById('blog-load-more-container')?.classList.toggle('hidden', !hasMore);
   }
 
   function resetSearch() {
@@ -391,51 +295,40 @@ export const BlogEngine = (function () {
   }
 
   function updateRobotsMeta(content) {
-    let robotsMeta = document.querySelector('meta[name="robots"]');
-    if (!robotsMeta) {
-      robotsMeta = document.createElement('meta');
-      robotsMeta.name = 'robots';
-      document.head.appendChild(robotsMeta);
+    let meta = document.querySelector('meta[name="robots"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'robots';
+      document.head.appendChild(meta);
     }
-    robotsMeta.content = content;
+    meta.content = content;
   }
 
   function renderFeatured(posts, container) {
     if (!container) return;
-    const featuredPost = posts.find(p => p.is_featured === true) || posts[0];
-    if (!featuredPost) {
-      container.innerHTML = '';
-      return;
-    }
+    const post = posts.find(p => p.is_featured === true) || posts[0];
+    if (!post) { container.innerHTML = ''; return; }
 
-    const url = `/blog/${featuredPost.slug}`;
-    const dateStr = featuredPost.published_at ? new Date(featuredPost.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Editorial';
-    
-    const tagsHtml = (Array.isArray(featuredPost.tags) && featuredPost.tags.length > 0)
-      ? featuredPost.tags.map(t => `<a href="/blog/tag/${normalizeTagSlug(t)}" class="blog-tag-pill" title="View all ${escapeHtml(t)} stories">${escapeHtml(t)}</a>`).join('')
+    const dateStr = post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Editorial';
+    const tagsHtml = Array.isArray(post.tags) && post.tags.length > 0
+      ? post.tags.map(t => `<a href="/blog/tag/${normalizeTagSlug(t)}" class="blog-tag-pill" title="View ${escapeHtml(t)}">${escapeHtml(t)}</a>`).join('')
       : '<span class="blog-tag-pill">FEATURED STORY</span>';
 
     container.innerHTML = `
-      <a href="${url}" class="blog-featured-card group">
+      <a href="/blog/${post.slug}" class="blog-featured-card group">
         <div class="blog-featured-thumb-wrap">
-          <img src="${featuredPost.featured_image || 'https://gullygang.in/brand-cover.png'}" 
-               alt="${escapeHtml(featuredPost.title)}" 
-               class="blog-featured-thumb" 
-               loading="eager" 
-               fetchpriority="high"
-               decoding="async" 
-               onerror="this.src='https://gullygang.in/brand-cover.png'" />
+          <img src="${post.featured_image || 'https://gullygang.in/brand-cover.png'}" alt="${escapeHtml(post.title)}" class="blog-featured-thumb" loading="eager" onerror="this.src='https://gullygang.in/brand-cover.png'" />
         </div>
         <div class="blog-featured-body">
           <div class="blog-tags-row">${tagsHtml}</div>
-          <h2 class="blog-featured-title">${escapeHtml(featuredPost.title)}</h2>
-          <p class="blog-featured-excerpt">${escapeHtml(featuredPost.excerpt || '')}</p>
+          <h2 class="blog-featured-title">${escapeHtml(post.title)}</h2>
+          <p class="blog-featured-excerpt">${escapeHtml(post.excerpt || '')}</p>
           <div class="blog-featured-meta">
-            <span>${escapeHtml(featuredPost.author || 'GULLYGANG Editorial')}</span>
+            <span>${escapeHtml(post.author || 'GULLYGANG Editorial')}</span>
             <span class="article-meta-dot">&bull;</span>
             <span>${dateStr}</span>
             <span class="article-meta-dot">&bull;</span>
-            <span>${escapeHtml(featuredPost.reading_time || '5 min read')}</span>
+            <span>${escapeHtml(post.reading_time || '5 min read')}</span>
           </div>
         </div>
       </a>
@@ -444,11 +337,10 @@ export const BlogEngine = (function () {
 
   function renderRecentStories(posts, feed, append = false) {
     if (!feed) return;
-
     let targetPosts = posts;
     if (currentMode === 'feed' && !append && posts.length > 0) {
-      const featuredPost = posts.find(p => p.is_featured === true) || posts[0];
-      targetPosts = posts.filter(p => p.id !== featuredPost?.id);
+      const featPost = posts.find(p => p.is_featured === true) || posts[0];
+      targetPosts = posts.filter(p => p.id !== featPost?.id);
     }
 
     if (targetPosts.length === 0 && !append) {
@@ -457,13 +349,10 @@ export const BlogEngine = (function () {
     }
 
     const html = targetPosts.map((post, idx) => {
-      const url = `/blog/${post.slug}`;
       const dateStr = post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Editorial';
-      
-      const tagsHtml = (Array.isArray(post.tags) && post.tags.length > 0)
+      const tagsHtml = Array.isArray(post.tags) && post.tags.length > 0
         ? `<div class="flex items-center gap-1.5 mb-2">${post.tags.slice(0, 2).map(t => `<a href="/blog/tag/${normalizeTagSlug(t)}" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-[var(--blog-accent)] uppercase tracking-wider hover:bg-white/10 transition-colors">${escapeHtml(t)}</a>`).join('')}</div>`
         : '';
-
       const adHtml = (idx === 0 && !append && currentMode === 'feed') ? `
         <div class="blog-direct-ad-section editorial-ad-placement-wrap" id="blog-ad-section-1" data-ad-placement="1" aria-label="Sponsored Advertisement">
           <div class="editorial-ad-slot-box editorial-ad-native-box" id="adsterra-blog-container-1"></div>
@@ -472,14 +361,9 @@ export const BlogEngine = (function () {
 
       return `
         <article class="blog-story-row">
-          <a href="${url}" class="blog-story-link group">
+          <a href="/blog/${post.slug}" class="blog-story-link group">
             <div class="blog-story-thumb-wrap">
-              <img src="${post.featured_image || 'https://gullygang.in/brand-cover.png'}" 
-                   alt="${escapeHtml(post.title)}" 
-                   class="blog-story-thumb" 
-                   loading="lazy" 
-                   decoding="async" 
-                   onerror="this.src='https://gullygang.in/brand-cover.png'" />
+              <img src="${post.featured_image || 'https://gullygang.in/brand-cover.png'}" alt="${escapeHtml(post.title)}" class="blog-story-thumb" loading="lazy" onerror="this.src='https://gullygang.in/brand-cover.png'" />
             </div>
             <div class="blog-story-body">
               ${tagsHtml}
@@ -498,14 +382,13 @@ export const BlogEngine = (function () {
       `;
     }).join('');
 
-    if (append) {
-      feed.insertAdjacentHTML('beforeend', html);
-    } else {
-      feed.innerHTML = html;
-    }
+    if (append) feed.insertAdjacentHTML('beforeend', html);
+    else feed.innerHTML = html;
   }
 
-  return {
-    init
-  };
+  return { init, resetSearch };
 })();
+
+if (typeof window !== 'undefined') {
+  window.BlogEngine = BlogEngine;
+}

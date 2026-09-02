@@ -281,6 +281,16 @@
           </div>
 
           <div class="top-header-controls-row flex items-center gap-2">
+            <!-- Universal Music Search Trigger (⌘K) -->
+            <button type="button" id="btn-music-search-nav" class="btn-music-search-trigger header-support-pill" title="Search Songs, Artists, Albums (⌘K)" aria-label="Search songs, artists, albums">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <span class="support-pill-text">Search</span>
+              <kbd class="music-search-kbd hidden sm:inline-block">⌘K</kbd>
+            </button>
+
             <!-- Blog Editorial Link -->
             <a href="/blog" class="header-support-pill" title="GULLYGANG Blog" aria-label="GULLYGANG Blog">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1391,6 +1401,49 @@
           <p class="editorial-footer-copy">A cinematic music sanctuary &bull; 2026</p>
         </div>
       </footer>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       UNIVERSAL YOUTUBE MUSIC SEARCH & PLAY MODAL (STEP 14)
+       ============================================================ -->
+  <div id="music-search-backdrop" class="music-search-backdrop hidden" aria-hidden="true"></div>
+  <div id="music-search-modal" class="music-search-modal hidden" role="dialog" aria-modal="true" aria-label="Music Search">
+    <div class="music-search-dialog-inner">
+      <!-- Top Search Bar -->
+      <div class="music-search-header">
+        <div class="music-search-input-wrap">
+          <svg class="music-search-input-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="search" id="music-search-input" class="music-search-input" placeholder="Search songs, artists, albums, videos..." aria-label="Search songs, artists, albums" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" />
+          <button type="button" id="music-search-clear" class="music-search-clear-btn hidden" aria-label="Clear search" title="Clear search">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+          <kbd class="music-search-esc-badge hidden sm:inline-block" title="Press Escape to close">ESC</kbd>
+        </div>
+        <button type="button" id="btn-close-music-search" class="music-search-close-btn" aria-label="Close search">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <!-- Live Search Suggestions Dropdown -->
+      <div id="music-search-suggestions" class="music-search-suggestions hidden" role="listbox" aria-label="Search suggestions"></div>
+
+      <!-- Filter Pills Row -->
+      <div class="music-search-filters">
+        <button type="button" class="music-search-filter-btn is-active" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" class="music-search-filter-btn" data-filter="songs" aria-pressed="false">Songs</button>
+        <button type="button" class="music-search-filter-btn" data-filter="artists" aria-pressed="false">Artists</button>
+        <button type="button" class="music-search-filter-btn" data-filter="albums" aria-pressed="false">Albums</button>
+        <button type="button" class="music-search-filter-btn" data-filter="videos" aria-pressed="false">Videos</button>
+      </div>
+
+      <!-- Scrollable Results Container -->
+      <div id="music-search-results" class="music-search-results" tabindex="-1">
+        <!-- Empty state rendered dynamically -->
+      </div>
     </div>
   </div>
 

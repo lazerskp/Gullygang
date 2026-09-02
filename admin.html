@@ -232,12 +232,13 @@
         </section>
 
         <!-- 1.5. ANALYTICS & INTELLIGENCE TAB -->
+        <!-- 1.5. ANALYTICS & GROWTH INTELLIGENCE TAB -->
         <section id="tab-analytics" class="admin-tab-panel hidden space-y-6">
           <!-- Filter Header -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
             <div>
-              <h2 class="text-lg font-extrabold text-[var(--text-primary)]">First-Party Analytics & Content Intelligence</h2>
-              <p class="text-xs text-[var(--text-secondary)]">Privacy-first visitor engagement, search queries, and content demand.</p>
+              <h2 class="text-lg font-extrabold text-[var(--text-primary)]">First-Party Growth Intelligence & SEO Engine</h2>
+              <p class="text-xs text-[var(--text-secondary)]">Automated content opportunities, search-to-article conversion, trending topics, and SEO performance.</p>
             </div>
             <div class="flex items-center gap-2">
               <div class="analytics-period-toggle inline-flex rounded-lg p-1 bg-[var(--bg-card)] border border-[var(--border-subtle)]" role="group" aria-label="Time period selector">
@@ -279,9 +280,9 @@
               </div>
             </div>
             <div class="admin-stat-card">
-              <span class="stat-label">Zero-Result Searches</span>
+              <span class="stat-label">Search CTR</span>
               <div class="stat-value-row">
-                <span id="stat-analytics-zero-searches" class="stat-num font-extrabold text-amber-400">--</span>
+                <span id="stat-analytics-search-ctr" class="stat-num font-extrabold text-amber-400">--%</span>
               </div>
             </div>
             <div class="admin-stat-card">
@@ -306,40 +307,176 @@
             </div>
           </div>
 
-          <!-- 2-Column Content Intelligence Grid -->
+          <!-- 1. Content Opportunities (Ranked Unmet Search Demand) -->
+          <div class="admin-section-box">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <div>
+                <h3 class="text-xs font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1.5">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                  Content Opportunity Intelligence (Ranked Search Demand)
+                </h3>
+                <p class="text-[11px] text-[var(--text-tertiary)]">Actionable demand scoring combining unfulfilled searches, trend trajectory, and existing editorial coverage.</p>
+              </div>
+            </div>
+            <div class="admin-table-container">
+              <table class="admin-data-table">
+                <thead>
+                  <tr>
+                    <th>Search Query</th>
+                    <th>Demand & Trend</th>
+                    <th>Opportunity Score</th>
+                    <th>Coverage</th>
+                    <th>Recommended Action</th>
+                    <th class="text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="analytics-opportunities-body">
+                  <tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">Analyzing growth opportunities...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 2-Column Grid: Trending Now & Content Decay -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Content Opportunities (Zero Result Searches) -->
+            <!-- 🔥 Trending Now -->
             <div class="admin-section-box">
               <div class="flex items-center justify-between mb-3">
                 <div>
-                  <h3 class="text-xs font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1.5">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                    Content Opportunities (Zero-Result Searches)
+                  <h3 class="text-xs font-bold tracking-wider uppercase text-emerald-400 flex items-center gap-1.5">
+                    🔥 Trending Now
                   </h3>
-                  <p class="text-[11px] text-[var(--text-tertiary)]">Queries visitors searched for where no published articles existed.</p>
+                  <p class="text-[11px] text-[var(--text-tertiary)]">Stories with meaningful growth compared to the previous period.</p>
                 </div>
               </div>
               <div class="admin-table-container">
                 <table class="admin-data-table">
                   <thead>
                     <tr>
-                      <th>Search Query</th>
-                      <th>Demand</th>
+                      <th>Article</th>
+                      <th>Views</th>
+                      <th>Growth</th>
                       <th class="text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody id="analytics-zero-searches-body">
-                    <tr><td colspan="3" class="text-center py-6 text-[var(--text-tertiary)]">Loading opportunities...</td></tr>
+                  <tbody id="analytics-trending-body">
+                    <tr><td colspan="4" class="text-center py-6 text-[var(--text-tertiary)]">Loading trending stories...</td></tr>
                   </tbody>
                 </table>
               </div>
             </div>
 
-            <!-- Top Articles Performance -->
+            <!-- ⚠️ Content Needs Attention (Decay) -->
             <div class="admin-section-box">
               <div class="flex items-center justify-between mb-3">
-                <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)]">Top Performing Stories</h3>
+                <div>
+                  <h3 class="text-xs font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1.5">
+                    ⚠️ Content Needs Attention
+                  </h3>
+                  <p class="text-[11px] text-[var(--text-tertiary)]">Established articles experiencing significant traffic decline.</p>
+                </div>
               </div>
+              <div class="admin-table-container">
+                <table class="admin-data-table">
+                  <thead>
+                    <tr>
+                      <th>Article</th>
+                      <th>Decline</th>
+                      <th>History</th>
+                      <th class="text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-decay-body">
+                    <tr><td colspan="4" class="text-center py-6 text-[var(--text-tertiary)]">Analyzing content health...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2-Column Grid: Search Conversion & SEO Health Overview -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Search-to-Article Conversion Intelligence -->
+            <div class="admin-section-box">
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <h3 class="text-xs font-bold tracking-wider uppercase text-cyan-400 flex items-center gap-1.5">
+                    🎯 Search-to-Article Conversion
+                  </h3>
+                  <p class="text-[11px] text-[var(--text-tertiary)]">Queries needing better content match or editorial relevance.</p>
+                </div>
+              </div>
+              <div class="admin-table-container">
+                <table class="admin-data-table">
+                  <thead>
+                    <tr>
+                      <th>Query</th>
+                      <th>Searches</th>
+                      <th>CTR</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-conversion-body">
+                    <tr><td colspan="4" class="text-center py-6 text-[var(--text-tertiary)]">Calculating search CTR...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- SEO Health Engine Overview -->
+            <div class="admin-section-box">
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <h3 class="text-xs font-bold tracking-wider uppercase text-purple-400 flex items-center gap-1.5">
+                    🛡️ SEO Health Engine Overview
+                  </h3>
+                  <p class="text-[11px] text-[var(--text-tertiary)]">Publication-wide on-page SEO health and metadata audits.</p>
+                </div>
+                <div id="seo-avg-score-badge" class="admin-badge-pill bg-purple-500/10 text-purple-400 border-purple-500/20 text-xs font-bold">
+                  Avg: -- / 100
+                </div>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3 text-center">
+                <div class="p-2 rounded bg-white/[0.02] border border-[var(--border-subtle)]">
+                  <span class="text-[10px] text-[var(--text-tertiary)] block">Warnings</span>
+                  <span id="seo-warnings-count" class="text-sm font-bold text-amber-400">--</span>
+                </div>
+                <div class="p-2 rounded bg-white/[0.02] border border-[var(--border-subtle)]">
+                  <span class="text-[10px] text-[var(--text-tertiary)] block">Failures</span>
+                  <span id="seo-failures-count" class="text-sm font-bold text-red-400">--</span>
+                </div>
+                <div class="p-2 rounded bg-white/[0.02] border border-[var(--border-subtle)]">
+                  <span class="text-[10px] text-[var(--text-tertiary)] block">Missing Meta</span>
+                  <span id="seo-missing-count" class="text-sm font-bold text-[var(--text-secondary)]">--</span>
+                </div>
+                <div class="p-2 rounded bg-white/[0.02] border border-[var(--border-subtle)]">
+                  <span class="text-[10px] text-[var(--text-tertiary)] block">Duplicates</span>
+                  <span id="seo-duplicates-count" class="text-sm font-bold text-cyan-400">--</span>
+                </div>
+              </div>
+              <div class="admin-table-container">
+                <table class="admin-data-table">
+                  <thead>
+                    <tr>
+                      <th>Article</th>
+                      <th>Score</th>
+                      <th>Status</th>
+                      <th class="text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-seo-body">
+                    <tr><td colspan="4" class="text-center py-6 text-[var(--text-tertiary)]">Auditing article SEO health...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2-Column Discovery & Music Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Top Articles Performance -->
+            <div class="admin-section-box">
+              <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)] mb-3">Top Performing Stories</h3>
               <div class="admin-table-container">
                 <table class="admin-data-table">
                   <thead>
@@ -355,43 +492,41 @@
                 </table>
               </div>
             </div>
-          </div>
 
-          <!-- 2-Column Discovery & Music Grid -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Popular Tags -->
-            <div class="admin-section-box">
-              <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)] mb-3">Popular Topic Tags</h3>
-              <div class="admin-table-container">
-                <table class="admin-data-table">
-                  <thead>
-                    <tr>
-                      <th>Tag</th>
-                      <th class="text-right">Total Views</th>
-                    </tr>
-                  </thead>
-                  <tbody id="analytics-tags-body">
-                    <tr><td colspan="2" class="text-center py-6 text-[var(--text-tertiary)]">Loading tags...</td></tr>
-                  </tbody>
-                </table>
+            <!-- Popular Tags & Top Music Plays -->
+            <div class="space-y-6">
+              <div class="admin-section-box">
+                <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)] mb-3">Popular Topic Tags</h3>
+                <div class="admin-table-container">
+                  <table class="admin-data-table">
+                    <thead>
+                      <tr>
+                        <th>Tag</th>
+                        <th class="text-right">Total Views</th>
+                      </tr>
+                    </thead>
+                    <tbody id="analytics-tags-body">
+                      <tr><td colspan="2" class="text-center py-6 text-[var(--text-tertiary)]">Loading tags...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
 
-            <!-- Top Music Plays -->
-            <div class="admin-section-box">
-              <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)] mb-3">Top Played Music Tracks</h3>
-              <div class="admin-table-container">
-                <table class="admin-data-table">
-                  <thead>
-                    <tr>
-                      <th>Track Title</th>
-                      <th class="text-right">Plays</th>
-                    </tr>
-                  </thead>
-                  <tbody id="analytics-music-body">
-                    <tr><td colspan="2" class="text-center py-6 text-[var(--text-tertiary)]">Loading music data...</td></tr>
-                  </tbody>
-                </table>
+              <div class="admin-section-box">
+                <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)] mb-3">Top Played Music Tracks</h3>
+                <div class="admin-table-container">
+                  <table class="admin-data-table">
+                    <thead>
+                      <tr>
+                        <th>Track Title</th>
+                        <th class="text-right">Plays</th>
+                      </tr>
+                    </thead>
+                    <tbody id="analytics-music-body">
+                      <tr><td colspan="2" class="text-center py-6 text-[var(--text-tertiary)]">Loading music data...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -926,47 +1061,232 @@
 
       async function loadAnalytics(isSilent = false) {
         const period = currentAnalyticsPeriod;
-        const [overviewRes, articlesRes, searchesRes, tagsRes, musicRes, timeseriesRes] = await Promise.all([
+        const [
+          overviewRes,
+          oppsRes,
+          trendingRes,
+          decayRes,
+          convRes,
+          seoRes,
+          articlesRes,
+          tagsRes,
+          musicRes,
+          timeseriesRes
+        ] = await Promise.all([
           apiRequest(`analytics_overview&period=${period}`),
+          apiRequest(`content_opportunities&period=${period}`),
+          apiRequest(`trending_content&period=${period}`),
+          apiRequest(`content_decay&period=30d`),
+          apiRequest(`analytics_search_conversion&period=${period}`),
+          apiRequest(`seo_overview`),
           apiRequest(`analytics_articles&period=${period}`),
-          apiRequest(`analytics_searches&period=${period}`),
           apiRequest(`analytics_tags&period=${period}`),
           apiRequest(`analytics_music&period=${period}`),
           apiRequest(`analytics_timeseries&period=${period}`)
         ]);
 
+        // 1. Overview KPIs
         if (overviewRes.ok && overviewRes.data) {
           const d = overviewRes.data;
           document.getElementById('stat-analytics-page-views').textContent = (d.page_views || 0).toLocaleString();
           document.getElementById('stat-analytics-article-views').textContent = (d.article_views || 0).toLocaleString();
           document.getElementById('stat-analytics-unique-visitors').textContent = (d.unique_visitors || 0).toLocaleString();
           document.getElementById('stat-analytics-searches').textContent = (d.searches || 0).toLocaleString();
-          document.getElementById('stat-analytics-zero-searches').textContent = (d.zero_result_searches || 0).toLocaleString();
           document.getElementById('stat-analytics-music-plays').textContent = (d.music_plays || 0).toLocaleString();
         }
 
-        // Render Zero-Result Searches (Content Opportunities)
-        const zeroBody = document.getElementById('analytics-zero-searches-body');
-        if (zeroBody && searchesRes.ok) {
-          const opps = searchesRes.data.content_opportunities || [];
+        if (convRes.ok && convRes.data) {
+          document.getElementById('stat-analytics-search-ctr').textContent = `${convRes.data.search_ctr || 0}%`;
+        }
+
+        // 2. Content Opportunities (Ranked Unmet Search Demand)
+        const oppsBody = document.getElementById('analytics-opportunities-body');
+        if (oppsBody && oppsRes.ok) {
+          const opps = oppsRes.data.opportunities || [];
           if (opps.length === 0) {
-            zeroBody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-[var(--text-tertiary)]">No unfulfilled searches in this period 🎉</td></tr>';
+            oppsBody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-[var(--text-tertiary)]">No unfulfilled content demand detected in this period 🎉</td></tr>';
           } else {
-            zeroBody.innerHTML = opps.map(o => `
-              <tr>
-                <td class="font-medium text-[var(--text-primary)] font-mono text-xs">"${escapeHtml(o.search_query)}"</td>
-                <td><span class="admin-badge-pill bg-amber-500/10 text-amber-400 border-amber-500/20">${o.zero_count} searches</span></td>
-                <td class="text-right">
-                  <button type="button" class="admin-secondary-btn text-xs py-1 px-2.5" onclick="AdminApp.switchTab('blog'); AdminApp.openAddPostModal('${escapeHtml(o.search_query.replace(/'/g, "\\'"))}');">
-                    Write Story &rarr;
-                  </button>
-                </td>
-              </tr>
-            `).join('');
+            oppsBody.innerHTML = opps.map(o => {
+              const tagsStr = (o.related_tags || []).join(', ');
+              const actionLabel = o.recommended_action === 'create_article' ? 'Create Article' : (o.recommended_action === 'update_existing_article' ? 'Update Article' : 'Improve Coverage');
+              const actionBadge = o.recommended_action === 'create_article'
+                ? '<span class="admin-badge-pill bg-amber-500/10 text-amber-400 border-amber-500/20">Create Article</span>'
+                : '<span class="admin-badge-pill bg-blue-500/10 text-blue-400 border-blue-500/20">' + actionLabel + '</span>';
+
+              const scoreBadge = o.opportunity_score >= 70
+                ? `<span class="admin-badge-pill bg-amber-500/20 text-amber-300 font-bold">${o.opportunity_score} / 100</span>`
+                : `<span class="admin-badge-pill bg-emerald-500/10 text-emerald-400 font-bold">${o.opportunity_score} / 100</span>`;
+
+              const coverageLabel = o.existing_coverage === 0
+                ? '<span class="text-xs text-red-400">0 articles</span>'
+                : `<span class="text-xs text-emerald-400">${o.existing_coverage} article${o.existing_coverage > 1 ? 's' : ''}</span>`;
+
+              const trendSign = o.trend_percent > 0 ? '+' : '';
+              const trendClass = o.trend_percent > 0 ? 'text-emerald-400' : (o.trend_percent < 0 ? 'text-red-400' : 'text-[var(--text-tertiary)]');
+
+              return `
+                <tr>
+                  <td>
+                    <p class="font-bold text-[var(--text-primary)] font-mono text-xs">"${escapeHtml(o.query)}"</p>
+                    ${tagsStr ? `<p class="text-[11px] text-[var(--text-tertiary)] mt-0.5">🏷️ ${escapeHtml(tagsStr)}</p>` : ''}
+                  </td>
+                  <td>
+                    <span class="font-semibold text-xs text-[var(--text-primary)]">${o.searches} searches</span>
+                    <span class="text-[11px] ${trendClass} ml-1">(${trendSign}${o.trend_percent}%)</span>
+                  </td>
+                  <td>${scoreBadge}</td>
+                  <td>${coverageLabel}</td>
+                  <td>${actionBadge}</td>
+                  <td class="text-right">
+                    <button type="button" class="admin-secondary-btn text-xs py-1 px-2.5" onclick="AdminApp.switchTab('blog'); AdminApp.openAddPostModal('${escapeHtml(o.query.replace(/'/g, "\\'"))}', '${escapeHtml(tagsStr.replace(/'/g, "\\'"))}');">
+                      Write Story &rarr;
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('');
           }
         }
 
-        // Render Top Articles Performance
+        // 3. Trending Now
+        const trendingBody = document.getElementById('analytics-trending-body');
+        if (trendingBody && trendingRes.ok) {
+          const trending = trendingRes.data.trending || [];
+          if (trending.length === 0) {
+            trendingBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-[var(--text-tertiary)]">No articles with significant trend acceleration yet</td></tr>';
+          } else {
+            trendingBody.innerHTML = trending.slice(0, 10).map(t => {
+              const art = t.article || {};
+              return `
+                <tr>
+                  <td>
+                    <p class="font-bold text-[var(--text-primary)] line-clamp-1">${escapeHtml(art.title || 'Untitled')}</p>
+                    <p class="text-[11px] text-[var(--text-tertiary)] font-mono">/${escapeHtml(art.slug || '')}</p>
+                  </td>
+                  <td class="font-extrabold text-[var(--text-primary)]">${t.current_views}</td>
+                  <td>
+                    <span class="admin-badge-pill bg-emerald-500/10 text-emerald-400 font-bold">+${t.percentage_growth}%</span>
+                    <span class="text-[11px] text-[var(--text-tertiary)] ml-1">(+${t.absolute_growth})</span>
+                  </td>
+                  <td class="text-right">
+                    <a href="/blog/${escapeHtml(art.slug || '')}" target="_blank" class="admin-subtle-btn text-xs py-1 px-2 inline-flex items-center gap-1">
+                      <span>View</span>
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></svg>
+                    </a>
+                  </td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
+
+        // 4. Content Needs Attention (Decay)
+        const decayBody = document.getElementById('analytics-decay-body');
+        if (decayBody && decayRes.ok) {
+          const decayed = decayRes.data.decayed || [];
+          if (decayed.length === 0) {
+            decayBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-[var(--text-tertiary)]">All established articles maintaining steady traffic 🚀</td></tr>';
+          } else {
+            decayBody.innerHTML = decayed.slice(0, 10).map(d => {
+              const art = d.article || {};
+              return `
+                <tr>
+                  <td>
+                    <p class="font-bold text-[var(--text-primary)] line-clamp-1">${escapeHtml(art.title || 'Untitled')}</p>
+                    <p class="text-[11px] text-[var(--text-tertiary)] font-mono">/${escapeHtml(art.slug || '')}</p>
+                  </td>
+                  <td>
+                    <span class="admin-badge-pill bg-red-500/10 text-red-400 font-bold">-${d.decline_percent}%</span>
+                  </td>
+                  <td class="text-xs text-[var(--text-secondary)] font-mono">
+                    ${d.previous_views} &rarr; ${d.current_views}
+                  </td>
+                  <td class="text-right">
+                    <button type="button" class="admin-secondary-btn text-xs py-1 px-2.5" onclick="AdminApp.switchTab('blog'); AdminApp.openEditPostModal('${art.id}');">
+                      Improve &rarr;
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
+
+        // 5. Search-to-Article Conversion
+        const convBody = document.getElementById('analytics-conversion-body');
+        if (convBody && convRes.ok) {
+          const queries = convRes.data.queries || [];
+          if (queries.length === 0) {
+            convBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-[var(--text-tertiary)]">No search queries recorded in this period</td></tr>';
+          } else {
+            convBody.innerHTML = queries.slice(0, 15).map(q => {
+              const statusBadge = q.needs_better_content_match
+                ? '<span class="admin-badge-pill bg-amber-500/10 text-amber-400 border-amber-500/20">⚠️ Needs Better Content Match</span>'
+                : '<span class="admin-badge-pill bg-emerald-500/10 text-emerald-400 border-emerald-500/20">✓ Healthy Match</span>';
+
+              return `
+                <tr>
+                  <td class="font-mono text-xs font-medium text-[var(--text-primary)]">"${escapeHtml(q.query)}"</td>
+                  <td class="text-xs font-semibold text-[var(--text-primary)]">${q.searches}</td>
+                  <td class="font-mono text-xs ${q.click_through_rate > 20 ? 'text-emerald-400' : (q.click_through_rate === 0 ? 'text-red-400' : 'text-amber-400')}">
+                    ${q.click_through_rate}% (${q.result_clicks})
+                  </td>
+                  <td>${statusBadge}</td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
+
+        // 6. SEO Health Overview
+        const seoBody = document.getElementById('analytics-seo-body');
+        if (seoBody && seoRes.ok) {
+          const d = seoRes.data;
+          const avgScoreBadge = document.getElementById('seo-avg-score-badge');
+          if (avgScoreBadge) {
+            avgScoreBadge.textContent = `Avg: ${d.average_seo_score || 0} / 100`;
+            avgScoreBadge.className = `admin-badge-pill text-xs font-bold ${
+              d.average_seo_score >= 80 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : (d.average_seo_score >= 60 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
+            }`;
+          }
+
+          document.getElementById('seo-warnings-count').textContent = d.articles_with_warnings || 0;
+          document.getElementById('seo-failures-count').textContent = d.articles_with_failures || 0;
+          
+          const meta = d.missing_metadata || {};
+          const missingTotal = (meta.missing_seo_title || 0) + (meta.missing_seo_description || 0) + (meta.missing_featured_image || 0) + (meta.missing_tags || 0);
+          document.getElementById('seo-missing-count').textContent = missingTotal;
+          document.getElementById('seo-duplicates-count').textContent = d.duplicate_issues || 0;
+
+          const articles = d.articles || [];
+          if (articles.length === 0) {
+            seoBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-[var(--text-tertiary)]">No articles to audit</td></tr>';
+          } else {
+            seoBody.innerHTML = articles.slice(0, 10).map(a => {
+              const scoreColor = a.score >= 80 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : (a.score >= 60 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20');
+              const statusPill = `<span class="admin-badge-pill ${scoreColor}">${a.score} / 100</span>`;
+              const pubStatus = a.status === 'published' ? '<span class="text-emerald-400 text-xs font-semibold">Published</span>' : `<span class="text-[var(--text-tertiary)] text-xs capitalize">${a.status}</span>`;
+
+              return `
+                <tr>
+                  <td>
+                    <p class="font-bold text-[var(--text-primary)] line-clamp-1">${escapeHtml(a.title)}</p>
+                    <p class="text-[11px] text-[var(--text-tertiary)] font-mono">/${escapeHtml(a.slug)}</p>
+                  </td>
+                  <td>${statusPill}</td>
+                  <td>${pubStatus}</td>
+                  <td class="text-right">
+                    <button type="button" class="admin-secondary-btn text-xs py-1 px-2.5" onclick="AdminApp.switchTab('blog'); AdminApp.openEditPostModal('${a.id}');">
+                      Audit &rarr;
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
+
+        // 7. Top Articles Performance
         const articlesBody = document.getElementById('analytics-articles-body');
         if (articlesBody && articlesRes.ok) {
           const arts = articlesRes.data.articles || [];
@@ -986,7 +1306,7 @@
           }
         }
 
-        // Render Popular Tags
+        // 8. Popular Tags
         const tagsBody = document.getElementById('analytics-tags-body');
         if (tagsBody && tagsRes.ok) {
           const tags = tagsRes.data.tags || [];
@@ -1002,7 +1322,7 @@
           }
         }
 
-        // Render Music Plays
+        // 9. Music Plays
         const musicBody = document.getElementById('analytics-music-body');
         if (musicBody && musicRes.ok) {
           const tracks = musicRes.data.tracks || [];
@@ -1018,7 +1338,7 @@
           }
         }
 
-        // Render SVG Time-Series Chart
+        // 10. SVG Time-Series Chart
         if (timeseriesRes.ok && timeseriesRes.data.timeseries) {
           renderAnalyticsChart(timeseriesRes.data.timeseries);
         }
@@ -1836,9 +2156,13 @@
         return isFormDirty;
       }
 
-      function openAddPostModal(prefillTitle = '') {
+      function openAddPostModal(prefillTitle = '', prefillTags = '') {
         if (prefillTitle && typeof prefillTitle === 'string') {
-          openPostModal({ title: prefillTitle.trim() });
+          const tagsStr = typeof prefillTags === 'string' ? prefillTags : (Array.isArray(prefillTags) ? prefillTags.join(', ') : '');
+          openPostModal({ 
+            title: prefillTitle.trim(),
+            tags: tagsStr
+          });
         } else {
           openPostModal(null);
         }
@@ -1897,6 +2221,26 @@
                 </button>
               </div>
             </div>
+
+            <!-- Article Performance Intelligence Panel (Editing Existing Article Only) -->
+            ${isEdit ? `
+              <div id="m-post-intelligence-wrap" class="p-3.5 rounded-lg bg-[var(--bg-main)]/60 border border-[var(--border-subtle)] space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                    Article Performance Intelligence (Last 30 Days)
+                  </span>
+                  <span id="m-perf-trend-badge" class="admin-badge-pill text-[10px]">Loading KPIs...</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center" id="m-perf-stats-grid">
+                  <div class="p-2 rounded bg-black/30"><p class="text-[10px] text-[var(--text-tertiary)]">Reads</p><p id="m-perf-views" class="text-sm font-bold text-emerald-400">--</p></div>
+                  <div class="p-2 rounded bg-black/30"><p class="text-[10px] text-[var(--text-tertiary)]">Unique Visitors</p><p id="m-perf-unique" class="text-sm font-bold">--</p></div>
+                  <div class="p-2 rounded bg-black/30"><p class="text-[10px] text-[var(--text-tertiary)]">Search Clicks</p><p id="m-perf-search-clicks" class="text-sm font-bold text-cyan-400">--</p></div>
+                  <div class="p-2 rounded bg-black/30"><p class="text-[10px] text-[var(--text-tertiary)]">Related Clicks</p><p id="m-perf-related-clicks" class="text-sm font-bold">--</p></div>
+                  <div class="p-2 rounded bg-black/30"><p class="text-[10px] text-[var(--text-tertiary)]">Music Plays</p><p id="m-perf-music-plays" class="text-sm font-bold text-indigo-400">--</p></div>
+                </div>
+              </div>
+            ` : ''}
 
             <!-- Scheduled DateTime Row (Conditional) -->
             <div id="m-post-schedule-wrap" class="${initialStatus === 'scheduled' ? '' : 'hidden'} p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex flex-wrap items-center gap-3">
@@ -2040,8 +2384,8 @@
             </div>
 
             <!-- SEO & Editorial Meta Accordion / Section -->
-            <div class="border border-[var(--border-subtle)] rounded-lg p-4 bg-white/[0.02] space-y-3">
-              <p class="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">⚙️ Publishing & SEO Metadata</p>
+            <div class="border border-[var(--border-subtle)] rounded-lg p-4 bg-white/[0.02] space-y-4">
+              <p class="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">⚙️ Publishing, SEO & Growth Intelligence</p>
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div class="form-group">
@@ -2053,7 +2397,7 @@
                   <input type="text" id="m-post-tags" class="form-input text-xs" 
                     value="${escapeHtml(initialTags)}" 
                     placeholder="hip-hop, drill, indian-rap, culture" 
-                    oninput="AdminApp.markDirty()" />
+                    oninput="AdminApp.markDirty(); AdminApp.runLiveSeoAudit();" />
                 </div>
               </div>
 
@@ -2063,6 +2407,34 @@
                   <span>⭐ Feature this article on top of editorial feeds</span>
                 </label>
               </div>
+
+              <!-- Live SEO Health Audit Checklist Card -->
+              <div class="p-3.5 rounded-lg bg-[var(--bg-main)]/60 border border-[var(--border-subtle)] space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                    🛡️ On-Site SEO Health Audit
+                  </span>
+                  <span id="m-seo-score-badge" class="admin-badge-pill bg-purple-500/10 text-purple-400 border-purple-500/20 font-bold">Score: -- / 100</span>
+                </div>
+                <div id="m-seo-checks-list" class="space-y-1 text-xs">
+                  <!-- Live rendered SEO checks -->
+                </div>
+              </div>
+
+              <!-- Internal Link Suggestions (Editing Existing Article) -->
+              ${isEdit ? `
+                <div id="m-internal-links-wrap" class="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
+                  <div class="flex items-center justify-between">
+                    <p class="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                      🔗 Internal Link Recommendations
+                    </p>
+                    <span class="text-[10px] text-[var(--text-tertiary)]">Contextual cross-links</span>
+                  </div>
+                  <div id="m-internal-links-list" class="space-y-1.5">
+                    <p class="text-xs text-[var(--text-tertiary)] animate-pulse">Analyzing internal linking opportunities...</p>
+                  </div>
+                </div>
+              ` : ''}
 
               <!-- SEO Meta Preview & Fields -->
               <div class="space-y-3 pt-2 border-t border-[var(--border-subtle)]">
@@ -2130,6 +2502,215 @@
         } else {
           setEditorViewMode('write');
         }
+
+        // Run live initial audit
+        runLiveSeoAudit();
+
+        // If editing an existing article, fetch intelligence & internal link suggestions
+        if (isEdit) {
+          loadArticleIntelligence(p.id);
+          loadInternalLinkSuggestions(p.id);
+        }
+      }
+
+      async function loadArticleIntelligence(articleId) {
+        const badge = document.getElementById('m-perf-trend-badge');
+        if (!badge) return;
+
+        const res = await apiRequest(`article_performance&id=${articleId}&period=30d`);
+        if (res.ok && res.data) {
+          const p = res.data.performance || {};
+          const viewsEl = document.getElementById('m-perf-views');
+          if (viewsEl) viewsEl.textContent = (p.views || 0).toLocaleString();
+          
+          const unqEl = document.getElementById('m-perf-unique');
+          if (unqEl) unqEl.textContent = (p.unique_sessions || 0).toLocaleString();
+
+          const scEl = document.getElementById('m-perf-search-clicks');
+          if (scEl) scEl.textContent = (p.search_clicks || 0).toLocaleString();
+
+          const rcEl = document.getElementById('m-perf-related-clicks');
+          if (rcEl) rcEl.textContent = (p.related_clicks || 0).toLocaleString();
+
+          const mpEl = document.getElementById('m-perf-music-plays');
+          if (mpEl) mpEl.textContent = (p.music_plays || 0).toLocaleString();
+
+          const trend = res.data.trend_percent || 0;
+          const sign = trend > 0 ? '+' : '';
+          badge.textContent = `${sign}${trend}% 30d Trend`;
+          badge.className = `admin-badge-pill text-[10px] font-bold ${
+            trend > 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : (trend < 0 ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-white/10 text-[var(--text-secondary)]')
+          }`;
+        } else {
+          badge.textContent = 'No 30d analytics';
+        }
+      }
+
+      async function loadInternalLinkSuggestions(articleId) {
+        const container = document.getElementById('m-internal-links-list');
+        if (!container) return;
+
+        const res = await apiRequest(`internal_link_suggestions&id=${articleId}`);
+        if (res.ok && res.data) {
+          const sugs = res.data.suggestions || [];
+          if (sugs.length === 0) {
+            container.innerHTML = '<p class="text-xs text-[var(--text-tertiary)]">No relevant internal link suggestions found</p>';
+            return;
+          }
+          container.innerHTML = sugs.slice(0, 5).map(s => {
+            const firstAnchor = (s.suggested_anchors && s.suggested_anchors[0]) || s.article.title;
+            const sharedTagsStr = (s.shared_tags || []).join(', ');
+            return `
+              <div class="flex items-center justify-between p-2 rounded bg-white/[0.02] border border-[var(--border-subtle)] text-xs">
+                <div class="min-w-0 pr-2">
+                  <p class="font-semibold text-[var(--text-primary)] truncate">${escapeHtml(s.article.title)}</p>
+                  <p class="text-[11px] text-[var(--text-tertiary)]">
+                    ${sharedTagsStr ? `Shared tags: <span class="text-zinc-300">${escapeHtml(sharedTagsStr)}</span> · ` : ''}
+                    Anchor: <code class="text-purple-300 font-mono">"${escapeHtml(firstAnchor)}"</code>
+                  </p>
+                </div>
+                <button type="button" class="admin-secondary-btn text-[11px] py-1 px-2 shrink-0" 
+                  onclick="AdminApp.insertInternalLink('${escapeHtml(firstAnchor.replace(/'/g, "\\'"))}', '${escapeHtml(s.article.slug.replace(/'/g, "\\'"))}')">
+                  + Insert Link
+                </button>
+              </div>
+            `;
+          }).join('');
+        } else {
+          container.innerHTML = '<p class="text-xs text-[var(--text-tertiary)]">Could not load suggestions</p>';
+        }
+      }
+
+      function insertInternalLink(anchorText, slug) {
+        const textarea = document.getElementById('m-post-content');
+        if (!textarea) return;
+        const linkMarkdown = `[${anchorText}](/blog/${slug})`;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const val = textarea.value;
+
+        if (start !== undefined && end !== undefined && start >= 0) {
+          textarea.value = val.substring(0, start) + linkMarkdown + val.substring(end);
+          textarea.focus();
+          textarea.setSelectionRange(start + linkMarkdown.length, start + linkMarkdown.length);
+        } else {
+          textarea.value += (textarea.value ? '\n\n' : '') + linkMarkdown;
+        }
+
+        markDirty();
+        handleContentInput();
+        runLiveSeoAudit();
+        showToast(`Inserted internal link: "${anchorText}"`);
+      }
+
+      function runLiveSeoAudit() {
+        const title = document.getElementById('m-post-title')?.value.trim() || '';
+        const seoTitle = document.getElementById('m-post-seo-title')?.value.trim() || '';
+        const effTitle = seoTitle || title;
+
+        const excerpt = document.getElementById('m-post-excerpt')?.value.trim() || '';
+        const seoDesc = document.getElementById('m-post-seo-desc')?.value.trim() || '';
+        const effDesc = seoDesc || excerpt;
+
+        const img = document.getElementById('m-post-img')?.value.trim() || '';
+        const tagsRaw = document.getElementById('m-post-tags')?.value || '';
+        const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+        const content = document.getElementById('m-post-content')?.value || '';
+        const words = countWords(content);
+        const slug = document.getElementById('m-post-slug')?.value.trim() || '';
+
+        const internalLinks = (content.match(/\[([^\]]+)\]\((?:\/blog\/|[^\)]+)/gi) || []).length;
+
+        let score = 0;
+        const checks = [];
+
+        // 1. Title
+        if (effTitle.length >= 50 && effTitle.length <= 60) {
+          score += 15;
+          checks.push({ ok: true, label: `Title length optimized (${effTitle.length}/60 chars)` });
+        } else if (effTitle.length >= 30 && effTitle.length <= 70) {
+          score += 8;
+          checks.push({ ok: false, warn: true, label: `Title length acceptable but not ideal (${effTitle.length} chars, recommended 50–60)` });
+        } else {
+          checks.push({ ok: false, label: `Title too short/long (${effTitle.length} chars, recommended 50–60)` });
+        }
+
+        // 2. Meta description
+        if (effDesc.length >= 120 && effDesc.length <= 160) {
+          score += 15;
+          checks.push({ ok: true, label: `Meta description length optimized (${effDesc.length}/160 chars)` });
+        } else if (effDesc.length >= 70 && effDesc.length <= 180) {
+          score += 8;
+          checks.push({ ok: false, warn: true, label: `Meta description acceptable (${effDesc.length} chars, recommended 120–160)` });
+        } else {
+          checks.push({ ok: false, label: `Meta description missing or suboptimal (${effDesc.length} chars)` });
+        }
+
+        // 3. Featured image
+        if (img && (img.startsWith('http') || img.startsWith('/'))) {
+          score += 15;
+          checks.push({ ok: true, label: `Featured image provided` });
+        } else {
+          checks.push({ ok: false, label: `Missing featured image` });
+        }
+
+        // 4. Tags
+        if (tags.length >= 2) {
+          score += 15;
+          checks.push({ ok: true, label: `Topic tags specified (${tags.length} tags)` });
+        } else if (tags.length === 1) {
+          score += 8;
+          checks.push({ ok: false, warn: true, label: `Only 1 tag specified (recommend >= 2)` });
+        } else {
+          checks.push({ ok: false, label: `No topic tags provided` });
+        }
+
+        // 5. Word count
+        if (words >= 600) {
+          score += 15;
+          checks.push({ ok: true, label: `Comprehensive article depth (${words} words)` });
+        } else if (words >= 300) {
+          score += 10;
+          checks.push({ ok: false, warn: true, label: `Moderate word count (${words} words, recommend 600+)` });
+        } else {
+          checks.push({ ok: false, label: `Low word count (${words} words, recommend >= 300)` });
+        }
+
+        // 6. Canonical Slug
+        if (slug && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+          score += 10;
+          checks.push({ ok: true, label: `Valid URL slug (/${slug})` });
+        } else {
+          checks.push({ ok: false, label: `Valid lowercase hyphenated slug required` });
+        }
+
+        // 7. Internal Links
+        if (internalLinks >= 1) {
+          score += 15;
+          checks.push({ ok: true, label: `Internal link(s) detected (${internalLinks})` });
+        } else {
+          checks.push({ ok: false, warn: true, label: `No internal links detected (insert from recommendations)` });
+        }
+
+        score = Math.min(100, Math.max(0, score));
+
+        const scoreBadge = document.getElementById('m-seo-score-badge');
+        if (scoreBadge) {
+          scoreBadge.textContent = `Score: ${score} / 100`;
+          scoreBadge.className = `admin-badge-pill font-bold ${
+            score >= 80 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : (score >= 60 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
+          }`;
+        }
+
+        const listEl = document.getElementById('m-seo-checks-list');
+        if (listEl) {
+          listEl.innerHTML = checks.map(c => {
+            const icon = c.ok ? '<span class="text-emerald-400">✓</span>' : (c.warn ? '<span class="text-amber-400">⚠️</span>' : '<span class="text-red-400">✕</span>');
+            const color = c.ok ? 'text-[var(--text-secondary)]' : (c.warn ? 'text-amber-300' : 'text-zinc-400');
+            return `<div class="flex items-center gap-1.5 ${color}">${icon} <span>${escapeHtml(c.label)}</span></div>`;
+          }).join('');
+        }
       }
 
       function handleTitleInput() {
@@ -2166,6 +2747,8 @@
           const seoCounter = document.getElementById('m-seo-title-counter');
           if (seoCounter) seoCounter.textContent = `${len} / 60`;
         }
+
+        runLiveSeoAudit();
       }
 
       function handleSlugInput() {
@@ -2178,6 +2761,8 @@
 
         const seoSlugPreview = document.getElementById('seo-preview-slug');
         if (seoSlugPreview) seoSlugPreview.textContent = formatted || 'article-slug';
+
+        runLiveSeoAudit();
       }
 
       function regenerateSlug() {
@@ -2192,6 +2777,7 @@
           const seoSlugPreview = document.getElementById('seo-preview-slug');
           if (seoSlugPreview) seoSlugPreview.textContent = autoSlug || 'article-slug';
           showToast('Slug regenerated from title');
+          runLiveSeoAudit();
         }
       }
 
@@ -2248,6 +2834,8 @@
           const seoDescCounter = document.getElementById('m-seo-desc-counter');
           if (seoDescCounter) seoDescCounter.textContent = `${len} / 160`;
         }
+
+        runLiveSeoAudit();
       }
 
       function handleContentInput() {
@@ -2268,6 +2856,8 @@
         if (previewPane) {
           previewPane.innerHTML = renderMarkdown(content);
         }
+
+        runLiveSeoAudit();
       }
 
       function insertMarkdown(prefix, suffix = '', placeholder = 'text') {
@@ -2347,6 +2937,8 @@
           fallbackEl?.classList.remove('hidden');
           removeBtn?.classList.add('hidden');
         }
+
+        runLiveSeoAudit();
       }
 
       function removeImage() {
@@ -2477,6 +3069,8 @@
 
         const previewDesc = document.getElementById('seo-preview-desc');
         if (previewDesc) previewDesc.textContent = displayDesc;
+
+        runLiveSeoAudit();
       }
 
       async function handleSavePost(e, id = null, forceStatus = null) {
@@ -2779,6 +3373,8 @@
         uploadImageFile,
         handleStatusChange,
         handleSeoInput,
+        runLiveSeoAudit,
+        insertInternalLink,
         markDirty,
         hasUnsavedChanges,
         handleSavePost,

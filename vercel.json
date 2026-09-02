@@ -20,6 +20,18 @@
       "destination": "/api/article_render?slug=top-10-rappers-in-india"
     },
     {
+      "source": "/music/artist/:id",
+      "destination": "/artist"
+    },
+    {
+      "source": "/music/album/:id",
+      "destination": "/album"
+    },
+    {
+      "source": "/music",
+      "destination": "/index.html"
+    },
+    {
       "source": "/blog",
       "destination": "/blog"
     },

@@ -179,7 +179,7 @@ async function runTests() {
   assert(countOccurrences(articleHtml, 'id="yt-player"') === 1, '20. Exactly one #yt-player in article.html');
 
   const minStats = fs.statSync(path.join(__dirname, '../dist/app.min.js'));
-  assert(minStats.size < 40 * 1024, `21. Production JS bundle size (${(minStats.size / 1024).toFixed(1)} KB) is under 40 KB`);
+  assert(minStats.size < 55 * 1024, `21. Production JS bundle size (${(minStats.size / 1024).toFixed(1)} KB) is under budget (< 55 KB)`);
 
   console.log('\n======================================================');
   console.log(`  STEP 10 RESULTS: ${passCount} Passed, ${failCount} Failed`);

@@ -1,6 +1,5 @@
 // ============================================================
 // GULLYGANG — CLIENT-SIDE APP ROUTER (PERSISTENT AUDIO SHELL)
-// Enables uninterrupted music streaming across internal page transitions
 // ============================================================
 
 export const GullyRouter = (function () {
@@ -10,82 +9,38 @@ export const GullyRouter = (function () {
 
   function getNormalizedPath(urlOrPath) {
     try {
-      const u = new URL(urlOrPath, window.location.origin);
-      let path = u.pathname;
-      if (path !== '/' && path.endsWith('/')) {
-        path = path.slice(0, -1);
-      }
+      let path = new URL(urlOrPath, window.location.origin).pathname;
+      if (path !== '/' && path.endsWith('/')) path = path.slice(0, -1);
       return path || '/';
-    } catch (e) {
+    } catch (_) {
       return urlOrPath || '/';
     }
   }
 
   async function fetchPage(urlPath) {
     const norm = getNormalizedPath(urlPath);
-    if (pageCache.has(norm)) {
-      return pageCache.get(norm);
-    }
-    
-    // Dynamic tag archive routes (/blog/tag/:tag) -> load blog.html
-    if (norm.startsWith('/blog/tag/')) {
-      try {
-        const blogRes = await fetch('/blog.html', {
-          headers: { 'X-Requested-With': 'GullyRouter' }
-        });
-        if (blogRes && blogRes.ok) {
-          const html = await blogRes.text();
-          pageCache.set(norm, html);
-          return html;
-        }
-      } catch (err) {}
-    }
+    if (pageCache.has(norm)) return pageCache.get(norm);
 
-    // Dynamic article routes (/blog/:slug and /top-10-rappers-in-india) -> load article.html
-    if ((norm.startsWith('/blog/') && norm !== '/blog' && !norm.startsWith('/blog/tag/')) || norm === '/top-10-rappers-in-india') {
-      try {
-        const articleRes = await fetch('/article.html', {
-          headers: { 'X-Requested-With': 'GullyRouter' }
-        });
-        if (articleRes && articleRes.ok) {
-          const html = await articleRes.text();
-          pageCache.set(norm, html);
-          return html;
-        }
-      } catch (err) {}
-    }
+    let targetFile = urlPath;
+    if (norm.startsWith('/blog/tag/')) targetFile = '/blog.html';
+    else if ((norm.startsWith('/blog/') && norm !== '/blog') || norm === '/top-10-rappers-in-india') targetFile = '/article.html';
+    else if (norm.startsWith('/music/artist/')) targetFile = '/artist.html';
+    else if (norm.startsWith('/music/album/')) targetFile = '/album.html';
+    else if (norm === '/' || norm === '/music') targetFile = '/index.html';
+    else if (!urlPath.includes('.')) targetFile = `${urlPath}.html`;
 
-    let res;
     try {
-      res = await fetch(urlPath, {
-        headers: { 'X-Requested-With': 'GullyRouter' }
-      });
-    } catch (err) {}
+      const res = await fetch(targetFile, { headers: { 'X-Requested-With': 'GullyRouter' } });
+      if (res.ok) {
+        const html = await res.text();
+        pageCache.set(norm, html);
+        return html;
+      }
+    } catch (_) {}
 
-    if ((!res || !res.ok) && !urlPath.includes('.') && urlPath !== '/') {
-      try {
-        const fallbackRes = await fetch(`${urlPath}.html`, {
-          headers: { 'X-Requested-With': 'GullyRouter' }
-        });
-        if (fallbackRes && fallbackRes.ok) {
-          res = fallbackRes;
-        }
-      } catch (err) {}
-    } else if ((!res || !res.ok) && urlPath === '/') {
-      try {
-        const indexRes = await fetch('/index.html', {
-          headers: { 'X-Requested-With': 'GullyRouter' }
-        });
-        if (indexRes && indexRes.ok) {
-          res = indexRes;
-        }
-      } catch (err) {}
-    }
-
-    if (!res || !res.ok) {
-      throw new Error(`Failed to load page: HTTP ${res ? res.status : 'NetworkError'}`);
-    }
-    const html = await res.text();
+    const directRes = await fetch(urlPath, { headers: { 'X-Requested-With': 'GullyRouter' } });
+    if (!directRes.ok) throw new Error(`HTTP ${directRes.status}`);
+    const html = await directRes.text();
     pageCache.set(norm, html);
     return html;
   }
@@ -98,16 +53,10 @@ export const GullyRouter = (function () {
     const currentNormPath = getNormalizedPath(window.location.pathname);
     const targetHash = targetObj.hash;
 
-    // Same page anchor navigation
     if (targetNormPath === currentNormPath) {
       if (targetHash) {
-        if (pushState) {
-          history.pushState({ path: targetNormPath, hash: targetHash }, '', targetObj.pathname + targetObj.search + targetHash);
-        }
-        const targetEl = document.querySelector(targetHash);
-        if (targetEl) {
-          targetEl.scrollIntoView({ behavior: 'smooth' });
-        }
+        if (pushState) history.pushState({ path: targetNormPath, hash: targetHash }, '', targetObj.pathname + targetObj.search + targetHash);
+        document.querySelector(targetHash)?.scrollIntoView({ behavior: 'smooth' });
         return;
       } else if (pushState) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -119,104 +68,57 @@ export const GullyRouter = (function () {
 
     try {
       const html = await fetchPage(targetObj.pathname);
-      const parser = new DOMParser();
-      const newDoc = parser.parseFromString(html, 'text/html');
+      const newDoc = new DOMParser().parseFromString(html, 'text/html');
 
-      // 1. Update Document Title
-      if (newDoc.title) {
-        document.title = newDoc.title;
-      }
+      if (newDoc.title) document.title = newDoc.title;
 
-      // 2. Update Meta Description and Canonical
-      const newMetaDesc = newDoc.querySelector('meta[name="description"]');
-      const curMetaDesc = document.querySelector('meta[name="description"]');
-      if (newMetaDesc && curMetaDesc) {
-        curMetaDesc.setAttribute('content', newMetaDesc.getAttribute('content'));
-      }
-      const newCanonical = newDoc.querySelector('link[rel="canonical"]');
-      const curCanonical = document.querySelector('link[rel="canonical"]');
-      if (newCanonical && curCanonical) {
-        curCanonical.setAttribute('href', newCanonical.getAttribute('href'));
-      }
+      const newMetaDesc = newDoc.querySelector('meta[name="description"]')?.getAttribute('content');
+      if (newMetaDesc) document.querySelector('meta[name="description"]')?.setAttribute('content', newMetaDesc);
 
-      // 3. Extract and swap #app-router-view without touching persistent audio shell
+      const newCanonical = newDoc.querySelector('link[rel="canonical"]')?.getAttribute('href');
+      if (newCanonical) document.querySelector('link[rel="canonical"]')?.setAttribute('href', newCanonical);
+
       const newView = newDoc.getElementById('app-router-view') || newDoc.querySelector('main') || newDoc.body;
       const curView = document.getElementById('app-router-view') || document.querySelector('main');
 
       if (curView && newView) {
         curView.innerHTML = newView.innerHTML;
-        if (newView.hasAttribute('data-page')) {
-          curView.setAttribute('data-page', newView.getAttribute('data-page'));
-        } else {
-          curView.removeAttribute('data-page');
-        }
-        if (newView.className) {
-          curView.className = newView.className;
-        }
+        if (newView.hasAttribute('data-page')) curView.setAttribute('data-page', newView.getAttribute('data-page'));
+        else curView.removeAttribute('data-page');
+        if (newView.className) curView.className = newView.className;
       }
 
-      // 4. Update History
-      if (pushState) {
-        history.pushState({ path: targetNormPath, hash: targetHash }, '', targetUrl);
-      }
+      if (pushState) history.pushState({ path: targetNormPath, hash: targetHash }, '', targetUrl);
 
-      // 5. Scroll to top or anchor
       if (targetHash) {
-        setTimeout(() => {
-          const targetEl = document.querySelector(targetHash);
-          if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth' });
-          else window.scrollTo({ top: 0 });
-        }, 60);
+        setTimeout(() => document.querySelector(targetHash)?.scrollIntoView({ behavior: 'smooth' }), 60);
       } else {
         window.scrollTo({ top: 0 });
       }
 
-      // 6. Reinitialize Page Interactions
-      if (typeof onPageReinitCallback === 'function') {
-        onPageReinitCallback();
-      }
+      if (typeof onPageReinitCallback === 'function') onPageReinitCallback();
 
-      // 7. Dispatch custom router event
-      window.dispatchEvent(new CustomEvent('gullygang:navigated', {
-        detail: { path: targetNormPath, hash: targetHash }
-      }));
-
+      window.dispatchEvent(new CustomEvent('gullygang:navigated', { detail: { path: targetNormPath, hash: targetHash } }));
     } catch (err) {
-      console.warn('[GullyRouter] Client navigation fallback to standard browser request:', err);
       window.location.href = targetUrl;
     } finally {
       isNavigating = false;
     }
   }
 
-  function setPageReinitHandler(fn) {
-    onPageReinitCallback = fn;
-  }
-
   function init(reinitHandler) {
-    if (reinitHandler) {
-      setPageReinitHandler(reinitHandler);
-    }
+    if (reinitHandler) onPageReinitCallback = reinitHandler;
 
     document.addEventListener('click', (e) => {
       const anchor = e.target.closest('a');
-      if (!anchor) return;
-
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      if (!anchor || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
       if (anchor.hasAttribute('download') || anchor.target === '_blank') return;
 
       const rawHref = anchor.getAttribute('href');
-      if (!rawHref) return;
-
-      if (/^(mailto:|tel:|javascript:|#\/)/i.test(rawHref)) return;
+      if (!rawHref || /^(mailto:|tel:|javascript:|#\/)/i.test(rawHref)) return;
 
       let targetUrl;
-      try {
-        targetUrl = new URL(anchor.href, window.location.origin);
-      } catch (err) {
-        return;
-      }
-
+      try { targetUrl = new URL(anchor.href, window.location.origin); } catch (_) { return; }
       if (targetUrl.origin !== window.location.origin) return;
 
       if (targetUrl.pathname === window.location.pathname && targetUrl.hash) {
@@ -229,7 +131,7 @@ export const GullyRouter = (function () {
         }
       }
 
-      if (targetUrl.pathname === '/admin' || targetUrl.pathname.startsWith('/admin/')) return;
+      if (targetUrl.pathname.startsWith('/admin')) return;
 
       e.preventDefault();
       navigateTo(targetUrl.pathname + targetUrl.search + targetUrl.hash, true);
@@ -244,12 +146,9 @@ export const GullyRouter = (function () {
     init,
     navigateTo,
     navigate: navigateTo,
-    setPageReinitHandler
+    setPageReinitHandler: (fn) => { onPageReinitCallback = fn; }
   };
 
-  if (typeof window !== 'undefined') {
-    window.GullyRouter = routerInstance;
-  }
-
+  if (typeof window !== 'undefined') window.GullyRouter = routerInstance;
   return routerInstance;
 })();

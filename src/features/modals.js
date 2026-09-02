@@ -10,7 +10,7 @@ export const ThemeEngine = (function () {
     const curView = document.getElementById('app-router-view');
     const pageType = curView?.getAttribute('data-page');
     if (pageType === 'blog' || pageType === 'article') return true;
-    const path = (typeof window !== 'undefined' ? window.location.pathname : '');
+    const path = typeof window !== 'undefined' ? window.location.pathname : '';
     return path.startsWith('/blog') || path.startsWith('/top-10-rappers');
   }
 
@@ -26,58 +26,41 @@ export const ThemeEngine = (function () {
 
   function applyTheme(theme, persist = true) {
     const normalized = (theme === 'day' || theme === 'light') ? 'day' : 'night';
-    
+    const isDay = normalized === 'day';
+
     if (isBlogContext()) {
       document.documentElement.setAttribute('data-blog-theme', normalized);
-      document.documentElement.setAttribute('data-theme', normalized === 'day' ? 'light' : 'dark');
-      document.documentElement.classList.toggle('blog-day-theme', normalized === 'day');
-      document.documentElement.classList.toggle('blog-night-theme', normalized === 'night');
+      document.documentElement.setAttribute('data-theme', isDay ? 'light' : 'dark');
+      document.documentElement.classList.toggle('blog-day-theme', isDay);
+      document.documentElement.classList.toggle('blog-night-theme', !isDay);
     } else {
       document.documentElement.removeAttribute('data-blog-theme');
       document.documentElement.setAttribute('data-theme', 'dark');
-      document.documentElement.classList.remove('blog-day-theme');
-      document.documentElement.classList.remove('blog-night-theme');
+      document.documentElement.classList.remove('blog-day-theme', 'blog-night-theme');
     }
 
     if (persist && isBlogContext()) {
-      try {
-        localStorage.setItem(STORAGE_KEY, normalized);
-      } catch (_) {}
+      try { localStorage.setItem(STORAGE_KEY, normalized); } catch (_) {}
     }
 
-    updateToggleButtons(normalized);
-  }
-
-  function updateToggleButtons(theme) {
-    const toggleBtns = document.querySelectorAll('#btn-theme-toggle, .blog-theme-toggle-btn, .btn-theme-toggle');
-    toggleBtns.forEach((btn) => {
-      const sunIcon = btn.querySelector('.theme-icon-sun');
-      const moonIcon = btn.querySelector('.theme-icon-moon');
-      if (theme === 'day') {
-        sunIcon?.classList.add('hidden');
-        moonIcon?.classList.remove('hidden');
-        btn.setAttribute('aria-label', 'Switch to Night mode');
-        btn.setAttribute('title', 'Switch to Night mode');
-      } else {
-        sunIcon?.classList.remove('hidden');
-        moonIcon?.classList.add('hidden');
-        btn.setAttribute('aria-label', 'Switch to Day mode');
-        btn.setAttribute('title', 'Switch to Day mode');
-      }
+    document.querySelectorAll('#btn-theme-toggle, .blog-theme-toggle-btn, .btn-theme-toggle').forEach(btn => {
+      btn.querySelector('.theme-icon-sun')?.classList.toggle('hidden', isDay);
+      btn.querySelector('.theme-icon-moon')?.classList.toggle('hidden', !isDay);
+      const title = isDay ? 'Switch to Night mode' : 'Switch to Day mode';
+      btn.setAttribute('aria-label', title);
+      btn.setAttribute('title', title);
     });
   }
 
   function toggle() {
     if (!isBlogContext()) return;
     const current = document.documentElement.getAttribute('data-blog-theme') || getPreferredBlogTheme();
-    const newTheme = (current === 'day' || current === 'light') ? 'night' : 'day';
-    applyTheme(newTheme, true);
+    applyTheme(current === 'day' || current === 'light' ? 'night' : 'day', true);
   }
 
   function init() {
     if (isBlogContext()) {
-      const activeTheme = getPreferredBlogTheme();
-      applyTheme(activeTheme, false);
+      applyTheme(getPreferredBlogTheme(), false);
     } else {
       document.documentElement.removeAttribute('data-blog-theme');
       document.documentElement.setAttribute('data-theme', 'dark');
@@ -104,28 +87,21 @@ export const ThemeEngine = (function () {
     getTheme: () => isBlogContext() ? (document.documentElement.getAttribute('data-blog-theme') || getPreferredBlogTheme()) : 'night'
   };
 
-  if (typeof window !== 'undefined') {
-    window.ThemeEngine = engine;
-  }
-
+  if (typeof window !== 'undefined') window.ThemeEngine = engine;
   return engine;
 })();
 
 export const LegalPagesEngine = (function () {
   function init() {
-    // Delegated click handling for legal links
     if (!window.__gullygang_legal_delegation_attached) {
       window.__gullygang_legal_delegation_attached = true;
       document.addEventListener('click', (e) => {
         const legalBtn = e.target.closest('[data-legal-modal]');
         if (legalBtn) {
           e.preventDefault();
-          const targetModal = legalBtn.getAttribute('data-legal-modal');
-          openModal(targetModal);
+          openModal(legalBtn.getAttribute('data-legal-modal'));
         }
-
-        const closeBtn = e.target.closest('.legal-modal-close, [data-close-modal]');
-        if (closeBtn) {
+        if (e.target.closest('.legal-modal-close, [data-close-modal]')) {
           e.preventDefault();
           closeAllModals();
         }
@@ -134,10 +110,7 @@ export const LegalPagesEngine = (function () {
   }
 
   function openModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-      modal.classList.remove('hidden');
-    }
+    document.getElementById(id)?.classList.remove('hidden');
   }
 
   function closeAllModals() {
@@ -152,18 +125,13 @@ export const SupportEngine = (function () {
     if (!window.__gullygang_support_delegation_attached) {
       window.__gullygang_support_delegation_attached = true;
       document.addEventListener('click', (e) => {
-        const supportBtn = e.target.closest('#btn-support, .btn-support-trigger');
-        if (supportBtn) {
+        if (e.target.closest('#btn-support, .btn-support-trigger')) {
           e.preventDefault();
-          const modal = document.getElementById('support-modal');
-          if (modal) modal.classList.remove('hidden');
+          document.getElementById('support-modal')?.classList.remove('hidden');
         }
-
-        const closeSupport = e.target.closest('#btn-close-support, .support-modal-backdrop');
-        if (closeSupport) {
+        if (e.target.closest('#btn-close-support, .support-modal-backdrop')) {
           e.preventDefault();
-          const modal = document.getElementById('support-modal');
-          if (modal) modal.classList.add('hidden');
+          document.getElementById('support-modal')?.classList.add('hidden');
         }
       });
     }
@@ -172,30 +140,18 @@ export const SupportEngine = (function () {
   return { init };
 })();
 
-export function initFaqAccordion() {
-  const items = document.querySelectorAll('.faq-item');
-  items.forEach(item => {
-    const trigger = item.querySelector('.faq-question-btn');
+function setupAccordion(itemSelector, btnSelector) {
+  document.querySelectorAll(itemSelector).forEach(item => {
+    const trigger = item.querySelector(btnSelector);
     if (!trigger || trigger.dataset.bound) return;
     trigger.dataset.bound = 'true';
     trigger.addEventListener('click', () => {
       const isOpen = item.classList.contains('is-open');
-      items.forEach(i => i.classList.remove('is-open'));
+      document.querySelectorAll(itemSelector).forEach(i => i.classList.remove('is-open'));
       if (!isOpen) item.classList.add('is-open');
     });
   });
 }
 
-export function initEditorialExperienceAccordion() {
-  const expItems = document.querySelectorAll('.editorial-experience-item');
-  expItems.forEach(item => {
-    const trigger = item.querySelector('.editorial-experience-btn');
-    if (!trigger || trigger.dataset.bound) return;
-    trigger.dataset.bound = 'true';
-    trigger.addEventListener('click', () => {
-      const isOpen = item.classList.contains('is-open');
-      expItems.forEach(i => i.classList.remove('is-open'));
-      if (!isOpen) item.classList.add('is-open');
-    });
-  });
-}
+export const initFaqAccordion = () => setupAccordion('.faq-item', '.faq-question-btn');
+export const initEditorialExperienceAccordion = () => setupAccordion('.editorial-experience-item', '.editorial-experience-btn');
