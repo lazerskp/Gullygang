@@ -5,6 +5,7 @@
 import { state, DOM, escapeHtml, formatTime, normalizeThumbnailUrl } from './core/state.js';
 import { GullyRouter } from './core/router.js';
 import { RealtimeManager } from './realtime/realtime-manager.js';
+import { Analytics } from './analytics/analytics.js';
 import { BlogEngine } from './blog/feed.js';
 import { ArticleEngine } from './blog/article.js';
 import { PlaylistPreviewEngine } from './music/queue.js';
@@ -26,8 +27,13 @@ export function bootstrap() {
 
   restoreCachedWeatherIfValid();
 
+  // Initialize First-Party Analytics Engine & Track Initial Page View
+  Analytics.init();
+  Analytics.trackPageView();
+
   // Initialize Router and persistent engines
   GullyRouter.init(() => {
+    Analytics.trackPageView();
     ThemeEngine.init();
     BlogEngine.init();
     ArticleEngine.init();

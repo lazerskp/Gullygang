@@ -1,11 +1,7 @@
-// ============================================================
-// GULLYGANG — DYNAMIC ARTICLE READER ENGINE
-// Hydrates /blog/:slug articles with sanitized markdown, SEO, & related stories
-// ============================================================
-
 import { escapeHtml, normalizeTagSlug } from '../core/state.js';
 import { renderSafeMarkdown } from './markdown.js';
 import { RealtimeManager } from '../realtime/realtime-manager.js';
+import { Analytics } from '../analytics/analytics.js';
 
 export const ArticleEngine = (function () {
   let currentArticleSlug = null;
@@ -141,6 +137,9 @@ export const ArticleEngine = (function () {
 
     // 6. Dynamic SEO Tags
     updateDynamicSEO(article);
+
+    // Track Article View
+    Analytics.trackArticleView(article.id, window.location.pathname, article.title);
   }
 
   function updateDynamicSEO(article) {
@@ -180,11 +179,11 @@ export const ArticleEngine = (function () {
       if (res.ok) {
         const stories = await res.json();
         if (Array.isArray(stories) && stories.length > 0) {
-          feed.innerHTML = stories.map(s => {
+          feed.innerHTML = stories.map((s, idx) => {
             const url = `/blog/${s.slug}`;
             const dateStr = s.published_at ? new Date(s.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Editorial';
             return `
-              <a href="${url}" class="article-related-card group">
+              <a href="${url}" class="article-related-card group" data-related-id="${s.id}" data-related-pos="${idx + 1}">
                 <div class="article-related-thumb-wrap">
                   <img src="${s.featured_image || 'https://gullygang.in/brand-cover.png'}" alt="${escapeHtml(s.title)}" class="article-related-thumb" loading="lazy" decoding="async" onerror="this.src='https://gullygang.in/brand-cover.png'" />
                 </div>
@@ -195,6 +194,16 @@ export const ArticleEngine = (function () {
               </a>
             `;
           }).join('');
+
+          // Track clicks on related articles
+          feed.querySelectorAll('.article-related-card').forEach(card => {
+            card.onclick = () => {
+              const targetId = card.getAttribute('data-related-id');
+              const pos = card.getAttribute('data-related-pos');
+              Analytics.trackRelatedArticleClick(currentArticleData?.id, targetId, pos);
+            };
+          });
+
           document.getElementById('article-related-section')?.classList.remove('hidden');
           return;
         }

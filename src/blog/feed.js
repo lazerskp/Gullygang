@@ -1,10 +1,6 @@
-// ============================================================
-// GULLYGANG — EDITORIAL BLOG FEED ENGINE
-// Fast Search, Tag Discovery, Progressive Pagination & Realtime Sync
-// ============================================================
-
 import { escapeHtml, normalizeTagSlug } from '../core/state.js';
 import { RealtimeManager } from '../realtime/realtime-manager.js';
+import { Analytics } from '../analytics/analytics.js';
 
 export const BlogEngine = (function () {
   let isListening = false;
@@ -249,6 +245,9 @@ export const BlogEngine = (function () {
           }
         }
 
+        // Track search analytics with result count
+        Analytics.trackSearch(query, total);
+
         if (results.length > 0) {
           renderRecentStories(results, feed, false);
           updateLoadMoreButton();
@@ -287,6 +286,9 @@ export const BlogEngine = (function () {
     const humanTag = tagSlug.replace(/-/g, ' ').toUpperCase();
     if (tagTitle) tagTitle.textContent = humanTag;
     if (tagHeader) tagHeader.classList.remove('hidden');
+
+    // Track tag view
+    Analytics.trackTagView(tagSlug, `/blog/tag/${tagSlug}`);
 
     // Update document title and metadata for SEO
     document.title = `${humanTag} Articles | GULLYGANG Journal`;
@@ -350,6 +352,8 @@ export const BlogEngine = (function () {
         const newPosts = data.results || data.stories || (Array.isArray(data) ? data : []);
         hasMore = data.pagination?.has_more || false;
         currentPage = nextPage;
+
+        Analytics.trackLoadMore(nextPage, currentQuery, currentTag);
 
         if (newPosts.length > 0) {
           renderRecentStories(newPosts, feed, true);

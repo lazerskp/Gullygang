@@ -1,9 +1,5 @@
-// ============================================================
-// GULLYGANG — PLAYLIST PREVIEW & NOW PLAYING QUEUE ENGINE
-// Authoritative track list, active row indicator, and slideout panel
-// ============================================================
-
 import { state } from '../core/state.js';
+import { Analytics } from '../analytics/analytics.js';
 
 export const PlaylistPreviewEngine = (function () {
   let isOpen = false;
@@ -97,6 +93,10 @@ export const PlaylistPreviewEngine = (function () {
         if (!isNaN(targetIdx) && targetIdx >= 0 && targetIdx < tracks.length) {
           if (typeof onTrackSelectHandler === 'function') {
             onTrackSelectHandler(targetIdx);
+          }
+          const clickedTrack = tracks[targetIdx];
+          if (clickedTrack) {
+            Analytics.trackMusic('track_play', state.currentPlaylist?.id, clickedTrack.id, clickedTrack.title);
           }
           updateActiveState();
         }

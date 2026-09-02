@@ -402,6 +402,147 @@ module.exports = async function handler(req, res) {
     }
 
     // ==========================================================
+    // 4.5 PROTECTED FIRST-PARTY ANALYTICS & INTELLIGENCE
+    // ==========================================================
+    if (action.startsWith('analytics_') && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const period = (url.searchParams.get('period') || '7d').toLowerCase();
+
+      function getAnalyticsTimeFilter(p) {
+        if (p === 'today' || p === '1d') return `created_at >= CURRENT_DATE`;
+        if (p === '30d') return `created_at >= NOW() - INTERVAL '30 days'`;
+        if (p === 'all') return `1=1`;
+        return `created_at >= NOW() - INTERVAL '7 days'`;
+      }
+
+      const timeFilter = getAnalyticsTimeFilter(period);
+
+      // 1. Overview KPIs
+      if (action === 'analytics_overview') {
+        const rows = await queryInsForge(`
+          SELECT 
+            COUNT(CASE WHEN event_type = 'page_view' THEN 1 END)::int as page_views,
+            COUNT(CASE WHEN event_type = 'article_view' THEN 1 END)::int as article_views,
+            COUNT(DISTINCT session_id)::int as unique_visitors,
+            COUNT(CASE WHEN event_type = 'search' THEN 1 END)::int as searches,
+            COUNT(CASE WHEN event_type = 'search' AND (metadata->>'result_count')::int = 0 THEN 1 END)::int as zero_result_searches,
+            COUNT(CASE WHEN event_type = 'track_play' THEN 1 END)::int as music_plays
+          FROM analytics_events
+          WHERE ${timeFilter};
+        `);
+
+        const stats = rows[0] || {};
+        return res.status(200).json({
+          period,
+          page_views: stats.page_views || 0,
+          article_views: stats.article_views || 0,
+          unique_visitors: stats.unique_visitors || 0,
+          searches: stats.searches || 0,
+          zero_result_searches: stats.zero_result_searches || 0,
+          music_plays: stats.music_plays || 0
+        });
+      }
+
+      // 2. Top Articles Performance
+      if (action === 'analytics_articles') {
+        const rows = await queryInsForge(`
+          SELECT 
+            p.id, p.slug, p.title, p.author, p.published_at,
+            COUNT(CASE WHEN e.event_type = 'article_view' THEN 1 END)::int as views,
+            COUNT(CASE WHEN e.event_type = 'search_result_click' THEN 1 END)::int as search_clicks
+          FROM blog_posts p
+          LEFT JOIN analytics_events e ON p.id = e.article_id AND ${timeFilter}
+          WHERE p.status = 'published' OR (p.status = 'scheduled' AND p.scheduled_at <= NOW())
+          GROUP BY p.id
+          ORDER BY views DESC, search_clicks DESC
+          LIMIT 20;
+        `);
+        return res.status(200).json({ articles: rows });
+      }
+
+      // 3. Search Intelligence & Zero-Result Content Opportunities
+      if (action === 'analytics_searches') {
+        const [topSearches, zeroSearches] = await Promise.all([
+          queryInsForge(`
+            SELECT 
+              search_query,
+              COUNT(id)::int as search_count,
+              MAX(CASE WHEN (metadata->>'result_count')::int > 0 THEN 1 ELSE 0 END)::int as has_results
+            FROM analytics_events
+            WHERE event_type = 'search' AND search_query IS NOT NULL AND ${timeFilter}
+            GROUP BY search_query
+            ORDER BY search_count DESC
+            LIMIT 15;
+          `),
+          queryInsForge(`
+            SELECT 
+              search_query,
+              COUNT(id)::int as zero_count
+            FROM analytics_events
+            WHERE event_type = 'search' 
+              AND search_query IS NOT NULL 
+              AND (metadata->>'result_count')::int = 0
+              AND ${timeFilter}
+            GROUP BY search_query
+            ORDER BY zero_count DESC
+            LIMIT 15;
+          `)
+        ]);
+
+        return res.status(200).json({
+          searches: topSearches,
+          content_opportunities: zeroSearches
+        });
+      }
+
+      // 4. Popular Tags Performance
+      if (action === 'analytics_tags') {
+        const rows = await queryInsForge(`
+          SELECT 
+            tag,
+            COUNT(id)::int as views
+          FROM analytics_events
+          WHERE event_type = 'tag_view' AND tag IS NOT NULL AND ${timeFilter}
+          GROUP BY tag
+          ORDER BY views DESC
+          LIMIT 15;
+        `);
+        return res.status(200).json({ tags: rows });
+      }
+
+      // 5. Music Plays Leaderboard
+      if (action === 'analytics_music') {
+        const rows = await queryInsForge(`
+          SELECT 
+            COALESCE(metadata->>'title', 'Track ' || track_id) as track_title,
+            COUNT(id)::int as plays
+          FROM analytics_events
+          WHERE event_type = 'track_play' AND ${timeFilter}
+          GROUP BY track_title
+          ORDER BY plays DESC
+          LIMIT 10;
+        `);
+        return res.status(200).json({ tracks: rows });
+      }
+
+      // 6. Time-Series Trends
+      if (action === 'analytics_timeseries') {
+        const daysLimit = period === 'today' || period === '1d' ? 1 : (period === '30d' ? 30 : 7);
+        const rows = await queryInsForge(`
+          SELECT 
+            TO_CHAR(created_at, 'YYYY-MM-DD') as day,
+            COUNT(CASE WHEN event_type IN ('page_view', 'article_view') THEN 1 END)::int as views,
+            COUNT(CASE WHEN event_type = 'search' THEN 1 END)::int as searches
+          FROM analytics_events
+          WHERE created_at >= NOW() - INTERVAL '${daysLimit} days'
+          GROUP BY day
+          ORDER BY day ASC;
+        `);
+        return res.status(200).json({ timeseries: rows });
+      }
+    }
+
+    // ==========================================================
     // 5. PLAYLISTS CRUD
     // ==========================================================
     if (action === 'playlists') {

@@ -106,6 +106,10 @@
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
           <span>Overview</span>
         </button>
+        <button type="button" class="admin-nav-item" data-tab="analytics">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          <span>Analytics</span>
+        </button>
         <button type="button" class="admin-nav-item" data-tab="playlists">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15V6M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM12 12H3M16 6H3M12 18H3"/></svg>
           <span>Playlists</span>
@@ -223,6 +227,172 @@
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
                 <span>Add Background Visual</span>
               </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 1.5. ANALYTICS & INTELLIGENCE TAB -->
+        <section id="tab-analytics" class="admin-tab-panel hidden space-y-6">
+          <!-- Filter Header -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
+            <div>
+              <h2 class="text-lg font-extrabold text-[var(--text-primary)]">First-Party Analytics & Content Intelligence</h2>
+              <p class="text-xs text-[var(--text-secondary)]">Privacy-first visitor engagement, search queries, and content demand.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="analytics-period-toggle inline-flex rounded-lg p-1 bg-[var(--bg-card)] border border-[var(--border-subtle)]" role="group" aria-label="Time period selector">
+                <button type="button" class="analytics-period-btn px-3 py-1 text-xs font-bold rounded-md" data-period="today" onclick="AdminApp.setAnalyticsPeriod('today')">Today</button>
+                <button type="button" class="analytics-period-btn is-active px-3 py-1 text-xs font-bold rounded-md" data-period="7d" onclick="AdminApp.setAnalyticsPeriod('7d')">7 Days</button>
+                <button type="button" class="analytics-period-btn px-3 py-1 text-xs font-bold rounded-md" data-period="30d" onclick="AdminApp.setAnalyticsPeriod('30d')">30 Days</button>
+                <button type="button" class="analytics-period-btn px-3 py-1 text-xs font-bold rounded-md" data-period="all" onclick="AdminApp.setAnalyticsPeriod('all')">All Time</button>
+              </div>
+              <button type="button" class="admin-secondary-btn text-xs py-1.5 px-3" onclick="AdminApp.loadAnalytics()">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 6 KPI Stat Cards -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="admin-stat-card">
+              <span class="stat-label">Page Views</span>
+              <div class="stat-value-row">
+                <span id="stat-analytics-page-views" class="stat-num font-extrabold">--</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <span class="stat-label">Article Reads</span>
+              <div class="stat-value-row">
+                <span id="stat-analytics-article-views" class="stat-num font-extrabold text-emerald-400">--</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <span class="stat-label">Unique Visitors</span>
+              <div class="stat-value-row">
+                <span id="stat-analytics-unique-visitors" class="stat-num font-extrabold">--</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <span class="stat-label">Total Searches</span>
+              <div class="stat-value-row">
+                <span id="stat-analytics-searches" class="stat-num font-extrabold text-cyan-400">--</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <span class="stat-label">Zero-Result Searches</span>
+              <div class="stat-value-row">
+                <span id="stat-analytics-zero-searches" class="stat-num font-extrabold text-amber-400">--</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <span class="stat-label">Music Plays</span>
+              <div class="stat-value-row">
+                <span id="stat-analytics-music-plays" class="stat-num font-extrabold text-indigo-400">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trends Chart Card -->
+          <div class="admin-section-box">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)]">Engagement & Search Trends</h3>
+              <div class="flex items-center gap-4 text-xs">
+                <span class="flex items-center gap-1.5 text-emerald-400"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Views</span>
+                <span class="flex items-center gap-1.5 text-cyan-400"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Searches</span>
+              </div>
+            </div>
+            <div id="analytics-chart-svg-wrap" class="w-full bg-[var(--bg-main)]/50 p-4 rounded-xl border border-[var(--border-subtle)] flex items-center justify-center min-h-[190px]">
+              <div class="text-xs text-[var(--text-tertiary)] uppercase tracking-widest font-mono">Loading Trend Chart...</div>
+            </div>
+          </div>
+
+          <!-- 2-Column Content Intelligence Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Content Opportunities (Zero Result Searches) -->
+            <div class="admin-section-box">
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <h3 class="text-xs font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1.5">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    Content Opportunities (Zero-Result Searches)
+                  </h3>
+                  <p class="text-[11px] text-[var(--text-tertiary)]">Queries visitors searched for where no published articles existed.</p>
+                </div>
+              </div>
+              <div class="admin-table-container">
+                <table class="admin-data-table">
+                  <thead>
+                    <tr>
+                      <th>Search Query</th>
+                      <th>Demand</th>
+                      <th class="text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-zero-searches-body">
+                    <tr><td colspan="3" class="text-center py-6 text-[var(--text-tertiary)]">Loading opportunities...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Top Articles Performance -->
+            <div class="admin-section-box">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)]">Top Performing Stories</h3>
+              </div>
+              <div class="admin-table-container">
+                <table class="admin-data-table">
+                  <thead>
+                    <tr>
+                      <th>Story</th>
+                      <th>Views</th>
+                      <th>Search Clicks</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-articles-body">
+                    <tr><td colspan="3" class="text-center py-6 text-[var(--text-tertiary)]">Loading top articles...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2-Column Discovery & Music Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Popular Tags -->
+            <div class="admin-section-box">
+              <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)] mb-3">Popular Topic Tags</h3>
+              <div class="admin-table-container">
+                <table class="admin-data-table">
+                  <thead>
+                    <tr>
+                      <th>Tag</th>
+                      <th class="text-right">Total Views</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-tags-body">
+                    <tr><td colspan="2" class="text-center py-6 text-[var(--text-tertiary)]">Loading tags...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Top Music Plays -->
+            <div class="admin-section-box">
+              <h3 class="text-xs font-bold tracking-wider uppercase text-[var(--text-secondary)] mb-3">Top Played Music Tracks</h3>
+              <div class="admin-table-container">
+                <table class="admin-data-table">
+                  <thead>
+                    <tr>
+                      <th>Track Title</th>
+                      <th class="text-right">Plays</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-music-body">
+                    <tr><td colspan="2" class="text-center py-6 text-[var(--text-tertiary)]">Loading music data...</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
@@ -700,6 +870,7 @@
         });
         const titles = {
           overview: 'Overview',
+          analytics: 'Analytics & Content Intelligence',
           playlists: 'Playlists Management',
           songs: 'Songs & Queue',
           visuals: 'Visuals Atmosphere',
@@ -719,6 +890,7 @@
 
       function loadTabData(tabId) {
         if (tabId === 'overview') loadOverview();
+        if (tabId === 'analytics') loadAnalytics();
         if (tabId === 'playlists') loadPlaylists();
         if (tabId === 'songs') loadSongs();
         if (tabId === 'visuals') loadVisuals();
@@ -740,6 +912,176 @@
           document.getElementById('stat-blogs-published').textContent = c.blogs_published;
           document.getElementById('stat-blogs-total').textContent = `/ ${c.blogs_total} total`;
         }
+      }
+
+      let currentAnalyticsPeriod = '7d';
+
+      async function setAnalyticsPeriod(period) {
+        currentAnalyticsPeriod = period;
+        document.querySelectorAll('.analytics-period-btn').forEach(btn => {
+          btn.classList.toggle('is-active', btn.getAttribute('data-period') === period);
+        });
+        await loadAnalytics();
+      }
+
+      async function loadAnalytics(isSilent = false) {
+        const period = currentAnalyticsPeriod;
+        const [overviewRes, articlesRes, searchesRes, tagsRes, musicRes, timeseriesRes] = await Promise.all([
+          apiRequest(`analytics_overview&period=${period}`),
+          apiRequest(`analytics_articles&period=${period}`),
+          apiRequest(`analytics_searches&period=${period}`),
+          apiRequest(`analytics_tags&period=${period}`),
+          apiRequest(`analytics_music&period=${period}`),
+          apiRequest(`analytics_timeseries&period=${period}`)
+        ]);
+
+        if (overviewRes.ok && overviewRes.data) {
+          const d = overviewRes.data;
+          document.getElementById('stat-analytics-page-views').textContent = (d.page_views || 0).toLocaleString();
+          document.getElementById('stat-analytics-article-views').textContent = (d.article_views || 0).toLocaleString();
+          document.getElementById('stat-analytics-unique-visitors').textContent = (d.unique_visitors || 0).toLocaleString();
+          document.getElementById('stat-analytics-searches').textContent = (d.searches || 0).toLocaleString();
+          document.getElementById('stat-analytics-zero-searches').textContent = (d.zero_result_searches || 0).toLocaleString();
+          document.getElementById('stat-analytics-music-plays').textContent = (d.music_plays || 0).toLocaleString();
+        }
+
+        // Render Zero-Result Searches (Content Opportunities)
+        const zeroBody = document.getElementById('analytics-zero-searches-body');
+        if (zeroBody && searchesRes.ok) {
+          const opps = searchesRes.data.content_opportunities || [];
+          if (opps.length === 0) {
+            zeroBody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-[var(--text-tertiary)]">No unfulfilled searches in this period 🎉</td></tr>';
+          } else {
+            zeroBody.innerHTML = opps.map(o => `
+              <tr>
+                <td class="font-medium text-[var(--text-primary)] font-mono text-xs">"${escapeHtml(o.search_query)}"</td>
+                <td><span class="admin-badge-pill bg-amber-500/10 text-amber-400 border-amber-500/20">${o.zero_count} searches</span></td>
+                <td class="text-right">
+                  <button type="button" class="admin-secondary-btn text-xs py-1 px-2.5" onclick="AdminApp.switchTab('blog'); AdminApp.openAddPostModal('${escapeHtml(o.search_query.replace(/'/g, "\\'"))}');">
+                    Write Story &rarr;
+                  </button>
+                </td>
+              </tr>
+            `).join('');
+          }
+        }
+
+        // Render Top Articles Performance
+        const articlesBody = document.getElementById('analytics-articles-body');
+        if (articlesBody && articlesRes.ok) {
+          const arts = articlesRes.data.articles || [];
+          if (arts.length === 0) {
+            articlesBody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-[var(--text-tertiary)]">No article views recorded yet</td></tr>';
+          } else {
+            articlesBody.innerHTML = arts.map(a => `
+              <tr>
+                <td>
+                  <p class="font-bold text-[var(--text-primary)] line-clamp-1">${escapeHtml(a.title)}</p>
+                  <p class="text-xs text-[var(--text-tertiary)]">/${escapeHtml(a.slug)}</p>
+                </td>
+                <td class="font-extrabold text-[var(--text-primary)]">${a.views || 0}</td>
+                <td class="text-[var(--text-secondary)] font-mono text-xs">${a.search_clicks || 0}</td>
+              </tr>
+            `).join('');
+          }
+        }
+
+        // Render Popular Tags
+        const tagsBody = document.getElementById('analytics-tags-body');
+        if (tagsBody && tagsRes.ok) {
+          const tags = tagsRes.data.tags || [];
+          if (tags.length === 0) {
+            tagsBody.innerHTML = '<tr><td colspan="2" class="text-center py-6 text-[var(--text-tertiary)]">No tag views recorded</td></tr>';
+          } else {
+            tagsBody.innerHTML = tags.map(t => `
+              <tr>
+                <td><span class="admin-badge-pill">${escapeHtml(t.tag)}</span></td>
+                <td class="font-extrabold text-right text-[var(--text-primary)]">${t.views || 0}</td>
+              </tr>
+            `).join('');
+          }
+        }
+
+        // Render Music Plays
+        const musicBody = document.getElementById('analytics-music-body');
+        if (musicBody && musicRes.ok) {
+          const tracks = musicRes.data.tracks || [];
+          if (tracks.length === 0) {
+            musicBody.innerHTML = '<tr><td colspan="2" class="text-center py-6 text-[var(--text-tertiary)]">No music plays recorded</td></tr>';
+          } else {
+            musicBody.innerHTML = tracks.map(tr => `
+              <tr>
+                <td class="font-medium text-[var(--text-primary)] text-xs line-clamp-1">${escapeHtml(tr.track_title)}</td>
+                <td class="font-extrabold text-right text-emerald-400">${tr.plays || 0}</td>
+              </tr>
+            `).join('');
+          }
+        }
+
+        // Render SVG Time-Series Chart
+        if (timeseriesRes.ok && timeseriesRes.data.timeseries) {
+          renderAnalyticsChart(timeseriesRes.data.timeseries);
+        }
+      }
+
+      function renderAnalyticsChart(data) {
+        const svgContainer = document.getElementById('analytics-chart-svg-wrap');
+        if (!svgContainer) return;
+
+        if (!data || data.length === 0) {
+          svgContainer.innerHTML = '<div class="py-12 text-center text-xs text-[var(--text-tertiary)] uppercase tracking-widest font-mono">No trend data for this period</div>';
+          return;
+        }
+
+        const width = 800;
+        const height = 180;
+        const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+
+        const maxViews = Math.max(...data.map(d => d.views || 0), 5);
+        const maxSearches = Math.max(...data.map(d => d.searches || 0), 5);
+        const maxY = Math.max(maxViews, maxSearches);
+
+        const innerWidth = width - padding.left - padding.right;
+        const innerHeight = height - padding.top - padding.bottom;
+
+        const xStep = data.length > 1 ? innerWidth / (data.length - 1) : innerWidth;
+
+        const getX = i => padding.left + i * xStep;
+        const getY = val => padding.top + innerHeight - ((val / maxY) * innerHeight);
+
+        const viewsPoints = data.map((d, i) => `${getX(i)},${getY(d.views || 0)}`).join(' ');
+        const searchesPoints = data.map((d, i) => `${getX(i)},${getY(d.searches || 0)}`).join(' ');
+
+        const viewsArea = `${padding.left},${padding.top + innerHeight} ` + viewsPoints + ` ${getX(data.length - 1)},${padding.top + innerHeight}`;
+
+        let xLabelsHtml = '';
+        data.forEach((d, i) => {
+          if (data.length <= 8 || i % Math.ceil(data.length / 6) === 0 || i === data.length - 1) {
+            const shortDate = (d.day || '').slice(5);
+            xLabelsHtml += `<text x="${getX(i)}" y="${height - 8}" text-anchor="middle" font-size="10" fill="var(--text-tertiary)" font-family="monospace">${shortDate}</text>`;
+          }
+        });
+
+        svgContainer.innerHTML = `
+          <svg viewBox="0 0 ${width} ${height}" class="w-full h-44 overflow-visible" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <line x1="${padding.left}" y1="${padding.top}" x2="${width - padding.right}" y2="${padding.top}" stroke="var(--border-subtle)" stroke-dasharray="3 3"/>
+            <line x1="${padding.left}" y1="${padding.top + innerHeight / 2}" x2="${width - padding.right}" y2="${padding.top + innerHeight / 2}" stroke="var(--border-subtle)" stroke-dasharray="3 3"/>
+            <line x1="${padding.left}" y1="${padding.top + innerHeight}" x2="${width - padding.right}" y2="${padding.top + innerHeight}" stroke="var(--border-subtle)"/>
+            
+            <polygon points="${viewsArea}" fill="url(#viewsGradient)"/>
+            
+            <polyline points="${viewsPoints}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="${searchesPoints}" fill="none" stroke="#06b6d4" stroke-width="2" stroke-dasharray="4 2" stroke-linecap="round" stroke-linejoin="round"/>
+            
+            ${xLabelsHtml}
+          </svg>
+        `;
       }
 
       async function loadPlaylists(isSilent = false) {
@@ -1494,8 +1836,12 @@
         return isFormDirty;
       }
 
-      function openAddPostModal() {
-        openPostModal(null);
+      function openAddPostModal(prefillTitle = '') {
+        if (prefillTitle && typeof prefillTitle === 'string') {
+          openPostModal({ title: prefillTitle.trim() });
+        } else {
+          openPostModal(null);
+        }
       }
 
       async function openEditPostModal(id) {
@@ -1505,12 +1851,12 @@
       }
 
       function openPostModal(p = null) {
-        editingPostId = p ? p.id : null;
+        const isEdit = !!(p && p.id);
+        editingPostId = isEdit ? p.id : null;
         isFormDirty = false;
 
-        const isEdit = !!p;
         const initialTitle = p?.title || '';
-        const initialSlug = p?.slug || '';
+        const initialSlug = p?.slug || (initialTitle ? generateSlug(initialTitle) : '');
         const initialExcerpt = p?.excerpt || '';
         const initialContent = p?.content || '';
         const initialImg = p?.featured_image || '';
@@ -2384,6 +2730,8 @@
         init,
         switchTab,
         loadTabData,
+        setAnalyticsPeriod,
+        loadAnalytics,
         loadPlaylists,
         loadSongs,
         debounceLoadSongs,
