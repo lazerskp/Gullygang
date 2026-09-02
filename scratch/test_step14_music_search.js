@@ -215,9 +215,55 @@ async function runTestSuite() {
   {
     const analyticsJs = fs.readFileSync(path.join(__dirname, '..', 'api', 'analytics.js'), 'utf8');
     assert(analyticsJs.includes("'music_search'") && analyticsJs.includes("'music_search_result_click'"), 'api/analytics.js whitelists music_search and music_search_result_click');
-
     const clientAnalyticsJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'analytics', 'analytics.js'), 'utf8');
     assert(clientAnalyticsJs.includes('trackMusicSearch') && clientAnalyticsJs.includes('trackMusicSearchResultClick'), 'src/analytics/analytics.js implements music search tracking helpers');
+  }
+
+  // --- 8. Music Search Trigger, Route Coverage & PJAX Resilience ---
+  console.log('\n--- 8. Music Search Trigger & Route Coverage Audit ---');
+  {
+    const templates = [
+      { name: 'index.html', file: 'index.html' },
+      { name: 'blog.html', file: 'blog.html' },
+      { name: 'article.html', file: 'article.html' },
+      { name: 'artist.html', file: 'artist.html' },
+      { name: 'album.html', file: 'album.html' }
+    ];
+
+    templates.forEach(({ name, file }) => {
+      const html = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+      assert(html.includes('data-music-search-trigger'), `${name} has data-music-search-trigger on search button`);
+      assert(html.includes('btn-music-search-trigger'), `${name} has .btn-music-search-trigger class`);
+      assert(html.includes('id="btn-music-search-nav"'), `${name} has #btn-music-search-nav ID`);
+      assert(html.includes('id="music-search-modal"'), `${name} contains #music-search-modal container`);
+      assert(html.includes('id="music-search-backdrop"'), `${name} contains #music-search-backdrop`);
+      assert(html.includes('id="music-search-input"'), `${name} contains #music-search-input`);
+    });
+
+    // Check src/main.js imports search.js and exposes MusicSearchEngine
+    const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+    assert(mainJs.includes("from './music/search.js'"), 'src/main.js imports src/music/search.js');
+    assert(mainJs.includes('MusicSearchEngine.init()'), 'src/main.js initializes MusicSearchEngine');
+    assert(mainJs.includes('MusicSearchEngine'), 'src/main.js exports/exposes MusicSearchEngine');
+
+    // Check search.js uses document-level event delegation for PJAX safety
+    const searchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'music', 'search.js'), 'utf8');
+    assert(searchJs.includes('setupEventDelegation'), 'src/music/search.js defines setupEventDelegation');
+    assert(searchJs.includes("closest('[data-music-search-trigger]"), 'src/music/search.js listens for data-music-search-trigger via event delegation');
+    assert(searchJs.includes('keydown'), 'src/music/search.js attaches global keydown handler');
+    assert(searchJs.includes("k === 'k'") && searchJs.includes("k === '/'"), 'src/music/search.js handles Cmd/Ctrl+K and / shortcuts');
+
+    // Check app.js contains MusicSearchEngine with PJAX event delegation
+    const appJs = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    assert(appJs.includes('MusicSearchEngine = (function'), 'app.js contains native MusicSearchEngine');
+    assert(appJs.includes('window.MusicSearchEngine = MusicSearchEngine'), 'app.js exports window.MusicSearchEngine');
+    assert(appJs.includes("closest('[data-music-search-trigger]"), 'app.js uses document event delegation for music search triggers');
+    assert(appJs.includes('MusicSearchEngine.init()'), 'app.js invokes MusicSearchEngine.init() on bootstrap');
+
+    // Check dist/app.min.js contains search initialization
+    const appMinJs = fs.readFileSync(path.join(__dirname, '..', 'dist', 'app.min.js'), 'utf8');
+    assert(appMinJs.includes('data-music-search-trigger'), 'dist/app.min.js includes music search trigger selector');
+    assert(appMinJs.includes('music-search-modal'), 'dist/app.min.js includes music-search-modal reference');
   }
 
   console.log('\n===========================================================');

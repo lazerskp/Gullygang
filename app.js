@@ -7627,6 +7627,9 @@
       SupportEngine.init();
       PlaylistSyncEngine.init();
       PlaylistPreviewEngine.init();
+      if (typeof MusicSearchEngine !== 'undefined' && typeof MusicSearchEngine.init === 'function') {
+        MusicSearchEngine.init();
+      }
       AdsterraEngine.init();
       initScrollReveal();
     }
@@ -7743,6 +7746,658 @@
     return routerInstance;
   })();
 
+  // ============================================================
+  // GULLYGANG UNIVERSAL MUSIC SEARCH ENGINE (PJAX & ROUTE RESILIENT)
+  // Provides instant search, suggestions, and seamless direct playback
+  // ============================================================
+  const MusicSearchEngine = (function () {
+    let isModalOpen = false;
+    let activeSearchController = null;
+    let activeSuggestionsController = null;
+    let debounceTimer = null;
+    let lastSearchedQuery = '';
+    let currentResults = null;
+    let currentSuggestions = [];
+    let selectedSuggestionIndex = -1;
+    let activeFilter = 'all';
+
+    function setupEventDelegation() {
+      if (document._musicSearchDelegationSetup) return;
+      document._musicSearchDelegationSetup = true;
+
+      // 1. Document-level click delegation for all search triggers across all routes
+      document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('[data-music-search-trigger], .btn-music-search-trigger, #btn-music-search-nav, #btn-music-search-mobile');
+        if (trigger) {
+          e.preventDefault();
+          open();
+          return;
+        }
+
+        if (e.target.closest('#btn-close-music-search, .music-search-close-btn')) {
+          e.preventDefault();
+          close();
+          return;
+        }
+
+        if (e.target.matches('#music-search-backdrop')) {
+          e.preventDefault();
+          close();
+          return;
+        }
+      });
+
+      // 2. Global keyboard shortcuts: Cmd+K, Ctrl+K, /, Escape
+      document.addEventListener('keydown', (e) => {
+        const k = e.key ? e.key.toLowerCase() : '';
+        if ((e.metaKey || e.ctrlKey) && k === 'k') {
+          e.preventDefault();
+          toggle();
+        } else if (k === '/' && !isModalOpen) {
+          const active = document.activeElement;
+          const tag = active?.tagName?.toLowerCase();
+          const isInput = tag === 'input' || tag === 'textarea' || active?.isContentEditable;
+          if (!isInput) {
+            e.preventDefault();
+            open();
+          }
+        } else if (e.key === 'Escape' && isModalOpen) {
+          e.preventDefault();
+          close();
+        }
+      });
+    }
+
+    function bindModalInputs() {
+      const input = document.getElementById('music-search-input');
+      const clearBtn = document.getElementById('music-search-clear');
+
+      if (input && !input._searchBound) {
+        input._searchBound = true;
+        input.addEventListener('input', (e) => {
+          const val = e.target.value;
+          clearBtn?.classList.toggle('hidden', !val);
+          handleInputChange(val);
+        });
+        input.addEventListener('keydown', handleInputKeydown);
+        input.addEventListener('focus', () => {
+          if (input.value.trim().length >= 2 && currentSuggestions.length > 0) {
+            showSuggestions();
+          }
+        });
+      }
+
+      if (clearBtn && !clearBtn._searchBound) {
+        clearBtn._searchBound = true;
+        clearBtn.addEventListener('click', () => {
+          if (input) {
+            input.value = '';
+            input.focus();
+          }
+          clearBtn.classList.add('hidden');
+          hideSuggestions();
+          renderEmptyState();
+        });
+      }
+
+      document.querySelectorAll('.music-search-filter-btn').forEach(b => {
+        if (!b._searchBound) {
+          b._searchBound = true;
+          b.addEventListener('click', () => setFilter(b.getAttribute('data-filter') || 'all'));
+        }
+      });
+    }
+
+    function init() {
+      if (typeof document === 'undefined') return;
+      setupEventDelegation();
+      bindModalInputs();
+    }
+
+    function open(initialQuery = '') {
+      const modal = document.getElementById('music-search-modal');
+      const backdrop = document.getElementById('music-search-backdrop');
+      if (!modal) return;
+
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+      if (backdrop) {
+        backdrop.classList.remove('hidden');
+        backdrop.setAttribute('aria-hidden', 'false');
+      }
+      document.body.classList.add('music-search-open');
+      isModalOpen = true;
+
+      bindModalInputs();
+
+      const input = document.getElementById('music-search-input');
+      if (input) {
+        if (initialQuery) {
+          input.value = initialQuery;
+          document.getElementById('music-search-clear')?.classList.remove('hidden');
+          performSearch(initialQuery);
+        } else if (!input.value) {
+          renderEmptyState();
+        }
+        setTimeout(() => {
+          input.focus();
+          input.select();
+        }, 50);
+      }
+    }
+
+    function close() {
+      const modal = document.getElementById('music-search-modal');
+      const backdrop = document.getElementById('music-search-backdrop');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+      if (backdrop) {
+        backdrop.classList.add('hidden');
+        backdrop.setAttribute('aria-hidden', 'true');
+      }
+      document.body.classList.remove('music-search-open');
+      isModalOpen = false;
+      hideSuggestions();
+
+      if (activeSearchController) {
+        activeSearchController.abort();
+        activeSearchController = null;
+      }
+      if (activeSuggestionsController) {
+        activeSuggestionsController.abort();
+        activeSuggestionsController = null;
+      }
+    }
+
+    function toggle() {
+      if (isModalOpen) close();
+      else open();
+    }
+
+    function handleInputChange(val) {
+      const query = (val || '').trim();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (query.length < 2) {
+        hideSuggestions();
+        if (query.length === 0) renderEmptyState();
+        return;
+      }
+      debounceTimer = setTimeout(() => {
+        fetchSuggestions(query);
+        performSearch(query);
+      }, 260);
+    }
+
+    function handleInputKeydown(e) {
+      const suggestionsEl = document.getElementById('music-search-suggestions');
+      const isVisible = suggestionsEl && !suggestionsEl.classList.contains('hidden');
+
+      if (e.key === 'ArrowDown') {
+        if (isVisible && currentSuggestions.length > 0) {
+          e.preventDefault();
+          selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, currentSuggestions.length - 1);
+          updateSelectedSuggestion();
+        }
+      } else if (e.key === 'ArrowUp') {
+        if (isVisible && currentSuggestions.length > 0) {
+          e.preventDefault();
+          selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1);
+          updateSelectedSuggestion();
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const input = document.getElementById('music-search-input');
+        const selected = (isVisible && selectedSuggestionIndex >= 0) ? currentSuggestions[selectedSuggestionIndex] : input?.value.trim();
+        if (selected && selected.length >= 2) {
+          if (input) input.value = selected;
+          hideSuggestions();
+          performSearch(selected);
+        }
+      } else if (e.key === 'Escape') {
+        if (isVisible) {
+          e.stopPropagation();
+          hideSuggestions();
+        } else {
+          close();
+        }
+      }
+    }
+
+    async function fetchSuggestions(query) {
+      if (activeSuggestionsController) activeSuggestionsController.abort();
+      activeSuggestionsController = new AbortController();
+      try {
+        const res = await fetch(`/api/music?action=suggestions&q=${encodeURIComponent(query)}`, {
+          signal: activeSuggestionsController.signal
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.suggestions)) {
+          currentSuggestions = data.suggestions;
+          renderSuggestions();
+        }
+      } catch (_) {
+        currentSuggestions = [];
+        hideSuggestions();
+      }
+    }
+
+    function renderSuggestions() {
+      const el = document.getElementById('music-search-suggestions');
+      if (!el || !currentSuggestions?.length) {
+        hideSuggestions();
+        return;
+      }
+      selectedSuggestionIndex = -1;
+      el.innerHTML = currentSuggestions.map((sug, idx) => `
+        <div class="music-search-suggestion-item" role="option" id="sug-item-${idx}" data-index="${idx}" data-query="${escapeHtml(sug)}">
+          <svg class="suggestion-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <span class="suggestion-text">${escapeHtml(sug)}</span>
+        </div>
+      `).join('');
+      el.classList.remove('hidden');
+
+      el.querySelectorAll('.music-search-suggestion-item').forEach(item => {
+        item.onclick = () => {
+          const q = item.getAttribute('data-query');
+          const input = document.getElementById('music-search-input');
+          if (input && q) {
+            input.value = q;
+            hideSuggestions();
+            performSearch(q);
+          }
+        };
+      });
+    }
+
+    function updateSelectedSuggestion() {
+      const el = document.getElementById('music-search-suggestions');
+      if (!el) return;
+      el.querySelectorAll('.music-search-suggestion-item').forEach((item, idx) => {
+        const isSelected = idx === selectedSuggestionIndex;
+        item.classList.toggle('is-selected', isSelected);
+        item.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+      });
+    }
+
+    function hideSuggestions() {
+      document.getElementById('music-search-suggestions')?.classList.add('hidden');
+      selectedSuggestionIndex = -1;
+    }
+
+    function showSuggestions() {
+      if (currentSuggestions.length > 0) {
+        document.getElementById('music-search-suggestions')?.classList.remove('hidden');
+      }
+    }
+
+    async function performSearch(query) {
+      const cleanQuery = (query || '').trim();
+      if (cleanQuery.length < 2) {
+        renderEmptyState();
+        return;
+      }
+
+      lastSearchedQuery = cleanQuery;
+      renderLoadingState();
+
+      if (activeSearchController) activeSearchController.abort();
+      activeSearchController = new AbortController();
+
+      try {
+        const res = await fetch(`/api/music?action=search&q=${encodeURIComponent(cleanQuery)}&type=${encodeURIComponent(activeFilter)}&limit=25`, {
+          signal: activeSearchController.signal
+        });
+        if (!res.ok) {
+          renderNotice('notice', 'Notice', 'Music search is temporarily unavailable.', true);
+          return;
+        }
+        const data = await res.json();
+        if (data?.success && data.results) {
+          currentResults = data.results;
+          trackEvent('music_search', { query: cleanQuery, filter: activeFilter });
+          renderResults();
+        } else {
+          renderNotice('empty', 'No results found', 'Try another song, artist, album or video.');
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          renderNotice('notice', 'Notice', 'Couldn\'t search right now.', true);
+        }
+      }
+    }
+
+    function setFilter(filter) {
+      if (activeFilter === filter) return;
+      activeFilter = filter;
+      document.querySelectorAll('.music-search-filter-btn').forEach(btn => {
+        const isActive = btn.getAttribute('data-filter') === filter;
+        btn.classList.toggle('is-active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+      if (lastSearchedQuery) performSearch(lastSearchedQuery);
+    }
+
+    function renderLoadingState() {
+      const el = document.getElementById('music-search-results');
+      if (!el) return;
+      el.innerHTML = `
+        <div class="music-search-skeletons space-y-3 p-4">
+          ${[1, 2, 3, 4].map(() => `
+            <div class="flex items-center gap-3 p-2 rounded-lg bg-white/5 animate-pulse">
+              <div class="w-12 h-12 rounded bg-white/10 shrink-0"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-3.5 bg-white/10 rounded w-3/5"></div>
+                <div class="h-2.5 bg-white/5 rounded w-2/5"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderNotice(type, title, desc, retry = false) {
+      const el = document.getElementById('music-search-results');
+      if (!el) return;
+      el.innerHTML = `
+        <div class="music-search-empty-state text-center py-16 px-4">
+          <div class="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3 ${type === 'start' ? 'text-[var(--accent)]' : 'text-white/40'}">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </div>
+          <h3 class="text-sm font-semibold text-white mb-1">${escapeHtml(title)}</h3>
+          <p class="text-xs text-white/50 max-w-xs mx-auto mb-3">${escapeHtml(desc)}</p>
+          ${retry ? '<button type="button" class="btn-subtle text-xs px-3 py-1" onclick="MusicSearchEngine.retrySearch()">Retry</button>' : ''}
+        </div>
+      `;
+    }
+
+    function renderEmptyState() {
+      renderNotice('start', 'Search millions of songs & artists', 'Explore songs, artists, albums, and videos.');
+    }
+
+    function navigateToEntity(path) {
+      close();
+      if (window.GullyRouter && typeof window.GullyRouter.navigateTo === 'function') {
+        window.GullyRouter.navigateTo(path);
+      } else {
+        window.location.href = path;
+      }
+    }
+
+    function renderResults() {
+      const el = document.getElementById('music-search-results');
+      if (!el || !currentResults) return;
+
+      if (activeFilter === 'all' && typeof currentResults === 'object' && !Array.isArray(currentResults)) {
+        renderGroupedView(currentResults, el);
+      } else if (activeFilter === 'artists' && Array.isArray(currentResults)) {
+        renderArtistsView(currentResults, el);
+      } else if (activeFilter === 'albums' && Array.isArray(currentResults)) {
+        renderAlbumsView(currentResults, el);
+      } else {
+        const tracks = Array.isArray(currentResults) ? currentResults : (currentResults.songs || []);
+        renderTracksView(tracks, el);
+      }
+    }
+
+    function renderGroupedView(grouped, el) {
+      const { top = [], songs = [], artists = [], albums = [], videos = [] } = grouped;
+      const topItem = top[0];
+      if (!topItem && !songs.length && !artists.length && !albums.length && !videos.length) {
+        renderNotice('empty', 'No results found', 'Try another search query.');
+        return;
+      }
+
+      let topHtml = '';
+      if (topItem) {
+        const isArtist = topItem.resultType === 'artist';
+        const isAlbum = topItem.resultType === 'album';
+        const title = escapeHtml(topItem.name || topItem.title || 'Result');
+        const thumb = escapeHtml(topItem.thumbnail || 'https://gullygang.in/brand-cover.png');
+        const badge = isArtist ? 'Artist' : (isAlbum ? 'Album' : 'Song');
+        const sub = isArtist ? (topItem.subscribers ? `${escapeHtml(topItem.subscribers)} subs` : 'Artist') : escapeHtml(topItem.artist || 'GULLYGANG');
+        const act = isArtist ? `data-action="open-artist" data-id="${escapeHtml(topItem.id)}"` : (isAlbum ? `data-action="open-album" data-id="${escapeHtml(topItem.id)}"` : `data-action="play-top"`);
+
+        topHtml = `
+          <div class="space-y-2">
+            <h4 class="text-[11px] font-mono font-bold text-white/40 uppercase tracking-wider px-1">Top Result</h4>
+            <div class="group flex items-center gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.07] transition-all cursor-pointer" ${act}>
+              <div class="${isArtist ? 'w-16 h-16 rounded-full' : 'w-16 h-16 rounded-xl'} overflow-hidden bg-black/40 shrink-0">
+                <img src="${thumb}" alt="${title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="eager" onerror="this.src='https://gullygang.in/brand-cover.png'" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <span class="inline-block px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-mono uppercase tracking-widest text-[var(--accent)] mb-1">${badge}</span>
+                <h3 class="text-base font-bold text-white truncate group-hover:text-[var(--accent)]">${title}</h3>
+                <p class="text-xs text-white/60 truncate">${sub}</p>
+              </div>
+              <div class="shrink-0 text-white/40 group-hover:text-[var(--accent)]">
+                ${isArtist ? '<span class="text-xs font-semibold text-[var(--accent)]">View Artist →</span>' : (isAlbum ? '<span class="text-xs font-semibold text-[var(--accent)]">View Album →</span>' : '<div class="w-9 h-9 rounded-full bg-[var(--accent)] text-black flex items-center justify-center font-bold">▶</div>')}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      el.innerHTML = `
+        <div class="space-y-6 p-2">
+          ${topHtml}
+          ${songs.length ? `
+            <div class="space-y-2">
+              <div class="flex items-center justify-between px-1">
+                <h4 class="text-[11px] font-mono font-bold text-white/40 uppercase tracking-wider">Songs</h4>
+                <button type="button" class="text-[11px] text-[var(--accent)] font-semibold" data-action="filter-tab" data-filter="songs">See All</button>
+              </div>
+              <div class="divide-y divide-white/5 bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
+                ${songs.slice(0, 4).map((s, idx) => `
+                  <div class="group flex items-center gap-3 p-2.5 hover:bg-white/5 transition-colors cursor-pointer" data-action="play-song" data-index="${idx}">
+                    <div class="relative w-11 h-11 rounded-lg overflow-hidden bg-black/40 shrink-0">
+                      <img src="${escapeHtml(s.thumbnail || 'https://gullygang.in/brand-cover.png')}" class="w-full h-full object-cover" alt="${escapeHtml(s.title)}" loading="lazy" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <h4 class="text-xs sm:text-sm font-medium text-white truncate group-hover:text-[var(--accent)]">${escapeHtml(s.title)}</h4>
+                      <p class="text-[11px] text-white/50 truncate">${escapeHtml(s.artist || 'GULLYGANG')}</p>
+                    </div>
+                    <span class="text-[11px] text-white/40 tabular-nums shrink-0">${s.duration || '0:00'}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          ${albums.length ? `
+            <div class="space-y-2">
+              <div class="flex items-center justify-between px-1">
+                <h4 class="text-[11px] font-mono font-bold text-white/40 uppercase tracking-wider">Albums</h4>
+                <button type="button" class="text-[11px] text-[var(--accent)] font-semibold" data-action="filter-tab" data-filter="albums">See All</button>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                ${albums.slice(0, 3).map(a => `
+                  <div class="group flex flex-col p-2 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-all cursor-pointer" data-action="open-album" data-id="${escapeHtml(a.id)}">
+                    <div class="aspect-square w-full rounded-lg overflow-hidden mb-2 bg-black/40">
+                      <img src="${escapeHtml(a.thumbnail || 'https://gullygang.in/brand-cover.png')}" alt="${escapeHtml(a.title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+                    </div>
+                    <h5 class="text-xs font-semibold text-white truncate group-hover:text-[var(--accent)]">${escapeHtml(a.title)}</h5>
+                    <span class="text-[10px] text-white/50 truncate">${escapeHtml(a.artist || 'GULLYGANG')}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          ${artists.length ? `
+            <div class="space-y-2">
+              <div class="flex items-center justify-between px-1">
+                <h4 class="text-[11px] font-mono font-bold text-white/40 uppercase tracking-wider">Artists</h4>
+                <button type="button" class="text-[11px] text-[var(--accent)] font-semibold" data-action="filter-tab" data-filter="artists">See All</button>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                ${artists.slice(0, 3).map(art => `
+                  <div class="group flex flex-col items-center text-center p-2.5 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-all cursor-pointer" data-action="open-artist" data-id="${escapeHtml(art.id)}">
+                    <div class="w-16 h-16 rounded-full overflow-hidden mb-2 bg-black/40 ring-2 ring-white/10 group-hover:ring-[var(--accent)] transition-all">
+                      <img src="${escapeHtml(art.thumbnail || 'https://gullygang.in/brand-cover.png')}" alt="${escapeHtml(art.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+                    </div>
+                    <h5 class="text-xs font-semibold text-white truncate max-w-full group-hover:text-[var(--accent)]">${escapeHtml(art.name)}</h5>
+                    <span class="text-[10px] text-white/40">Artist</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      // Handlers for grouped items
+      el.querySelectorAll('[data-action="open-artist"]').forEach(btn => {
+        btn.onclick = () => navigateToEntity(`/music/artist/${btn.getAttribute('data-id')}`);
+      });
+      el.querySelectorAll('[data-action="open-album"]').forEach(btn => {
+        btn.onclick = () => navigateToEntity(`/music/album/${btn.getAttribute('data-id')}`);
+      });
+      el.querySelectorAll('[data-action="play-song"]').forEach(row => {
+        const idx = parseInt(row.getAttribute('data-index'), 10);
+        row.onclick = () => playTrackImmediately(songs[idx], idx);
+      });
+      el.querySelectorAll('[data-action="play-top"]').forEach(card => {
+        card.onclick = () => playTrackImmediately(topItem, 0);
+      });
+      el.querySelectorAll('[data-action="filter-tab"]').forEach(btn => {
+        btn.onclick = () => setFilter(btn.getAttribute('data-filter'));
+      });
+    }
+
+    function renderTracksView(tracks, el) {
+      if (!tracks?.length) {
+        renderNotice('empty', 'No tracks found', 'Try another search query.');
+        return;
+      }
+      el.innerHTML = `
+        <div class="music-search-results-list divide-y divide-white/5" role="list">
+          ${tracks.map((track, idx) => `
+            <div class="music-search-result-row group flex items-center gap-3 p-3 hover:bg-white/5 transition-colors rounded-xl cursor-pointer" data-index="${idx}">
+              <div class="relative w-12 h-12 rounded-lg overflow-hidden bg-black/40 shrink-0">
+                <img src="${escapeHtml(track.thumbnail || 'https://gullygang.in/brand-cover.png')}" class="w-full h-full object-cover" alt="${escapeHtml(track.title)}" loading="lazy" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <h4 class="text-sm font-medium text-white truncate group-hover:text-[var(--accent)]">${escapeHtml(track.title)}</h4>
+                <p class="text-xs text-white/50 truncate">${escapeHtml(track.artist || 'GULLYGANG')}</p>
+              </div>
+              <span class="text-xs text-white/40 tabular-nums">${track.duration || '0:00'}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      el.querySelectorAll('.music-search-result-row').forEach(row => {
+        const idx = parseInt(row.getAttribute('data-index'), 10);
+        row.onclick = () => playTrackImmediately(tracks[idx], idx);
+      });
+    }
+
+    function renderArtistsView(artists, el) {
+      if (!artists?.length) {
+        renderNotice('empty', 'No artists found', 'Try another search query.');
+        return;
+      }
+      el.innerHTML = `
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-3">
+          ${artists.map(art => `
+            <div class="group flex flex-col items-center text-center p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-all cursor-pointer" data-id="${escapeHtml(art.id)}">
+              <div class="w-20 h-20 rounded-full overflow-hidden mb-2 bg-black/40 ring-2 ring-white/10 group-hover:ring-[var(--accent)] transition-all">
+                <img src="${escapeHtml(art.thumbnail || 'https://gullygang.in/brand-cover.png')}" alt="${escapeHtml(art.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+              </div>
+              <h5 class="text-xs font-semibold text-white truncate max-w-full group-hover:text-[var(--accent)]">${escapeHtml(art.name)}</h5>
+              <span class="text-[10px] text-white/40">Artist</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      el.querySelectorAll('.group[data-id]').forEach(card => {
+        card.onclick = () => navigateToEntity(`/music/artist/${card.getAttribute('data-id')}`);
+      });
+    }
+
+    function renderAlbumsView(albums, el) {
+      if (!albums?.length) {
+        renderNotice('empty', 'No albums found', 'Try another search query.');
+        return;
+      }
+      el.innerHTML = `
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-3">
+          ${albums.map(alb => `
+            <div class="group flex flex-col p-2.5 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-all cursor-pointer" data-id="${escapeHtml(alb.id)}">
+              <div class="aspect-square w-full rounded-xl overflow-hidden mb-2 bg-black/40">
+                <img src="${escapeHtml(alb.thumbnail || 'https://gullygang.in/brand-cover.png')}" alt="${escapeHtml(alb.title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+              </div>
+              <h5 class="text-xs font-semibold text-white truncate group-hover:text-[var(--accent)]">${escapeHtml(alb.title)}</h5>
+              <span class="text-[10px] text-white/50 truncate">${escapeHtml(alb.artist || 'GULLYGANG')}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      el.querySelectorAll('.group[data-id]').forEach(card => {
+        card.onclick = () => navigateToEntity(`/music/album/${card.getAttribute('data-id')}`);
+      });
+    }
+
+    function playTrackImmediately(track, position = 1) {
+      if (!track) return;
+      const trackId = track.videoId || track.id;
+      trackEvent('music_search_result_click', { song_id: trackId, title: track.title });
+
+      const normTrack = {
+        id: trackId,
+        videoId: trackId,
+        title: track.title || 'Untitled Track',
+        artist: track.artist || 'GULLYGANG',
+        thumbnail: track.thumbnail || 'https://gullygang.in/brand-cover.png',
+        duration: track.duration || '0:00',
+        duration_seconds: track.duration_seconds || 0,
+        source: 'ytmusic'
+      };
+
+      if (!Array.isArray(state.tracks)) state.tracks = [];
+      const curIdx = state.currentIndex || 0;
+      state.tracks.splice(curIdx, 0, normTrack);
+      state.currentIndex = curIdx;
+
+      if (typeof loadTrackAtIndex === 'function') {
+        loadTrackAtIndex(curIdx, true, 'direct');
+      } else if (window.GullyMusic?.loadTrackAtIndex) {
+        window.GullyMusic.loadTrackAtIndex(curIdx, true, 'direct');
+      }
+
+      showToast(`Playing "${normTrack.title}"`);
+      close();
+    }
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'fixed bottom-24 right-6 z-50 px-4 py-2.5 rounded-xl bg-black/90 text-white text-xs border border-white/10 shadow-2xl backdrop-blur-md';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }
+
+    function retrySearch() {
+      if (lastSearchedQuery) performSearch(lastSearchedQuery);
+    }
+
+    return {
+      init,
+      open,
+      close,
+      toggle,
+      performSearch,
+      retrySearch,
+      setFilter,
+      playTrackImmediately,
+      isOpen: () => isModalOpen
+    };
+  })();
+
+  if (typeof window !== 'undefined') {
+    window.MusicSearchEngine = MusicSearchEngine;
+  }
+
   // --- Bootstrap ---
   function init() {
     let clockTimer = null;
@@ -7757,6 +8412,13 @@
 
     // Immediately restore cached weather if valid to prevent blank UI or layout shift
     restoreCachedWeatherIfValid();
+
+    // Immediately initialize Universal Music Search so all triggers & shortcuts work instantly
+    try {
+      MusicSearchEngine.init();
+    } catch (err) {
+      console.error('[MusicSearch] Startup error:', err);
+    }
 
     let lastWeatherFetch = 0;
     function refreshWeatherIfStale(force = false) {

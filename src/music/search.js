@@ -16,68 +16,143 @@ export const MusicSearchEngine = (function () {
   let selectedSuggestionIndex = -1;
   let activeFilter = 'all';
 
-  function init() {
-    if (typeof document === 'undefined') return;
+  function setupEventDelegation() {
+    if (document._musicSearchDelegationSetup) return;
+    document._musicSearchDelegationSetup = true;
 
-    document.addEventListener('keydown', (e) => {
-      const k = e.key.toLowerCase();
-      if ((e.metaKey || e.ctrlKey) && k === 'k') { e.preventDefault(); toggle(); }
-      else if (k === '/' && !isModalOpen) {
-        const tag = document.activeElement?.tagName?.toLowerCase();
-        if (tag !== 'input' && tag !== 'textarea' && !document.activeElement?.isContentEditable) { e.preventDefault(); open(); }
-      } else if (e.key === 'Escape' && isModalOpen) { e.preventDefault(); close(); }
+    // Document-level click delegation for all triggers, close buttons, and backdrop
+    document.addEventListener('click', (e) => {
+      // 1. Search trigger button click (Desktop, Mobile, Nav, or inline)
+      const trigger = e.target.closest('[data-music-search-trigger], .btn-music-search-trigger, #btn-music-search-nav, #btn-music-search-mobile');
+      if (trigger) {
+        e.preventDefault();
+        open();
+        return;
+      }
+
+      // 2. Close search modal button
+      if (e.target.closest('#btn-close-music-search, .music-search-close-btn')) {
+        e.preventDefault();
+        close();
+        return;
+      }
+
+      // 3. Click backdrop
+      if (e.target.matches('#music-search-backdrop')) {
+        e.preventDefault();
+        close();
+        return;
+      }
     });
 
-    document.querySelectorAll('.btn-music-search-trigger, #btn-music-search-nav, #btn-music-search-mobile').forEach(b => b.onclick = (e) => { e.preventDefault(); open(); });
-    document.getElementById('music-search-backdrop')?.addEventListener('click', close);
-    document.getElementById('btn-close-music-search')?.addEventListener('click', close);
+    // Document-level keyboard shortcuts: Cmd+K, Ctrl+K, /, Escape
+    document.addEventListener('keydown', (e) => {
+      const k = e.key ? e.key.toLowerCase() : '';
+      if ((e.metaKey || e.ctrlKey) && k === 'k') {
+        e.preventDefault();
+        toggle();
+      } else if (k === '/' && !isModalOpen) {
+        const active = document.activeElement;
+        const tag = active?.tagName?.toLowerCase();
+        const isInput = tag === 'input' || tag === 'textarea' || active?.isContentEditable;
+        if (!isInput) {
+          e.preventDefault();
+          open();
+        }
+      } else if (e.key === 'Escape' && isModalOpen) {
+        e.preventDefault();
+        close();
+      }
+    });
+  }
 
+  function bindModalInputs() {
     const input = document.getElementById('music-search-input');
     const clearBtn = document.getElementById('music-search-clear');
-    if (input) {
-      input.oninput = (e) => {
+    if (input && !input._searchBound) {
+      input._searchBound = true;
+      input.addEventListener('input', (e) => {
         const val = e.target.value;
         clearBtn?.classList.toggle('hidden', !val);
         handleInputChange(val);
-      };
-      input.onkeydown = handleInputKeydown;
-      input.onfocus = () => { if (input.value.trim().length >= 2 && currentSuggestions.length > 0) showSuggestions(); };
+      });
+      input.addEventListener('keydown', handleInputKeydown);
+      input.addEventListener('focus', () => {
+        if (input.value.trim().length >= 2 && currentSuggestions.length > 0) {
+          showSuggestions();
+        }
+      });
     }
 
-    if (clearBtn) {
-      clearBtn.onclick = () => {
-        if (input) { input.value = ''; input.focus(); }
+    if (clearBtn && !clearBtn._searchBound) {
+      clearBtn._searchBound = true;
+      clearBtn.addEventListener('click', () => {
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
         clearBtn.classList.add('hidden');
         hideSuggestions();
         renderEmptyState();
-      };
+      });
     }
 
-    document.querySelectorAll('.music-search-filter-btn').forEach(b => b.onclick = () => setFilter(b.getAttribute('data-filter') || 'all'));
+    document.querySelectorAll('.music-search-filter-btn').forEach(b => {
+      if (!b._searchBound) {
+        b._searchBound = true;
+        b.addEventListener('click', () => setFilter(b.getAttribute('data-filter') || 'all'));
+      }
+    });
+  }
+
+  function init() {
+    if (typeof document === 'undefined') return;
+    setupEventDelegation();
+    bindModalInputs();
   }
 
   function open(initialQuery = '') {
     const modal = document.getElementById('music-search-modal');
-    const input = document.getElementById('music-search-input');
+    const backdrop = document.getElementById('music-search-backdrop');
     if (!modal) return;
     modal.classList.remove('hidden');
-    document.getElementById('music-search-backdrop')?.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    if (backdrop) {
+      backdrop.classList.remove('hidden');
+      backdrop.setAttribute('aria-hidden', 'false');
+    }
     document.body.classList.add('music-search-open');
     isModalOpen = true;
 
+    bindModalInputs();
+
+    const input = document.getElementById('music-search-input');
     if (input) {
       if (initialQuery) {
         input.value = initialQuery;
         document.getElementById('music-search-clear')?.classList.remove('hidden');
         performSearch(initialQuery);
-      } else if (!input.value) renderEmptyState();
-      setTimeout(() => input.focus(), 50);
+      } else if (!input.value) {
+        renderEmptyState();
+      }
+      setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 50);
     }
   }
 
   function close() {
-    document.getElementById('music-search-modal')?.classList.add('hidden');
-    document.getElementById('music-search-backdrop')?.classList.add('hidden');
+    const modal = document.getElementById('music-search-modal');
+    const backdrop = document.getElementById('music-search-backdrop');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+    if (backdrop) {
+      backdrop.classList.add('hidden');
+      backdrop.setAttribute('aria-hidden', 'true');
+    }
     document.body.classList.remove('music-search-open');
     isModalOpen = false;
     hideSuggestions();
@@ -261,10 +336,13 @@ export const MusicSearchEngine = (function () {
     if (window.MusicDiscoveryEngine) return window.MusicDiscoveryEngine;
     try {
       const m = await import('./discovery.js');
-      return m.MusicDiscoveryEngine || window.MusicDiscoveryEngine;
-    } catch (_) {
-      return null;
-    }
+      if (m?.MusicDiscoveryEngine) return m.MusicDiscoveryEngine;
+    } catch (_) {}
+    try {
+      const m2 = await import('/dist/discovery.min.js');
+      if (m2?.MusicDiscoveryEngine) return m2.MusicDiscoveryEngine;
+    } catch (_) {}
+    return window.MusicDiscoveryEngine || null;
   }
 
   async function renderResults() {
@@ -283,7 +361,35 @@ export const MusicSearchEngine = (function () {
     };
 
     const engine = await getDiscoveryEngine();
-    if (!engine) return;
+    if (!engine) {
+      // Direct robust fallback renderer
+      const tracks = Array.isArray(currentResults) ? currentResults : (currentResults.songs || currentResults.top || []);
+      if (!tracks.length) {
+        renderNotice('empty', 'No results found', 'Try another search query.');
+        return;
+      }
+      el.innerHTML = `
+        <div class="music-search-results-list divide-y divide-white/5" role="list">
+          ${tracks.map((t, idx) => `
+            <div class="music-search-result-row group flex items-center gap-3 p-3 hover:bg-white/5 transition-colors rounded-xl cursor-pointer" data-index="${idx}">
+              <div class="relative w-12 h-12 rounded-lg overflow-hidden bg-black/40 shrink-0">
+                <img src="${normalizeThumbnailUrl(t.thumbnail, t.videoId || t.id)}" class="w-full h-full object-cover" alt="${escapeHtml(t.title)}" loading="lazy" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <h4 class="text-sm font-medium text-white truncate group-hover:text-[var(--accent)]">${escapeHtml(t.title)}</h4>
+                <p class="text-xs text-white/50 truncate">${escapeHtml(t.artist || 'GULLYGANG')}</p>
+              </div>
+              <span class="text-xs text-white/40 tabular-nums">${t.duration || '0:00'}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      el.querySelectorAll('.music-search-result-row').forEach(row => {
+        const idx = parseInt(row.getAttribute('data-index'), 10);
+        row.onclick = () => playTrackImmediately(tracks[idx], idx);
+      });
+      return;
+    }
 
     if (activeFilter === 'all' && typeof currentResults === 'object' && !Array.isArray(currentResults)) {
       engine.renderGrouped(currentResults, el, callbacks);
