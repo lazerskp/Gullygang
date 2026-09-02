@@ -1,0 +1,23 @@
+project-includes = ["services/ytmusic"]
+project-excludes = [
+    "**/node_modules",
+    "**/dist",
+    "**/scratch",
+    "**/migrations",
+    "**/src",
+    "**/api",
+    "**/__pycache__",
+    "**/.*",
+    "__pyrefly_virtual__",
+    "**/__pyrefly_virtual__/**",
+]
+python-platform = "all"
+python-version = "3.10.0"
+infer-with-first-use = false
+
+[errors]
+missing-import = "ignore"
+untyped-import = "ignore"
+parse-error = "ignore"
+unknown-name = "ignore"
+invalid-syntax = "ignore"

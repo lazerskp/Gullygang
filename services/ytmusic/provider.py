@@ -11,7 +11,7 @@ import json
 import urllib.request
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 try:
     from ytmusicapi import YTMusic
@@ -217,7 +217,7 @@ class YTMusicProvider:
         else:
             return self.normalize_track(item)
 
-    def search(self, query: str, limit: int = 20, filter_type: Optional[str] = "all") -> Dict[str, Any]:
+    def search(self, query: str, limit: int = 20, filter_type: Optional[str] = "all") -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         query = (query or "").strip()
         if len(query) < 2:
             return {"top": [], "songs": [], "artists": [], "albums": [], "videos": []} if filter_type == "all" else []
