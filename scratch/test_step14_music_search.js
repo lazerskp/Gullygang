@@ -116,6 +116,28 @@ async function runTestSuite() {
 
     const badMethodRes = await mockMusicApi('/api/music?action=search&q=Divine', 'POST');
     assert(badMethodRes.statusCode === 405, `Rejects non-GET methods with HTTP 405 (got ${badMethodRes.statusCode})`);
+
+    // Known real searches verification
+    const tsRes = await mockMusicApi('/api/music?action=search&q=Taylor+Swift&type=all&limit=5');
+    assert(tsRes.statusCode === 200 && tsRes.data.success, 'Known search: Taylor Swift returns success 200');
+    assert(tsRes.data.results?.songs?.length > 0 || tsRes.data.results?.top?.length > 0, 'Taylor Swift search returns entities');
+
+    const tuRes = await mockMusicApi('/api/music?action=search&q=tu&type=all&limit=5');
+    assert(tuRes.statusCode === 200 && tuRes.data.success, 'Known search: "tu" returns success 200');
+    assert(tuRes.data.results?.songs?.length > 0, '"tu" search returns populated songs');
+
+    const asRes = await mockMusicApi('/api/music?action=search&q=Arijit+Singh&type=artists&limit=5');
+    assert(asRes.statusCode === 200 && asRes.data.success, 'Known search: Arijit Singh (artists) returns success 200');
+    assert(asRes.data.results?.length > 0, 'Arijit Singh search returns artist entities');
+
+    const tumRes = await mockMusicApi('/api/music?action=search&q=Tum+Hi+Ho&type=songs&limit=5');
+    assert(tumRes.statusCode === 200 && tumRes.data.success, 'Known search: Tum Hi Ho (songs) returns success 200');
+    assert(tumRes.data.results?.length > 0, 'Tum Hi Ho search returns song entities');
+
+    // Health endpoint check
+    const healthRes = await mockMusicApi('/api/music?action=health');
+    assert(healthRes.statusCode === 200, 'Health endpoint returns HTTP 200');
+    assert(healthRes.data && healthRes.data.available === true, 'Health check reports provider available: true');
   }
 
   // --- 2. Live Search Suggestions API ---

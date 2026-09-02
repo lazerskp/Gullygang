@@ -96,6 +96,12 @@ module.exports = async function handler(req, res) {
       const limit = Math.min(30, Math.max(1, parseInt(queryObj.limit, 10) || 20));
       const searchType = String(queryObj.type || queryObj.filter || 'all').toLowerCase().trim();
       const results = await musicProvider.searchMusic(q, limit, searchType);
+      if (!results || results.success === false) {
+        return sendJson(503, {
+          success: false,
+          error: 'Music search provider temporarily unavailable'
+        });
+      }
 
       return sendJson(200, results, 'public, max-age=300, s-maxage=600, stale-while-revalidate=120');
     }
@@ -187,10 +193,19 @@ module.exports = async function handler(req, res) {
       return sendJson(200, related, 'public, max-age=300, s-maxage=600, stale-while-revalidate=120');
     }
 
+    // -----------------------------------------------------------
+    // 6. PROVIDER HEALTH CHECK
+    // -----------------------------------------------------------
+    if (action === 'health') {
+      const health = await musicProvider.getHealth();
+      const statusCode = health.available ? 200 : 503;
+      return sendJson(statusCode, health, 'no-store');
+    }
+
     // Unknown action
     return sendJson(400, {
       success: false,
-      error: `Unknown music API action: "${action}". Supported: "search", "artist", "album", "suggestions", "related".`
+      error: `Unknown music API action: "${action}". Supported: "search", "artist", "album", "suggestions", "related", "health".`
     });
 
   } catch (err) {

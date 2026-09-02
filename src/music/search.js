@@ -277,18 +277,29 @@ export const MusicSearchEngine = (function () {
       const res = await fetch(`/api/music?action=search&q=${encodeURIComponent(cleanQuery)}&type=${encodeURIComponent(activeFilter)}&limit=25`, {
         signal: activeSearchController.signal
       });
-      if (!res.ok) { renderNotice('notice', 'Notice', 'Music search is temporarily unavailable.', true); return; }
+      if (!res.ok) {
+        renderNotice('notice', 'Music search is temporarily unavailable', 'Please try again in a moment.', true);
+        return;
+      }
       const data = await res.json();
       if (data?.success && data.results) {
         currentResults = data.results;
-        const count = Array.isArray(data.results) ? data.results.length : ((data.results.songs?.length || 0) + (data.results.artists?.length || 0) + (data.results.albums?.length || 0));
+        const count = Array.isArray(data.results)
+          ? data.results.length
+          : ((data.results.songs?.length || 0) + (data.results.artists?.length || 0) + (data.results.albums?.length || 0) + (data.results.top?.length || 0));
+        if (count === 0) {
+          renderNotice('empty', 'No results found', 'Try another artist, song, or album.');
+          return;
+        }
         Analytics.trackMusicSearch(cleanQuery, count);
         renderResults();
       } else {
-        renderNotice('empty', 'No results found', 'Try another song, artist, album or video.');
+        renderNotice('notice', 'Music search is temporarily unavailable', 'Please try again in a moment.', true);
       }
     } catch (err) {
-      if (err.name !== 'AbortError') renderNotice('notice', 'Notice', 'Couldn\'t search right now.', true);
+      if (err.name !== 'AbortError') {
+        renderNotice('notice', 'Music search is temporarily unavailable', 'Please try again in a moment.', true);
+      }
     }
   }
 
@@ -306,7 +317,12 @@ export const MusicSearchEngine = (function () {
   function renderLoadingState() {
     const el = document.getElementById('music-search-results');
     if (!el) return;
-    el.innerHTML = `<div class="music-search-skeletons space-y-3 p-4">${[1, 2, 3, 4].map(() => `<div class="flex items-center gap-3 p-2 rounded-lg bg-white/5 animate-pulse"><div class="w-12 h-12 rounded bg-white/10 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3.5 bg-white/10 rounded w-3/5"></div><div class="h-2.5 bg-white/5 rounded w-2/5"></div></div></div>`).join('')}</div>`;
+    el.innerHTML = `
+      <div class="music-search-skeletons space-y-3 p-4">
+        <div class="music-search-loading text-center py-2 text-xs font-medium text-white/50 animate-pulse">Searching music...</div>
+        ${[1, 2, 3, 4].map(() => `<div class="flex items-center gap-3 p-2 rounded-lg bg-white/5 animate-pulse"><div class="w-12 h-12 rounded bg-white/10 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3.5 bg-white/10 rounded w-3/5"></div><div class="h-2.5 bg-white/5 rounded w-2/5"></div></div></div>`).join('')}
+      </div>
+    `;
   }
 
   function renderNotice(type, title, desc, retry = false) {

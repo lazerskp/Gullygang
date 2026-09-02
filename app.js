@@ -8051,20 +8051,27 @@
           signal: activeSearchController.signal
         });
         if (!res.ok) {
-          renderNotice('notice', 'Notice', 'Music search is temporarily unavailable.', true);
+          renderNotice('notice', 'Music search is temporarily unavailable', 'Please try again in a moment.', true);
           return;
         }
         const data = await res.json();
         if (data?.success && data.results) {
           currentResults = data.results;
+          const count = Array.isArray(data.results)
+            ? data.results.length
+            : ((data.results.songs?.length || 0) + (data.results.artists?.length || 0) + (data.results.albums?.length || 0) + (data.results.top?.length || 0));
+          if (count === 0) {
+            renderNotice('empty', 'No results found', 'Try another artist, song, or album.');
+            return;
+          }
           trackEvent('music_search', { query: cleanQuery, filter: activeFilter });
           renderResults();
         } else {
-          renderNotice('empty', 'No results found', 'Try another song, artist, album or video.');
+          renderNotice('notice', 'Music search is temporarily unavailable', 'Please try again in a moment.', true);
         }
       } catch (err) {
         if (err.name !== 'AbortError') {
-          renderNotice('notice', 'Notice', 'Couldn\'t search right now.', true);
+          renderNotice('notice', 'Music search is temporarily unavailable', 'Please try again in a moment.', true);
         }
       }
     }
@@ -8085,6 +8092,7 @@
       if (!el) return;
       el.innerHTML = `
         <div class="music-search-skeletons space-y-3 p-4">
+          <div class="music-search-loading text-center py-2 text-xs font-medium text-white/50 animate-pulse">Searching music...</div>
           ${[1, 2, 3, 4].map(() => `
             <div class="flex items-center gap-3 p-2 rounded-lg bg-white/5 animate-pulse">
               <div class="w-12 h-12 rounded bg-white/10 shrink-0"></div>
